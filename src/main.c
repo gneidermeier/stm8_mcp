@@ -29,12 +29,14 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
+u8 forceCommutation; // switch input to test "commutation" logic
 u8 latch_T4_is_zero;
 u8 zero_xing;         // flag for ... we'll seee .... ??? !!!! ;)
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 u16 T4counter = 0;
 //unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
 u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
+u16 duty_cycle;
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -285,51 +287,35 @@ u16 updateChannels(s8 selectedChannel)
  */
 u16 updateLED0(u16 dwell){
 
-  u16 dc_counts = T4_count_pd;
+  u16 dc_counts =  ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
 
-  dc_counts = ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
-// not a clue here ... stupid f'in 8-bit C coding crap
-/*
-        if ( T4counter < dc_counts )
-        {
-            GPIOD->ODR |= (1 << LED);
-        }
-        else
-        {
-            GPIOD->ODR &= ~(1 << LED);
-        }
-*/
+  if ( T4counter < dc_counts )
+  {
+    GPIOD->ODR |= (1 << LED);
+  }
+  else
+  {
+    GPIOD->ODR &= ~(1 << LED);
+  }
+
   return dc_counts;
 }
-
-
-
-u8 forceCommutation; // switch input to test "commutation" logic
 
 /*
  * 
  */
 void periodic_task(void)
 {
-    u16 duty_cycle;
-    u16 dc_counts;
+    u16 a_input =  updateChannels(buttonState);
+    u16 dc_counts  =  updateLED0(a_input);
 
-    duty_cycle =  updateChannels(buttonState);
-    dc_counts  =  updateLED0(duty_cycle); // wtf can't i update LED in  function call?
-///*
-    if ( T4counter < dc_counts )
-    {
-        GPIOD->ODR |= (1 << LED);
-    }
-    else
-    {
-        GPIOD->ODR &= ~(1 << LED);
-    }
-//*/
+// duty_cycle global to feed it to PWM config
+    duty_cycle = a_input;
+
 // commutation experiment
     zero_xing = FALSE;
 
-    if (duty_cycle >= (512-50) && duty_cycle <= (512+50) )
+    if (a_input >= (512-50) && a_input <= (512+50) )
     {
         zero_xing = TRUE;
     }
@@ -370,10 +356,6 @@ void periodic_task(void)
  */
 main()
 {
-    u16 duty_cycle;
-    u16 dc_counts;
-
-
     uint16_t duty_cycles[N_PHASES] =
     {
         CCR1_Val, CCR2_Val, CCR3_Val
@@ -403,8 +385,9 @@ main()
 // WIP ... reconfig PWM only on button push.
 // Before switch "channel":
 //   store duty cycle of the presently selected  channel
-            duty_cycles[buttonState] = duty_cycle;
-
+/*
+            duty_cycles[buttonState] = duty_cycle;   
+*/
 // let (ALL) PWM channels update to present DC setting
             PWM_Config(duty_cycle, &duty_cycles[0]);
 
