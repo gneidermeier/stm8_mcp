@@ -32,9 +32,9 @@
 u8 latch_T4_is_zero;
 u8 zero_xing;         // flag for ... we'll seee .... ??? !!!! ;)
 u8 ADSampRdy;					// flag for timer interrupt service A/D
-unsigned int T4counter = 0;
+u16 T4counter = 0;
 //unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
-unsigned int T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
+u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -288,11 +288,10 @@ int testval = 0;
 
 main()
 {
-    unsigned  int AINch;
-    unsigned int duty_cycle;
-    unsigned int dc_counts;
+    u16 duty_cycle;
+    u16 dc_counts;
 
-    u8 enableCommutation = FALSE;
+    u8 forceCommutation; // switch input to test "commutation" logic
 
     uint16_t duty_cycles[N_PHASES] =
     {
@@ -316,10 +315,10 @@ main()
         GPIOC->ODR |= (1<<6);
 
 //button input test enable commutation
-        enableCommutation = FALSE;
-        if (! (( GPIOE->IDR)&(1<<2)))
+        forceCommutation = FALSE;
+        if ( GPIOE->IDR & (1<<2) )
         {
-            enableCommutation = TRUE;
+            forceCommutation = TRUE;
         }
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -334,7 +333,7 @@ main()
 // let (ALL) PWM channels update to present DC setting
             PWM_Config(duty_cycle, &duty_cycles[0]);
 
-            if (! enableCommutation)  // tmp test "commutation" enabled by switch/button
+            if (! forceCommutation)  // tmp test "commutation" enabled by switch/button
             {
                 buttonState += 1;
                 if (buttonState >= N_PHASES)
@@ -372,7 +371,7 @@ main()
             zero_xing = TRUE;
         }
 
-        if (FALSE != enableCommutation )
+        if (FALSE != forceCommutation )
         {
             // do "commutation" at "time 0"
             if ( FALSE != latch_T4_is_zero )

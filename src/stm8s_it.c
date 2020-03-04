@@ -457,8 +457,8 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     */
 //    static u8 toggle = 0;
 
-    unsigned int dwell_counter;
-    unsigned int counter_period = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?		
+    u16 dwell_counter;
+    u16 counter_period = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?		
 
 //    toggle ^= 1;  // wiggle test pin
 //        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
@@ -489,7 +489,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
         dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
         dwell_counter = 1 ; // practically nearly solid briteness
     }
-
+#if 1
     if ( T4counter < dwell_counter )
     {
         GPIOC->ODR |= (1 << 7); // drive hi i.e. LED off, as this is lo (cathode)side
@@ -498,6 +498,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     {
         GPIOC->ODR &= ~(1 << 7);
     }
+#endif
 }
 #endif /*STM8S903*/
 
