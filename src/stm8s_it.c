@@ -24,7 +24,6 @@
 //#include "parameter.h" // GN: app defines
 
 extern u8 latch_T4_is_zero;
-extern u8 zero_xing;   /// commutaion flag ... we'll see
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 extern u16 T4counter ;
 extern u16 T4_count_pd;
@@ -455,10 +454,6 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
        it is recommended to set a breakpoint on the following instruction.
     */
 //    static u8 toggle = 0;
-
-    u16 dwell_counter;
-    u16 counter_period = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?		
-
 //    toggle ^= 1;  // wiggle test pin
 //        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
 
@@ -471,33 +466,12 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
 
     T4counter  += 1;
 
-    counter_period = T4_count_pd ; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
-
     // using counter period to cycle LED0, slo enuff rate to see it
-    if (T4counter >= counter_period)
+    if (T4counter >= T4_count_pd)
     {
         T4counter = 0;
         latch_T4_is_zero = TRUE;
     }
-
-
-// experiment to show "zero crossing" by making the test LED briter       wow that is kool
-    dwell_counter = (counter_period * 7) / 8;   //  7/8 off time
-    if (0 != zero_xing)
-    {
-        dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
-        dwell_counter = 1 ; // practically nearly solid briteness
-    }
-#if 1
-    if ( T4counter < dwell_counter )
-    {
-        GPIOC->ODR |= (1 << 7); // drive hi i.e. LED off, as this is lo (cathode)side
-    }
-    else
-    {
-        GPIOC->ODR &= ~(1 << 7);
-    }
-#endif
 }
 #endif /*STM8S903*/
 

@@ -31,7 +31,6 @@
 
 u8 forceCommutation; // switch input to test "commutation" logic
 u8 latch_T4_is_zero;
-u8 zero_xing;         // flag for ... we'll seee .... ??? !!!! ;)
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 u16 T4counter = 0;
 //unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
@@ -285,7 +284,7 @@ u16 updateChannels(s8 selectedChannel)
 /*
  * determine duty-cycle counts based on analog input (ratio for 10 bit A/d)
  */
-u16 updateLED0(u16 dwell){
+void updateLED0(u16 dwell){
 
   u16 dc_counts =  ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
 
@@ -297,8 +296,43 @@ u16 updateLED0(u16 dwell){
   {
     GPIOD->ODR &= ~(1 << LED);
   }
+}
 
-  return dc_counts;
+/*
+ * Tests the input analog reading to determine the "zero crossing"
+ * Test LED output shows trim adjustment (solid when trimmed to neutral/half)
+ */
+u8 getZeroCross(u16 ainp, u16 counter_period){
+
+  // set the LED off time (nearly 90% of the period) so that when not
+  // trimmed, the LED will be flashing, albeit at a dimmed intensity
+    u16 dwell_counter = (counter_period * 7) / 8;
+
+// commutation experiment
+    u8 zeroX = FALSE;
+
+    if (ainp >= (512-50) && ainp <= (512+50) )
+    {
+        zeroX = TRUE;
+    }
+
+    if (FALSE != zeroX)
+    {
+// show "zero crossing" by making the test LED briter
+//        dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
+        dwell_counter = 1 ; // practically nearly solid briteness
+    }
+
+    if ( T4counter < dwell_counter )
+    {
+        GPIOC->ODR |= (1 << 7); // drive hi i.e. LED off, as this is lo (cathode)side
+    }
+    else
+    {
+        GPIOC->ODR &= ~(1 << 7);
+    }
+
+    return zeroX;
 }
 
 /*
@@ -307,34 +341,30 @@ u16 updateLED0(u16 dwell){
 void periodic_task(void)
 {
     u16 a_input =  updateChannels(buttonState);
-    u16 dc_counts  =  updateLED0(a_input);
+    u8 zero_x = FALSE;
+
+    updateLED0(a_input);
 
 // duty_cycle global to feed it to PWM config
     duty_cycle = a_input;
 
-// commutation experiment
-    zero_xing = FALSE;
-
-    if (a_input >= (512-50) && a_input <= (512+50) )
-    {
-        zero_xing = TRUE;
-    }
+    zero_x = getZeroCross(a_input, T4_count_pd);
 
 //button input test enable commutation
-        forceCommutation = FALSE;
-        if ( GPIOE->IDR & (1<<2) )
-        {
-            forceCommutation = TRUE;
-        }
+    forceCommutation = FALSE;
+    if ( GPIOE->IDR & (1<<2) )   //if closed the switch
+    {
+        forceCommutation = TRUE;
+    }
 
     if (FALSE != forceCommutation )
     {
         // do "commutation" at "time 0"
         if ( FALSE != latch_T4_is_zero )
         {
-            latch_T4_is_zero = FALSE;
+            latch_T4_is_zero = FALSE; // lame ... need to use a dedicated timer/counter
 
-            if (FALSE != zero_xing)
+            if (FALSE != zero_x)
             {
                 buttonState += 1;
             }
