@@ -23,6 +23,7 @@
 #include "stm8s_it.h"
 //#include "parameter.h" // GN: app defines
 
+extern u8 latch_T4_is_zero;
 extern u8 zero_xing;   /// commutaion flag ... we'll see
 extern u8	ADSampRdy;					// flag for filed of samples ready
 
@@ -454,12 +455,13 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-    static u8 toggle = 0;
+//    static u8 toggle = 0;
 
     unsigned int dwell_counter;
     unsigned int counter_period = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?		
 
-    toggle ^= 1;
+//    toggle ^= 1;  // wiggle test pin
+//        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
@@ -470,17 +472,15 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
 
     T4counter  += 1;
 
-
     counter_period = T4_count_pd ; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
 
     // using counter period to cycle LED0, slo enuff rate to see it
     if (T4counter >= counter_period)
     {
         T4counter = 0;
+        latch_T4_is_zero = TRUE;
     }
 
-// wiggle test pin
-//        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
 
 // experiment to show "zero crossing" by making the test LED briter       wow that is kool
     dwell_counter = (counter_period * 7) / 8;   //  7/8 off time
@@ -489,7 +489,6 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
         dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
         dwell_counter = 1 ; // practically nearly solid briteness
     }
-
 
     if ( T4counter < dwell_counter )
     {

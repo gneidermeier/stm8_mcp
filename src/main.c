@@ -29,6 +29,7 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
+u8 latch_T4_is_zero;
 u8 zero_xing;         // flag for ... we'll seee .... ??? !!!! ;)
 u8 ADSampRdy;					// flag for timer interrupt service A/D
 unsigned int T4counter = 0;
@@ -42,7 +43,7 @@ s8 buttonState = 0;
 
 
 /* Private function prototypes -----------------------------------------------*/
-/* Private functions ---------------------------------------------------------*/		
+/* Private functions ---------------------------------------------------------*/
 
 void GPIO_Config(void)
 { 
@@ -182,6 +183,9 @@ TIM2_pulse_0 = \
 TIM2_pulse_1 = \
 TIM2_pulse_2 = uDC;
 
+
+//return; // tmp test
+
 /* TIM2 Peripheral Configuration */ 
   TIM2_DeInit();
 
@@ -219,7 +223,7 @@ TIM2_pulse_2 = uDC;
  *
  *   https://lujji.github.io/blog/bare-metal-programming-stm8/
  *
- * Default setup for STM8S Discovery is 2Mhz HSI ... leave this period @ 5mS for now I guesss.....
+ * Default setup for STM8S Discovery is 2Mhz HSI ... leave period @ 5mS for now I guesss.....
  */
 void TIM4_Config(void){
     /* Prescaler = 128 */
@@ -231,18 +235,62 @@ void TIM4_Config(void){
 }
 
 
+/*
+*/
+unsigned int updateChannels(s8 selectedChannel)
+{
+
+    unsigned const int AIN9 = 9;  // PE6
+    unsigned const int AIN8 = 8;  // PE7
+    unsigned const int AIN6 = 6;  // PB6
+
+    unsigned  int AINch;
+    unsigned int AINx;
+
+// set the lo-sides (HI) to turn off LED (pulls cathodes hi)...
+// PA4  (VDD for LED/OUT/CH1.TIM2.PWM on PA3)
+    GPIOA->ODR |= (1<<4);
+// PD2  (VDD for LED/OUT/CH2.TIM2.PWM on PD3)
+    GPIOD->ODR |= (1<<2);
+// PD5  (VDD for LED/OUT/CH3.TIM2.PWM on PD4)
+    GPIOD->ODR |= (1<<5);
+
+    switch (selectedChannel)
+    {
+    case 0:
+        AINch = AIN9;
+        GPIOA->ODR &= ~(1<<4);
+        break;
+    case 1:
+        AINch = AIN8;
+        GPIOD->ODR &= ~(1<<2);
+        break;
+    case 2:
+        AINch = AIN6;
+        GPIOD->ODR &= ~(1<<5);
+        break;
+    default:
+        break;
+    }
+
+
+    if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
+    {
+        AINx = readADC1( AINch );
+        ADSampRdy = FALSE;
+    }
+
+    return AINx;
+}
+
+
 int testCnt1 = 0;
 int testCnt2 = 0;
 int testval = 0;
 
 main()
 {
-    unsigned const int AIN9 = 9;  // PE6
-    unsigned const int AIN8 = 8;  // PE7
-    unsigned const int AIN6 = 6;  // PB6
-
-    unsigned  int AINch = AIN6;
-
+    unsigned  int AINch;
     unsigned int duty_cycle;
     unsigned int dc_counts;
 
@@ -261,40 +309,21 @@ main()
 
     TIM4_Config();
 
-
-    // Enable interrupts (no, really). Interrupts are globally disabled by default, hence the need to call enableInterrupts().
+    // Enable interrupts (no, really). Interrupts are globally disabled by default
     enableInterrupts();
 
 
     while(1)
     {
-// set the lo-sides (HI) to turn off LED (pulls cathodes hi)...
-// PA4  (VDD for LED/OUT/CH1.TIM2.PWM on PA3)
-        GPIOA->ODR |= (1<<4);
-// PD2  (VDD for LED/OUT/CH2.TIM2.PWM on PD3)
-        GPIOD->ODR |= (1<<2);
-// PD5  (VDD for LED/OUT/CH3.TIM2.PWM on PD4)
-        GPIOD->ODR |= (1<<5);
-
 // PC6  (VDD for LED/OUT/CH3.TIM2.PWM on PC7)
         GPIOC->ODR |= (1<<6);
-
-
-        if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
-        {
-            duty_cycle = readADC1( AINch );
-            ADSampRdy = FALSE;
-            testCnt1 += 1;//tmp test
-        }
-        else
-            testCnt2 += 1;//tmp test
 
 
 //button input test enable commutation
         enableCommutation = FALSE;
         if (! (( GPIOE->IDR)&(1<<2)))
         {
-          enableCommutation = TRUE;
+            enableCommutation = TRUE;
         }
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -319,23 +348,7 @@ main()
             }
         }
 
-        switch (buttonState)
-        {
-        case 0:
-            AINch = AIN9;
-            GPIOA->ODR &= ~(1<<4);
-            break;
-        case 1:
-            AINch = AIN8;
-            GPIOD->ODR &= ~(1<<2);
-            break;
-        case 2:
-            AINch = AIN6;
-            GPIOD->ODR &= ~(1<<5);
-            break;
-        default:
-            break;
-        }
+        duty_cycle =  updateChannels(buttonState);
 
 // slow LED0 rate enuff to see it
 // using Tim4 period 5mS so 20 * 5ms = 100mS (blink @ 10Hz)
@@ -363,15 +376,18 @@ main()
             buttonInc =      1 ;
             zero_xing = TRUE;
         }
-        else {
+        else
+        {
             buttonInc = 0;
         }
 
         if (FALSE != enableCommutation )
         {
-            // do "commutation" at "time 0" ... whatever that is
-            if (0 == T4counter )
+            // do "commutation" at "time 0"
+            if ( FALSE != latch_T4_is_zero )
             {
+                latch_T4_is_zero = FALSE;
+
                 buttonState += buttonInc;
                 if (buttonState >= N_PHASES)
                 {
