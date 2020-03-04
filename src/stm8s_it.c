@@ -25,10 +25,9 @@
 
 extern u8 latch_T4_is_zero;
 extern u8 zero_xing;   /// commutaion flag ... we'll see
-extern u8	ADSampRdy;					// flag for filed of samples ready
-
-extern unsigned int T4counter ;
-extern const unsigned int T4_count_pd ;
+extern u8  ADSampRdy;					// flag for filed of samples ready
+extern u16 T4counter ;
+extern u16 T4_count_pd;
 
 /** @addtogroup I2C_EEPROM
   * @{

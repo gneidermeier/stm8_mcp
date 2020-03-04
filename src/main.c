@@ -234,10 +234,9 @@ void TIM4_Config(void){
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4	
 }
 
-
 /*
 */
-unsigned int updateChannels(s8 selectedChannel)
+u16 updateChannels(s8 selectedChannel)
 {
     unsigned const int AIN9 = 9;  // PE6
     unsigned const int AIN8 = 8;  // PE7
@@ -281,11 +280,32 @@ unsigned int updateChannels(s8 selectedChannel)
     return AINx;
 }
 
+/*
+ * determine duty-cycle counts based on analog input (ratio for 10 bit A/d)
+ */
+u16 updateLED0(u16 dwell){
 
-int testCnt1 = 0;
-int testCnt2 = 0;
-int testval = 0;
+  u16 dc_counts = T4_count_pd;
 
+  dc_counts = ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
+// not a clue here ... stupid f'in 8-bit C coding crap
+/*
+        if ( T4counter < dc_counts )
+        {
+            GPIOD->ODR |= (1 << LED);
+        }
+        else
+        {
+            GPIOD->ODR &= ~(1 << LED);
+        }
+*/
+  return dc_counts;
+}
+
+
+/*
+ * 
+ */
 main()
 {
     u16 duty_cycle;
@@ -345,23 +365,17 @@ main()
 
         duty_cycle =  updateChannels(buttonState);
 
-// slow LED0 rate enuff to see it
-// using Tim4 period 5mS so 20 * 5ms = 100mS (blink @ 10Hz)
-#if 1 // AIN adjusts LED0 "duty-cycle" (fixed rate/period)
-        dc_counts = ( T4_count_pd * duty_cycle ) / 1024;    // 10-bit A/D input
-#else
-        T4_count_pd = duty_cycle;
-        dc_counts =  T4_count_pd  / 2; // fixed at 50% but let period/frequence follow AIN
-#endif
-
+        dc_counts =  updateLED0(duty_cycle); // wtf can't i update LED in the function call?
+///*
         if ( T4counter < dc_counts )
         {
-            GPIOD->ODR |= (1 << LED);
+         GPIOD->ODR |= (1 << LED);
         }
         else
         {
-            GPIOD->ODR &= ~(1 << LED);
+         GPIOD->ODR &= ~(1 << LED);
         }
+//*/
 
 //instead of button .. try commutation experiment
         zero_xing = FALSE;
