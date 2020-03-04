@@ -31,7 +31,7 @@
 
 u8 latch_T4_is_zero;
 u8 zero_xing;         // flag for ... we'll seee .... ??? !!!! ;)
-u8 ADSampRdy;					// flag for timer interrupt service A/D
+u8 TaskRdy;           // flag for timer interrupt for BG task timing
 u16 T4counter = 0;
 //unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
 u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
@@ -271,10 +271,10 @@ u16 updateChannels(s8 selectedChannel)
         break;
     }
 
-    if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
+//    if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
     {
         AINx = readADC1( AINch );
-        ADSampRdy = FALSE;
+//        ADSampRdy = FALSE;
     }
 
     return AINx;
@@ -303,15 +303,76 @@ u16 updateLED0(u16 dwell){
 }
 
 
+
+u8 forceCommutation; // switch input to test "commutation" logic
+
 /*
  * 
+ */
+void periodic_task(void)
+{
+    u16 duty_cycle;
+    u16 dc_counts;
+
+    duty_cycle =  updateChannels(buttonState);
+    dc_counts  =  updateLED0(duty_cycle); // wtf can't i update LED in  function call?
+///*
+    if ( T4counter < dc_counts )
+    {
+        GPIOD->ODR |= (1 << LED);
+    }
+    else
+    {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+//*/
+// commutation experiment
+    zero_xing = FALSE;
+
+    if (duty_cycle >= (512-50) && duty_cycle <= (512+50) )
+    {
+        zero_xing = TRUE;
+    }
+
+//button input test enable commutation
+        forceCommutation = FALSE;
+        if ( GPIOE->IDR & (1<<2) )
+        {
+            forceCommutation = TRUE;
+        }
+
+    if (FALSE != forceCommutation )
+    {
+        // do "commutation" at "time 0"
+        if ( FALSE != latch_T4_is_zero )
+        {
+            latch_T4_is_zero = FALSE;
+
+            if (FALSE != zero_xing)
+            {
+                buttonState += 1;
+            }
+
+            if (buttonState >= N_PHASES)
+            {
+                buttonState = 0;
+            }
+            else  if (buttonState < 0)
+            {
+                buttonState = (N_PHASES - 1);
+            }
+        }
+    }
+}
+
+/*
+ * mainly looping
  */
 main()
 {
     u16 duty_cycle;
     u16 dc_counts;
 
-    u8 forceCommutation; // switch input to test "commutation" logic
 
     uint16_t duty_cycles[N_PHASES] =
     {
@@ -328,18 +389,12 @@ main()
     // Enable interrupts (no, really). Interrupts are globally disabled by default
     enableInterrupts();
 
+// PC6  (VDD for LED/OUT/CH3.TIM2.PWM on PC7)
+    GPIOC->ODR |= (1<<6);
+
 
     while(1)
     {
-// PC6  (VDD for LED/OUT/CH3.TIM2.PWM on PC7)
-        GPIOC->ODR |= (1<<6);
-
-//button input test enable commutation
-        forceCommutation = FALSE;
-        if ( GPIOE->IDR & (1<<2) )
-        {
-            forceCommutation = TRUE;
-        }
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
         {
@@ -363,51 +418,17 @@ main()
             }
         }
 
-        duty_cycle =  updateChannels(buttonState);
-
-        dc_counts =  updateLED0(duty_cycle); // wtf can't i update LED in the function call?
-///*
-        if ( T4counter < dc_counts )
+// while( FALSE == TaskRdy )
+        if ( FALSE == TaskRdy )  // idk .. don't block here in case there were actually some background tasks to do 
         {
-         GPIOD->ODR |= (1 << LED);
+            nop();
         }
-        else
-        {
-         GPIOD->ODR &= ~(1 << LED);
-        }
-//*/
-
-//instead of button .. try commutation experiment
-        zero_xing = FALSE;
-
-        if (duty_cycle >= (512-50) && duty_cycle <= (512+50) )
-        {
-            zero_xing = TRUE;
-        }
-
-        if (FALSE != forceCommutation )
-        {
-            // do "commutation" at "time 0"
-            if ( FALSE != latch_T4_is_zero )
-            {
-                latch_T4_is_zero = FALSE;
-
-                if (FALSE != zero_xing)
-                {
-                    buttonState += 1;
-                }
-
-                if (buttonState >= N_PHASES)
-                {
-                    buttonState = 0;
-                }
-                else  if (buttonState < 0)
-                {
-                    buttonState = (N_PHASES - 1);
-                }
-            }
-        }
-    } // while
+				else
+				{
+          TaskRdy = TRUE;
+          periodic_task();
+			  }
+    } // while 1
 }
 
 #ifdef USE_FULL_ASSERT

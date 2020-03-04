@@ -25,7 +25,7 @@
 
 extern u8 latch_T4_is_zero;
 extern u8 zero_xing;   /// commutaion flag ... we'll see
-extern u8  ADSampRdy;					// flag for filed of samples ready
+extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 extern u16 T4counter ;
 extern u16 T4_count_pd;
 
@@ -466,7 +466,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     TIM4->SR1 &= ~TIM4_SR1_UIF;
 
 //        duty_cycle = readADC1( AINx ); // needs to  use  AIN interrupt to read sample
-    ADSampRdy = TRUE;     // notify background process
+    TaskRdy = TRUE;     // notify background process
 
 
     T4counter  += 1;
