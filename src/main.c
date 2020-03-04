@@ -239,7 +239,6 @@ void TIM4_Config(void){
 */
 unsigned int updateChannels(s8 selectedChannel)
 {
-
     unsigned const int AIN9 = 9;  // PE6
     unsigned const int AIN8 = 8;  // PE7
     unsigned const int AIN6 = 6;  // PB6
@@ -273,7 +272,6 @@ unsigned int updateChannels(s8 selectedChannel)
         break;
     }
 
-
     if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
     {
         AINx = readADC1( AINch );
@@ -294,7 +292,6 @@ main()
     unsigned int duty_cycle;
     unsigned int dc_counts;
 
-    u8 buttonInc = 0;
     u8 enableCommutation = FALSE;
 
     uint16_t duty_cycles[N_PHASES] =
@@ -317,7 +314,6 @@ main()
     {
 // PC6  (VDD for LED/OUT/CH3.TIM2.PWM on PC7)
         GPIOC->ODR |= (1<<6);
-
 
 //button input test enable commutation
         enableCommutation = FALSE;
@@ -373,12 +369,7 @@ main()
 
         if (duty_cycle >= (512-50) && duty_cycle <= (512+50) )
         {
-            buttonInc =      1 ;
             zero_xing = TRUE;
-        }
-        else
-        {
-            buttonInc = 0;
         }
 
         if (FALSE != enableCommutation )
@@ -388,7 +379,11 @@ main()
             {
                 latch_T4_is_zero = FALSE;
 
-                buttonState += buttonInc;
+                if (FALSE != zero_xing)
+                {
+                    buttonState += 1;
+                }
+
                 if (buttonState >= N_PHASES)
                 {
                     buttonState = 0;
