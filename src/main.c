@@ -26,6 +26,7 @@
 
 /* Private defines -----------------------------------------------------------*/
 #define N_PHASES  3 
+#define OL_DEV
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -48,20 +49,35 @@ s8 buttonState = 0;
 
 void GPIO_Config(void)
 { 
+// OUTPUTS
 // built-in LED    
-		 GPIOD->DDR |= (1 << LED); //PD.n as output
+     GPIOD->DDR |= (1 << LED); //PD.n as output
      GPIOD->CR1 |= (1 << LED); //push pull output
 
-// test LED
-	GPIOC->ODR &= ~(1<<7); 				//  drive  low (GND)
-	GPIOC->DDR |=  (1<<7);
-	GPIOC->CR1 |=  (1<<7);
+// 3 "ENABLES" for the 3 fields on CN2 1-3-5  PE5, PC2, PC4
+     GPIOE->ODR &=  ~(1<<5); 				//  PE5
+     GPIOE->DDR |=  (1<<5);
+     GPIOE->CR1 |=  (1<<5);
 
-	GPIOC->ODR |=  (1<<6); 				//  LED on C6   7
-	GPIOC->DDR |=  (1<<6);
-	GPIOC->CR1 |=  (1<<6);
+     GPIOC->ODR &=  ~(1<<2); 				//  PC2
+     GPIOC->DDR |=  (1<<2);
+     GPIOC->CR1 |=  (1<<2);
 
-// 3 LEDs 
+     GPIOC->ODR &=  ~(1<<4); 				//  PC4
+     GPIOC->DDR |=  (1<<4);
+     GPIOC->CR1 |=  (1<<4);
+
+// test LED C6+C7
+     GPIOC->ODR &= ~(1<<7); 				//  drive  low (GND)
+     GPIOC->DDR |=  (1<<7);
+     GPIOC->CR1 |=  (1<<7);
+
+     GPIOC->ODR |=  (1<<6); 				//  LED on C6
+     GPIOC->DDR |=  (1<<6);
+     GPIOC->CR1 |=  (1<<6);
+
+
+// 3 PWM Channels 
 // PA4 
 	GPIOA->ODR &= ~(1<<4); 				//  drive  low (GND for LED on PDx)
 	GPIOA->DDR |=  (1<<4);
@@ -89,39 +105,40 @@ void GPIO_Config(void)
 	GPIOD->DDR |=  (1<<4);
 	GPIOD->CR1 |=  (1<<4);
 
+// INPUTS
 // PA5/6 as button input 
 		GPIOA->DDR &= ~(1 << 6); // PB.2 as input
 		GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-		GPIOA->DDR |= (1 << 5); //PD.n as output
-		GPIOA->CR1 |= (1 << 5); //push pull output
+		GPIOA->DDR |= (1 << 5);  // PD.n as output
+		GPIOA->CR1 |= (1 << 5);  // push pull output
 		GPIOA->ODR &= ~(1 << 5); // set "off" (not driven) to use as hi-side of button
 
 // PE3/2 as test switch input 
 		GPIOE->DDR &= ~(1 << 2); // PE.2 as input
 		GPIOE->CR1 |= (1 << 2);  // pull up w/o interrupts
-		GPIOE->DDR |= (1 << 3); //PD.n as output
-		GPIOE->CR1 |= (1 << 3); //push pull output
-		GPIOE->ODR |= (1 << 3); // use as hi-side of button		
+		GPIOE->DDR |= (1 << 3);  // PD.n as output
+		GPIOE->CR1 |= (1 << 3);  // push pull output
+		GPIOE->ODR |= (1 << 3);  // use as hi-side of button		
 
 
 // PE.6 AIN9
-		GPIOE->DDR &= ~(1 << 6); // PE.6 as input
-		GPIOE->CR1 &= ~(1 << 6);  //  floating input
+		GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
+		GPIOE->CR1 &= ~(1 << 6);  // floating input
 		GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
 		
 // PE.7 AIN8
-		GPIOE->DDR &= ~(1 << 7); // PE.7 as input
-		GPIOE->CR1 &= ~(1 << 7);  //  floating input
+		GPIOE->DDR &= ~(1 << 7);  // PE.7 as input
+		GPIOE->CR1 &= ~(1 << 7);  // floating input
 		GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
 // PB.6 AIN6
-		GPIOB->DDR &= ~(1 << 6); // PE.7 as input
-		GPIOB->CR1 &= ~(1 << 6);  //  floating input
+		GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
+		GPIOB->CR1 &= ~(1 << 6);  // floating input
 		GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
 
 // PB.0 AIN0
-		GPIOB->DDR &= ~(1 << 0); // PB.0 as input
-		GPIOB->CR1 &= ~(1 << 0);  //  floating input
+		GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
+		GPIOB->CR1 &= ~(1 << 0);  // floating input
 		GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
 }
 
@@ -221,6 +238,7 @@ TIM2_pulse_2 = uDC;
 
 /*
  * Configure Timer 4 as general purpose fixed time-base reference
+ * Timer 4 & 6 are 8-bit basic timers
  *
  *   https://lujji.github.io/blog/bare-metal-programming-stm8/
  *
@@ -233,6 +251,22 @@ void TIM4_Config(void){
     TIM4->ARR = 77;
     TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4	
+}
+// Timers 2 3 & 5 are 16-bit general purpose timers
+void TIMx_Config(void){
+     // GN: right now this is trying to (visibly) blink a LED
+    TIM3->PSCR = 0x08;
+    /* Period = ?? ... be sure to set byte ARRH first, see data sheet  */
+    TIM3->ARRH = 0;
+    TIM3->ARRL = 128;
+    TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
+    TIM3->CR1 = TIM3_CR1_ARPE; // GN: don't think it was (re)loading the count
+    TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM4	
+}
+
+void Timer_Config(void){
+  TIM4_Config();
+  TIMx_Config();
 }
 
 /*
@@ -357,6 +391,11 @@ void periodic_task(void)
         forceCommutation = TRUE;
     }
 
+#ifdef OL_DEV
+  zero_x = TRUE;
+  forceCommutation = TRUE;
+#endif
+
     if (FALSE != forceCommutation )
     {
         // do "commutation" at "time 0"
@@ -396,7 +435,7 @@ main()
 
     PWM_Config( duty_cycles[0], &duty_cycles[0] );
 
-    TIM4_Config();
+    Timer_Config();
 
     // Enable interrupts (no, really). Interrupts are globally disabled by default
     enableInterrupts();
