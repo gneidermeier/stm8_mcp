@@ -253,12 +253,24 @@ void TIM4_Config(void){
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4	
 }
 // Timers 2 3 & 5 are 16-bit general purpose timers
-void TIMx_Config(void){
-     // GN: right now this is trying to (visibly) blink a LED
+void TIMx_Config(u16 period){
+     // GN: trying to get this into a range where LED flashing is mostly visible (leave pre-scale fixed for now)
     TIM3->PSCR = 0x08;
     /* Period = ?? ... be sure to set byte ARRH first, see data sheet  */
-    TIM3->ARRH = 0;
-    TIM3->ARRL = 128;
+//    TIM3->ARRH = 0;
+//    TIM3->ARRL = 128;
+
+    if (period > 1023){
+      period = 1023; // cap it to 10-bit so that is correspond to A/D channel
+    }
+    // this limit is hackaroun for funky slide-pot
+    if (period < 10){
+      period = 10;
+    }
+
+    TIM3->ARRH = period >> 8;
+    TIM3->ARRL = period & 0xff;
+
     TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
     TIM3->CR1 = TIM3_CR1_ARPE; // GN: don't think it was (re)loading the count
     TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM4	
@@ -266,19 +278,19 @@ void TIMx_Config(void){
 
 void Timer_Config(void){
   TIM4_Config();
-  TIMx_Config();
+  TIMx_Config( 128 );
 }
 
 /*
-*/
-u16 updateChannels(s8 selectedChannel)
+ * returns AIN channel corresponing to selected phase
+ */
+u8 updateChannels(s8 selectedChannel)
 {
     unsigned const int AIN9 = 9;  // PE6
     unsigned const int AIN8 = 8;  // PE7
     unsigned const int AIN6 = 6;  // PB6
 
-    unsigned  int AINch;
-    unsigned int AINx;
+    u8 AINch;
 
 // set the lo-sides (HI) to turn off LED (pulls cathodes hi)...
 // PA4  (VDD for LED/OUT/CH1.TIM2.PWM on PA3)
@@ -305,14 +317,8 @@ u16 updateChannels(s8 selectedChannel)
     default:
         break;
     }
-
-//    if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
-    {
-        AINx = readADC1( AINch );
-//        ADSampRdy = FALSE;
-    }
-
-    return AINx;
+  
+    return AINch;
 }
 
 /*
@@ -374,8 +380,17 @@ u8 getZeroCross(u16 ainp, u16 counter_period){
  */
 void periodic_task(void)
 {
-    u16 a_input =  updateChannels(buttonState);
+    u16 a_input;
     u8 zero_x = FALSE;
+
+    u8 AIN_channel = updateChannels(buttonState);
+
+#ifndef OL_DEV	
+    a_input =  readADC1( AIN_channel );
+#else
+    a_input = readADC1( 9 );
+    TIMx_Config( a_input );	
+#endif
 
     updateLED0(a_input);
 

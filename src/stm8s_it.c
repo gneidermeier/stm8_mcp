@@ -298,24 +298,35 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
 
     static u8 toggle = 0;
-    toggle ^= 1;  // wiggle test pin
-
+//    toggle ^= 1;  // wiggle test pin
+  toggle += 1;
+  if (toggle >=3){
+    toggle = 0;
+  }
 
   // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 
 // TMP TEST 
 ////  CN2 1-3-5  PE5, PC2, PC4
-  if (0 != toggle) {
-    GPIOE->ODR &=  ~(1<<5); 				//  PE5
-    GPIOC->ODR &=  ~(1<<2); 				//  PC2
-    GPIOC->ODR &=  ~(1<<4); 				//  PC4
-  }
-  else {
-    GPIOE->ODR |=  (1<<5); 				//  PE5
-    GPIOC->ODR |=  (1<<2); 				//  PC2
-    GPIOC->ODR |=  (1<<4); 				//  PC4
-  }
+	switch(toggle){
+		default:
+		case 0:
+      GPIOE->ODR |=  (1<<5); 				//  PE5
+      GPIOC->ODR &=  ~(1<<2); 				//  PC2
+      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+		break;
+		case 1:
+      GPIOE->ODR &=  ~(1<<5); 				//  PE5
+      GPIOC->ODR |=  (1<<2); 				//  PC2
+      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+		break;
+	  case 2:
+      GPIOE->ODR &=  ~(1<<5); 				//  PE5
+      GPIOC->ODR &=  ~(1<<2); 				//  PC2
+      GPIOC->ODR |=  (1<<4); 				//  PC4
+		break;
+	}
 }
 
 /**
