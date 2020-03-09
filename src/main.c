@@ -78,35 +78,21 @@ void GPIO_Config(void)
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
 
-
+#if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
 // 3 PWM Channels 
-// PA4 
-    GPIOA->ODR &= ~(1<<4); 				//  drive  low (GND for LED on PDx)
-    GPIOA->DDR |=  (1<<4);
-    GPIOA->CR1 |=  (1<<4);
-
-    GPIOA->ODR |=  (1<<3); 				//  LED/OUT/CH1.TIM2.PWM on PA3
+// T2.PWM.CH3 
+    GPIOA->ODR |=  (1<<3);  // PA3
     GPIOA->DDR |=  (1<<3);
     GPIOA->CR1 |=  (1<<3);
-
-// PD2
-    GPIOD->ODR &= ~(1<<2); 				//  drive  low (GND for LED on PDx)
-    GPIOD->DDR |=  (1<<2);
-    GPIOD->CR1 |=  (1<<2);
-
-    GPIOD->ODR |=  (1<<3); 				//  VDD for LED/OUT/CH2.TIM2.PWM on PD3
+// T2.PWM.CH2 
+    GPIOD->ODR |=  (1<<3);  // PD3
     GPIOD->DDR |=  (1<<3);
     GPIOD->CR1 |=  (1<<3);
-
-// PD5
-    GPIOD->ODR &= ~(1<<5); 				//  drive  low (GND for LED on PDx)
-    GPIOD->DDR |=  (1<<5);
-    GPIOD->CR1 |=  (1<<5);
-
-    GPIOD->ODR |=  (1<<4); 				//  VDD for LED/OUT/CH3.TIM2.PWM on PD4
+// T2.PWM.CH1 
+    GPIOD->ODR |=  (1<<4);  // PD4
     GPIOD->DDR |=  (1<<4);
     GPIOD->CR1 |=  (1<<4);
-
+#endif
 // INPUTS
 // PA5/6 as button input 
     GPIOA->DDR &= ~(1 << 6); // PB.2 as input
@@ -233,6 +219,11 @@ void PWM_Config(uint16_t uDC, uint16_t *p_DC)
 
     /* Enable TIM2 */
     TIM2_Cmd(ENABLE);
+
+#if 0
+// GN: tmp test
+    TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt 
+#endif
 }
 
 /*
@@ -385,7 +376,7 @@ void periodic_task(void)
     u16 a_input;
     u8 zero_x = FALSE;
 
-    u8 AIN_channel = updateChannels(buttonState);
+//    u8 AIN_channel = updateChannels(buttonState);
 
 #ifndef OL_DEV
     a_input =  readADC1( AIN_channel );
@@ -466,7 +457,7 @@ main()
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce
 
 // WIP ... reconfig PWM only on button push.
-// Before switch "channel":
+
 //   store duty cycle of the presently selected  channel
 /*
             duty_cycles[buttonState] = duty_cycle;   
