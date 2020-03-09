@@ -270,6 +270,22 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+#if 1 
+const u8 LED = 0;
+static u8 toggle = 0;
+toggle ^= 1;
+  if ( toggle )
+    {
+        GPIOD->ODR |= (1 << LED);
+    }
+    else
+    {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+
+  // must reset the tmer interrupt flag
+    TIM2->SR1 &= ~TIM2_SR1_UIF;
+#endif
 }
 
 /**
@@ -484,9 +500,6 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-//    static u8 toggle = 0;
-//    toggle ^= 1;  // wiggle test pin
-//        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
