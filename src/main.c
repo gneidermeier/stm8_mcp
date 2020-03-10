@@ -30,17 +30,16 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
-u8 forceCommutation; // switch input to test "commutation" logic
 u8 latch_T4_is_zero;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 u16 T4counter = 0;
 //unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
 u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
-u16 duty_cycle;
 
 
 /* Private variables ---------------------------------------------------------*/
-const u8 COMMUATION_PD_ADJ_AINCH = 9;   // adjust pot to set duration of "phase" period
+const u8 AINCH_COMMUATION_PD = 9;   // adjust pot to set "commutation" period
+const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
 
 const unsigned  char LED = 0;
 s8 buttonState = 0;
@@ -55,6 +54,7 @@ void GPIO_Config(void)
 // built-in LED    
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
+    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathod driven to Vcc)	
 
 // 3 "ENABLES" for the 3 fields on CN2 1-3-5  PE5, PC2, PC4
     GPIOE->ODR &=  ~(1<<5); 				//  PE5
@@ -179,7 +179,7 @@ unsigned int readADC1(unsigned int channel)
 #define CCR2_Val  ((u16)250) // Configure channel 2 Pulse Width
 #define CCR3_Val  ((u16)750) // Configure channel 3 Pulse Width
 
-void PWM_Config(uint16_t uDC, uint16_t *p_DC)
+void PWM_Config(uint16_t uDC)
 {
     uint16_t TIM2_pulse_0 ;// = *(p_DC + 0);
     uint16_t TIM2_pulse_1 ;// = *(p_DC + 1);
@@ -220,7 +220,7 @@ void PWM_Config(uint16_t uDC, uint16_t *p_DC)
     /* Enable TIM2 */
     TIM2_Cmd(ENABLE);
 
-#if 0
+#if 1
 // GN: tmp test
     TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt 
 #endif
@@ -374,48 +374,19 @@ u8 getZeroCross(u16 ainp, u16 counter_period)
 void periodic_task(void)
 {
     u16 a_input;
-    u8 zero_x = FALSE;
 
-//    u8 AIN_channel = updateChannels(buttonState);
+    a_input = readADC1( AINCH_COMMUATION_PD );
+    TIMx_Config( a_input );                    // set the commutation rate by the POT
 
-#ifndef OL_DEV
-    a_input =  readADC1( AIN_channel );
-#else
-    a_input = readADC1( COMMUATION_PD_ADJ_AINCH );
-    TIMx_Config( a_input );
-#endif
-
-    updateLED0(a_input);
-
-// duty_cycle global to feed it to PWM config
-    duty_cycle = a_input;
-
-    zero_x = getZeroCross(a_input, T4_count_pd);
-
-//button input test enable commutation
-    forceCommutation = FALSE;
-    if ( GPIOE->IDR & (1<<2) )   //if closed the switch
-    {
-        forceCommutation = TRUE;
-    }
-
-#ifdef OL_DEV
-    zero_x = TRUE;
-    forceCommutation = TRUE;
-#endif
-
-    if (FALSE != forceCommutation )
-    {
-        // do "commutation" at "time 0"
+        // do "commutation" at "time 0"  (free-running counter on T4)
         if ( FALSE != latch_T4_is_zero )
         {
             latch_T4_is_zero = FALSE; // lame ... need to use a dedicated timer/counter
 
-            if (FALSE != zero_x)
+            if (TRUE /* FALSE != zero_x */)
             {
                 buttonState += 1;
             }
-
             if (buttonState >= N_PHASES)
             {
                 buttonState = 0;
@@ -425,7 +396,6 @@ void periodic_task(void)
                 buttonState = (N_PHASES - 1);
             }
         }
-    }
 }
 
 /*
@@ -433,6 +403,8 @@ void periodic_task(void)
  */
 main()
 {
+    u16 ain_pwm_dc_ch8;
+
     uint16_t duty_cycles[N_PHASES] =
     {
         CCR1_Val, CCR2_Val, CCR3_Val
@@ -441,12 +413,11 @@ main()
 
     GPIO_Config();
 
-    PWM_Config( duty_cycles[0], &duty_cycles[0] );
+    PWM_Config( duty_cycles[0] );
 
     Timer_Config();
 
-    // Enable interrupts (no, really). Interrupts are globally disabled by default
-    enableInterrupts();
+    enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
 
     while(1)
@@ -456,23 +427,19 @@ main()
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce
 
-// WIP ... reconfig PWM only on button push.
+// WIP ... reconfig PWM on button push.
+            ain_pwm_dc_ch8 = readADC1( AINCH_PWM_DC );
 
-//   store duty cycle of the presently selected  channel
-/*
-            duty_cycles[buttonState] = duty_cycle;   
-*/
-// let (ALL) PWM channels update to present DC setting
-            PWM_Config(duty_cycle, &duty_cycles[0]);
+            PWM_Config( ain_pwm_dc_ch8 );
 
-            if (! forceCommutation)  // tmp test "commutation" enabled by switch/button
-            {
-                buttonState += 1;
-                if (buttonState >= N_PHASES)
-                {
-                    buttonState = 0;
-                }
-            }
+//            if (! forceCommutation)  // tmp test "commutation" enabled by switch/button
+//            {
+//                buttonState += 1;
+//                if (buttonState >= N_PHASES)
+//                {
+//                    buttonState = 0;
+//                }
+//            }
         }
 
 // while( FALSE == TaskRdy )

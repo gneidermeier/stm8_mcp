@@ -270,7 +270,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
-#if 1 
+#if 1
 const u8 LED = 0;
 static u8 toggle = 0;
 toggle ^= 1;
