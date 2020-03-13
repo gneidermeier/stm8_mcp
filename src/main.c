@@ -244,10 +244,10 @@ void timer_config_task_rate(void)
 void TIMx_Config(u16 period)
 {
     // GN: trying to get this into a range where LED flashing is mostly visible (leave pre-scale fixed for now)
-#if 0
-    if (period > 1023)
+#if 1
+    if (period > 1014)
     {
-        period = 1023; // cap it to 10-bit so that is correspond to A/D channel
+        period = 1014; // cap it to 10-bit so that is correspond to A/D channel
     }
     // this limit is hackaroun for funky slide-pot
     if (period < 10)
@@ -255,7 +255,19 @@ void TIMx_Config(u16 period)
         period = 10;
     }
 #endif
-    TIM3->PSCR = 0x08;
+
+// 5mS
+//period=77;
+TIM3->PSCR = 0x08;  // PSC==5 -> 1.25mS
+// 0.75mS (750uS)
+//period=78;
+TIM3->PSCR = 0x05;  // PSC==5 -> 1.25mS
+//period=936;
+TIM3->PSCR = 0x05;  // PSC==5 -> 15mS
+//period=936+78;//=1014;
+TIM3->PSCR = 0x05;  // PSC==5 -> 16.125mS
+
+
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
 
@@ -267,14 +279,16 @@ void TIMx_Config(u16 period)
 /*
  * 
  */
+//u16 a_input; // tmp
 void periodic_task(void)
 {
     u16 a_input;
 
     a_input = readADC1( AINCH_COMMUATION_PD );
-
+///*
+//a_input = 1014;
     TIMx_Config( a_input );                    // set the commutation rate by the POT
-
+//*/
     duty_cycle_pcnt_20ms = ( TIM2_T20_MS * a_input ) / 1024;
 }
 
@@ -292,7 +306,7 @@ main()
 
     timer_config_task_rate( /* 5mS */ /* 200 hZ */ );
 
-    TIMx_Config( 128 );
+    TIMx_Config( 78 );
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
