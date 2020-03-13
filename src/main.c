@@ -24,33 +24,23 @@
 
 #include "stm8s.h"
 
-#include "parameter.h" // GN: app defines
+#include "parameter.h" // app defines
 
 
 /* Private defines -----------------------------------------------------------*/
-#define N_PHASES  3 
-
 
 /* Public variables  ---------------------------------------------------------*/
-
 u8 duty_cycle_pcnt_20ms;
-
-u8 latch_T4_is_zero;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
-u16 T4counter = 0;
-//unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
-u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
 
 
 /* Private variables ---------------------------------------------------------*/
 const u8 AINCH_COMMUATION_PD = 9;   // adjust pot to set "commutation" period
 const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
 
-const unsigned  char LED = 0;
-s8 buttonState = 0;
-
 
 /* Private function prototypes -----------------------------------------------*/
+
 /* Private functions ---------------------------------------------------------*/
 
 void GPIO_Config(void)
@@ -198,8 +188,8 @@ void PWM_Config(uint16_t uDC)
     TIM2_DeInit();
 
     /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  ); // PS==1, 999   ->  2khz (period == .000500)
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 499  ); // PS==1, 499   ->  4khz (period == .000250)
+//    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  ); // PS==1, 999   ->  2khz (period == .000500)
+    TIM2_TimeBaseInit(TIM2_PRESCALER_1, TIM2_PWM_PD  ); // PS==1, 499   ->  4khz (period == .000250)
 //    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 249  ); // PS==1, 249 ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
@@ -240,7 +230,7 @@ void PWM_Config(uint16_t uDC)
  *
  * Default setup for STM8S Discovery is 2Mhz HSI ... leave period @ 5mS for now I guesss.....
  */
-void TIM4_Config(void)
+void timer_config_task_rate(void)
 {
     /* Prescaler = 128 */
     TIM4->PSCR = 0x07; // 0b00000111;
@@ -254,8 +244,7 @@ void TIM4_Config(void)
 void TIMx_Config(u16 period)
 {
     // GN: trying to get this into a range where LED flashing is mostly visible (leave pre-scale fixed for now)
-    TIM3->PSCR = 0x08;
-
+#if 0
     if (period > 1023)
     {
         period = 1023; // cap it to 10-bit so that is correspond to A/D channel
@@ -265,113 +254,14 @@ void TIMx_Config(u16 period)
     {
         period = 10;
     }
-
+#endif
+    TIM3->PSCR = 0x08;
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
 
     TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
     TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
     TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM4
-}
-
-void Timer_Config(void)
-{
-    TIM4_Config();
-    TIMx_Config( 128 );
-}
-
-/*
- * returns AIN channel corresponing to selected phase
- */
-u8 updateChannels(s8 selectedChannel)
-{
-    unsigned const int AIN9 = 9;  // PE6
-    unsigned const int AIN8 = 8;  // PE7
-    unsigned const int AIN6 = 6;  // PB6
-
-    u8 AINch;
-
-// set the lo-sides (HI) to turn off LED (pulls cathodes hi)...
-// PA4  (VDD for LED/OUT/CH1.TIM2.PWM on PA3)
-    GPIOA->ODR |= (1<<4);
-// PD2  (VDD for LED/OUT/CH2.TIM2.PWM on PD3)
-    GPIOD->ODR |= (1<<2);
-// PD5  (VDD for LED/OUT/CH3.TIM2.PWM on PD4)
-    GPIOD->ODR |= (1<<5);
-
-    switch (selectedChannel)
-    {
-    case 0:
-        AINch = AIN9;
-        GPIOA->ODR &= ~(1<<4);
-        break;
-    case 1:
-        AINch = AIN8;
-        GPIOD->ODR &= ~(1<<2);
-        break;
-    case 2:
-        AINch = AIN6;
-        GPIOD->ODR &= ~(1<<5);
-        break;
-    default:
-        break;
-    }
-
-    return AINch;
-}
-
-/*
- * determine duty-cycle counts based on analog input (ratio for 10 bit A/d)
- */
-void updateLED0(u16 dwell)
-{
-    u16 dc_counts =  ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
-
-    if ( T4counter < dc_counts )
-    {
-        GPIOD->ODR |= (1 << LED);
-    }
-    else
-    {
-        GPIOD->ODR &= ~(1 << LED);
-    }
-}
-
-/*
- * Tests the input analog reading to determine the "zero crossing"
- * Test LED output shows trim adjustment (solid when trimmed to neutral/half)
- */
-u8 getZeroCross(u16 ainp, u16 counter_period)
-{
-    // set the LED off time (nearly 90% of the period) so that when not
-    // trimmed, the LED will be flashing, albeit at a dimmed intensity
-    u16 dwell_counter = (counter_period * 7) / 8;
-
-// commutation experiment
-    u8 zeroX = FALSE;
-
-    if (ainp >= (512-50) && ainp <= (512+50) )
-    {
-        zeroX = TRUE;
-    }
-
-    if (FALSE != zeroX)
-    {
-// show "zero crossing" by making the test LED briter
-//        dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
-        dwell_counter = 1 ; // practically nearly solid briteness
-    }
-
-    if ( T4counter < dwell_counter )
-    {
-        GPIOC->ODR |= (1 << 7); // drive hi i.e. LED off, as this is lo (cathode)side
-    }
-    else
-    {
-        GPIOC->ODR &= ~(1 << 7);
-    }
-
-    return zeroX;
 }
 
 /*
@@ -382,28 +272,10 @@ void periodic_task(void)
     u16 a_input;
 
     a_input = readADC1( AINCH_COMMUATION_PD );
+
     TIMx_Config( a_input );                    // set the commutation rate by the POT
 
-    duty_cycle_pcnt_20ms = ( TIM2_T20_MS  * a_input ) / 1024;
-
-        // do "commutation" at "time 0"  (free-running counter on T4)
-        if ( FALSE != latch_T4_is_zero )
-        {
-            latch_T4_is_zero = FALSE; // lame ... need to use a dedicated timer/counter
-
-            if (TRUE /* FALSE != zero_x */)
-            {
-                buttonState += 1;
-            }
-            if (buttonState >= N_PHASES)
-            {
-                buttonState = 0;
-            }
-            else  if (buttonState < 0)
-            {
-                buttonState = (N_PHASES - 1);
-            }
-        }
+    duty_cycle_pcnt_20ms = ( TIM2_T20_MS * a_input ) / 1024;
 }
 
 /*
@@ -411,25 +283,23 @@ void periodic_task(void)
  */
 main()
 {
-    u16 ain_pwm_dc_ch8;
-
-    uint16_t duty_cycles[N_PHASES] =
-    {
-        CCR1_Val, CCR2_Val, CCR3_Val
-    } ;
-
-
     GPIO_Config();
 
-    PWM_Config( duty_cycles[0] );
 
-    Timer_Config();
+// initialize PWM w/  dc to 50% ... 512/1024-> 50%  
+    PWM_Config(  150 /* idfk */     );     //  tmp /....    // ( TIM2_T20_MS  * 512 ) / 1024 
+
+
+    timer_config_task_rate( /* 5mS */ /* 200 hZ */ );
+
+    TIMx_Config( 128 );
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
 
     while(1)
     {
+        u16 ain_pwm_dc_ch8;	
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
         {
@@ -439,15 +309,6 @@ main()
             ain_pwm_dc_ch8 = readADC1( AINCH_PWM_DC );
 
             PWM_Config( ain_pwm_dc_ch8 );
-
-//            if (! forceCommutation)  // tmp test "commutation" enabled by switch/button
-//            {
-//                buttonState += 1;
-//                if (buttonState >= N_PHASES)
-//                {
-//                    buttonState = 0;
-//                }
-//            }
         }
 
 // while( FALSE == TaskRdy )
@@ -457,7 +318,7 @@ main()
         }
         else
         {
-            TaskRdy = TRUE;
+            TaskRdy = FALSE;
             periodic_task();
         }
     } // while 1

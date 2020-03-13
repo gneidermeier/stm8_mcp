@@ -30,3 +30,8 @@
 // Using TIM2 to count up to 20mS time base 
 // 20mS / 250uS = 80
 #define TIM2_T20_MS 80
+
+#define N_PHASES  3 
+
+
+#define LED  0

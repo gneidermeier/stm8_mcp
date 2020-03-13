@@ -25,10 +25,8 @@
 
 
 extern u8 duty_cycle_pcnt_20ms;
-extern u8 latch_T4_is_zero;
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-extern u16 T4counter ;
-extern u16 T4_count_pd;
+
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -272,7 +270,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-    const u8 LED = 0;
     static u8 count20ms = 0;
 
     count20ms += 1;
@@ -316,12 +313,12 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
-
     static u8 toggle = 0;
+    static u8 phase = 0;
 //    toggle ^= 1;  // wiggle test pin
-  toggle += 1;
-  if (toggle >=3){
-    toggle = 0;
+  phase += 1;
+  if (phase >= N_PHASES){
+    phase = 0;
   }
 
   // must reset the tmer interrupt flag
@@ -329,7 +326,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
 // TMP TEST 
 ////  CN2 1-3-5  PE5, PC2, PC4
-	switch(toggle){
+	switch(phase){
 		default:
 		case 0:
       GPIOE->ODR |=  (1<<5); 				//  PE5
@@ -347,6 +344,15 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
       GPIOC->ODR |=  (1<<4); 				//  PC4
 		break;
 	}
+
+#if 1
+toggle ^= 1;
+    if ( toggle ){
+        GPIOC->ODR &= ~(1<<7);
+    }else {
+        GPIOC->ODR |=  (1<<7);
+    }
+#endif
 }
 
 /**
@@ -504,22 +510,20 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+#if 0
+static u8 toggle = 0; 
+    toggle ^= 1;          //  LED/OUT/CH3.TIM2.PWM on PC7
+    if (toggle){
+        GPIOC->ODR &= ~(1<<7);
+    }else {
+        GPIOC->ODR |=  (1<<7);
+    }
+#endif
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
 
-//        duty_cycle = readADC1( AINx ); // needs to  use  AIN interrupt to read sample
     TaskRdy = TRUE;     // notify background process
-
-
-    T4counter  += 1;
-
-    // using counter period to cycle LED0, slo enuff rate to see it
-    if (T4counter >= T4_count_pd)
-    {
-        T4counter = 0;
-        latch_T4_is_zero = TRUE;
-    }
 }
 #endif /*STM8S903*/
 
