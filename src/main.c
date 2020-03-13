@@ -24,11 +24,16 @@
 
 #include "stm8s.h"
 
+#include "parameter.h" // GN: app defines
+
+
 /* Private defines -----------------------------------------------------------*/
 #define N_PHASES  3 
-#define OL_DEV
+
 
 /* Public variables  ---------------------------------------------------------*/
+
+u8 duty_cycle_pcnt_20ms;
 
 u8 latch_T4_is_zero;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
@@ -192,9 +197,10 @@ void PWM_Config(uint16_t uDC)
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
 
-    /* Set TIM2 Frequency to 2Mhz */
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  );
-//TIM2_TimeBaseInit(TIM2_PRESCALER_1, 10  );   // appears 1 cycle = 1uS, so fMASTER period == @ 0.5uS
+    /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
+    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  ); // PS==1, 999   ->  2khz (period == .000500)
+    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 499  ); // PS==1, 499   ->  4khz (period == .000250)
+//    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 249  ); // PS==1, 249 ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
 //TIM2_Pulse = CCR1_Val;
@@ -377,6 +383,8 @@ void periodic_task(void)
 
     a_input = readADC1( AINCH_COMMUATION_PD );
     TIMx_Config( a_input );                    // set the commutation rate by the POT
+
+    duty_cycle_pcnt_20ms = ( TIM2_T20_MS  * a_input ) / 1024;
 
         // do "commutation" at "time 0"  (free-running counter on T4)
         if ( FALSE != latch_T4_is_zero )

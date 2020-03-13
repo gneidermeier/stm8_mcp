@@ -21,8 +21,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
-//#include "parameter.h" // GN: app defines
+#include "parameter.h" // GN: app defines
 
+
+extern u8 duty_cycle_pcnt_20ms;
 extern u8 latch_T4_is_zero;
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 extern u16 T4counter ;
@@ -267,25 +269,27 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
-#if 1
-const u8 LED = 0;
-static u8 toggle = 0;
-toggle ^= 1;
-  if ( toggle )
+    /* In order to detect unexpected events during development,
+       it is recommended to set a breakpoint on the following instruction.
+    */
+    const u8 LED = 0;
+    static u8 count20ms = 0;
+
+    count20ms += 1;
+
+    if (count20ms > TIM2_T20_MS)
     {
+        count20ms = 0;
         GPIOD->ODR |= (1 << LED);
     }
-    else
+
+    if (count20ms > duty_cycle_pcnt_20ms)
     {
         GPIOD->ODR &= ~(1 << LED);
     }
 
-  // must reset the tmer interrupt flag
+    // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
-#endif
 }
 
 /**
