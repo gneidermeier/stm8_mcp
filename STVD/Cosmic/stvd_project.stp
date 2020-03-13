@@ -482,7 +482,7 @@ PathName=..\..\src\stm8s_it.c
 [Root.Include Files]
 ElemType=Folder
 PathName=Include Files
-Child=Root.Include Files...\..\inc\stm8s_it.h
+Child=Root.Include Files...\..\inc\parameter.h
 Config.0=Root.Include Files.Config.0
 Config.1=Root.Include Files.Config.1
 
@@ -551,6 +551,11 @@ String.3.0=
 String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
+
+[Root.Include Files...\..\inc\parameter.h]
+ElemType=File
+PathName=..\..\inc\parameter.h
+Next=Root.Include Files...\..\inc\stm8s_it.h
 
 [Root.Include Files...\..\inc\stm8s_it.h]
 ElemType=File
