@@ -274,13 +274,15 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
     count20ms += 1;
 
+/* create a reference signal @50Hz/20mS ... set LED0 for visual reference 
+ * of duty cycle percentage to be set by the "speed pot"
+ */
     if (count20ms > TIM2_T20_MS)
     {
         count20ms = 0;
         GPIOD->ODR |= (1 << LED);
     }
-
-    if (count20ms > duty_cycle_pcnt_20ms)
+    else if (count20ms > duty_cycle_pcnt_20ms)
     {
         GPIOD->ODR &= ~(1 << LED);
     }

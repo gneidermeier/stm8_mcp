@@ -170,10 +170,6 @@ unsigned int readADC1(unsigned int channel)
   * @retval void None
   *   GN: from UM0834 PWM example
   */
-#define CCR1_Val  ((u16)500) // Configure channel 1 Pulse Width
-#define CCR2_Val  ((u16)250) // Configure channel 2 Pulse Width
-#define CCR3_Val  ((u16)750) // Configure channel 3 Pulse Width
-
 void PWM_Config(uint16_t uDC)
 {
     uint16_t TIM2_pulse_0 ;// = *(p_DC + 0);
@@ -189,24 +185,20 @@ void PWM_Config(uint16_t uDC)
 
     /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
 //    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  ); // PS==1, 999   ->  2khz (period == .000500)
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, TIM2_PWM_PD  ); // PS==1, 499   ->  4khz (period == .000250)
+    TIM2_TimeBaseInit(TIM2_PRESCALER_1, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  4khz (period == .000250)
 //    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 249  ); // PS==1, 249 ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
-//TIM2_Pulse = CCR1_Val;
-    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0 /* CCR1_Val */, TIM2_OCPOLARITY_LOW );
-//TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 5, TIM2_OCPOLARITY_LOW );
+    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0, TIM2_OCPOLARITY_LOW );
     TIM2_OC1PreloadConfig(ENABLE);
 
 
     /* Channel 2 PWM configuration */
-//TIM2_Pulse = CCR2_Val;
     TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_1, TIM2_OCPOLARITY_LOW );
     TIM2_OC2PreloadConfig(ENABLE);
 
 
     /* Channel 3 PWM configuration */
-//TIM2_Pulse = CCR3_Val;
     TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_2, TIM2_OCPOLARITY_LOW );
     TIM2_OC3PreloadConfig(ENABLE);
 
@@ -241,32 +233,31 @@ void timer_config_task_rate(void)
 }
 
 // Timers 2 3 & 5 are 16-bit general purpose timers
-void TIMx_Config(u16 period)
+/*
+ * Control "Enable" signal of each channel, sequencing thru each of 
+ *  3 phases. (this was for DRV8813 but we could still do an "Enable" 
+ * on each channel thus allowing PWM to be controlled independently - PWM basically just left "ON")
+ * Let the timer3 period be dynamically adjusted to the "speed pot"
+ * Presently, to set this up to allow "RPM" range ruffly 60-400 Hz.  ***
+ * (***actual RPM would be calculated from cycle-time reduced by factor of 3 since 3 phases -> 1 RPM)
+ *
+ *  1 Count Time = 0.0000005 * 32 = 0.000016 Sec
+ *  (1/500) == 125 counts * 0.000016 
+ *   (1/60) == 1014 counts * 0.000016
+ *
+ *   hmmm this is dumb ... forcing range of channel timer/counter to that of anlg input 
+ */
+void timer_config_channel_time(u16 period)
 {
-    // GN: trying to get this into a range where LED flashing is mostly visible (leave pre-scale fixed for now)
-#if 1
-    if (period > 1014)
-    {
-        period = 1014; // cap it to 10-bit so that is correspond to A/D channel
+    if (period < 1){
+        period = 1;  // protect against setting a 0 period
     }
-    // this limit is hackaroun for funky slide-pot
-    if (period < 10)
-    {
-        period = 10;
-    }
-#endif
-
-// 5mS
-//period=77;
-TIM3->PSCR = 0x08;  // PSC==5 -> 1.25mS
-// 0.75mS (750uS)
 //period=78;
 TIM3->PSCR = 0x05;  // PSC==5 -> 1.25mS
 //period=936;
 TIM3->PSCR = 0x05;  // PSC==5 -> 15mS
-//period=936+78;//=1014;
-TIM3->PSCR = 0x05;  // PSC==5 -> 16.125mS
-
+    //period=936+78;//=1014;
+    TIM3->PSCR = 0x05;  // PSC==5 -> 16.125mS
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
@@ -282,14 +273,15 @@ TIM3->PSCR = 0x05;  // PSC==5 -> 16.125mS
 //u16 a_input; // tmp
 void periodic_task(void)
 {
+    u16 period;
     u16 a_input;
-
     a_input = readADC1( AINCH_COMMUATION_PD );
-///*
 //a_input = 1014;
-    TIMx_Config( a_input );                    // set the commutation rate by the POT
-//*/
-    duty_cycle_pcnt_20ms = ( TIM2_T20_MS * a_input ) / 1024;
+    period = a_input; // the timer pre-scale is set such that 10-bit range of the ainput 
+    timer_config_channel_time( period );
+
+// 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
+    duty_cycle_pcnt_20ms =   (TIM2_T20_MS/2) * a_input / (1024/2);
 }
 
 /*
@@ -299,30 +291,31 @@ main()
 {
     GPIO_Config();
 
+// initialize to 50% DC (just because) 
+    PWM_Config( TIM2_PWM_PD / 2 );
 
-// initialize PWM w/  dc to 50% ... 512/1024-> 50%  
-    PWM_Config(  150 /* idfk */     );     //  tmp /....    // ( TIM2_T20_MS  * 512 ) / 1024 
+    timer_config_task_rate(  ); // fixed at 5mS 
 
-
-    timer_config_task_rate( /* 5mS */ /* 200 hZ */ );
-
-    TIMx_Config( 78 );
+    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
 
     while(1)
     {
-        u16 ain_pwm_dc_ch8;	
+        u16 ainp;
+        u16 pwm_dc_count;
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce
 
 // WIP ... reconfig PWM on button push.
-            ain_pwm_dc_ch8 = readADC1( AINCH_PWM_DC );
+            ainp = readADC1( AINCH_PWM_DC );
 
-            PWM_Config( ain_pwm_dc_ch8 );
+// 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
+            pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8);
+            PWM_Config( pwm_dc_count );
         }
 
 // while( FALSE == TaskRdy )

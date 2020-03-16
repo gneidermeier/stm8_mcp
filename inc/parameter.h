@@ -25,11 +25,16 @@
 //  0.5uS * 500 counts = 250uS
 //  1 / 250uS = 4000Hz
 
-#define TIM2_PWM_PD (500 - 1)
+#define TIM2_PWM_PD (500 - 0)   // set prescaler with "(period - 1)" (see datasheet)
 
 // Using TIM2 to count up to 20mS time base 
 // 20mS / 250uS = 80
-#define TIM2_T20_MS 80
+
+// 1/50Hz = 0.020 S
+// 1/250uS = 4000Hz
+// 20mS / 250uS = 20mS * 1/250uS = (1/50) * 4000 = 80
+
+#define TIM2_T20_MS  (4000 / 50) // 80
 
 #define N_PHASES  3 
 
