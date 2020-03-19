@@ -25,7 +25,12 @@
 //  0.5uS * 500 counts = 250uS
 //  1 / 250uS = 4000Hz
 
-#define TIM2_PWM_PD (500 - 0)   // set prescaler with "(period - 1)" (see datasheet)
+//set prescaler with "(period - 1)" (see datasheet)
+//#define TIM2_PWM_PD (125 - 0)    // 16k
+#define TIM2_PWM_PD (250 - 0)  //  8k
+//#define TIM2_PWM_PD (500 - 0)  //  4k
+//#define TIM2_PWM_PD (1000 - 0) //  2k
+//#define TIM2_PWM_PD (2000 - 0) //  1kHz ... test 290k*470pf -> Tau==136uSec
 
 // Using TIM2 to count up to 20mS time base 
 // 20mS / 250uS = 80
