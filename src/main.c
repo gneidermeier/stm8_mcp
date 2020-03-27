@@ -46,12 +46,12 @@ const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
 void GPIO_Config(void)
 { 
 // OUTPUTS
-// built-in LED    
+// built-in LED
+    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)	
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
-    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathod driven to Vcc)	
 
-// 3 "ENABLES" for the 3 fields on CN2 1-3-5  PE5, PC2, PC4
+// HB driver "ENABLES" (/SD input pin of IR2104) on PE5, PC2, PC4
     GPIOE->ODR &=  ~(1<<5); 				//  PE5
     GPIOE->DDR |=  (1<<5);
     GPIOE->CR1 |=  (1<<5);
@@ -64,12 +64,14 @@ void GPIO_Config(void)
     GPIOC->DDR |=  (1<<4);
     GPIOC->CR1 |=  (1<<4);
 
+
+
 // test LED C6+C7
-    GPIOC->ODR &= ~(1<<7); 				//  LED/OUT/CH3.TIM2.PWM on PC7
+    GPIOC->ODR &= ~(1<<7); 				//  LED toggle on PC7
     GPIOC->DDR |=  (1<<7);
     GPIOC->CR1 |=  (1<<7);
 
-    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on C6 (to VCC)
+    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6 
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
 
@@ -97,11 +99,11 @@ void GPIO_Config(void)
     GPIOA->ODR &= ~(1 << 5); // set "off" (not driven) to use as hi-side of button
 
 // PE3/2 as test switch input 
-    GPIOE->DDR &= ~(1 << 2); // PE.2 as input
-    GPIOE->CR1 |= (1 << 2);  // pull up w/o interrupts
-    GPIOE->DDR |= (1 << 3);  // PD.n as output
-    GPIOE->CR1 |= (1 << 3);  // push pull output
-    GPIOE->ODR |= (1 << 3);  // use as hi-side of button
+//    GPIOE->DDR &= ~(1 << 2); // PE.2 as input
+//    GPIOE->CR1 |= (1 << 2);  // pull up w/o interrupts
+//    GPIOE->DDR |= (1 << 3);  // PD.n as output
+//    GPIOE->CR1 |= (1 << 3);  // push pull output
+//    GPIOE->ODR |= (1 << 3);  // use as hi-side of button
 
 
 // PE.6 AIN9
@@ -214,6 +216,27 @@ void PWM_Config(uint16_t uDC)
 #endif
 }
 
+// from:
+//   http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
+void TIM1_setup(void)
+{
+     TIM1_DeInit();
+                
+     TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 1);
+                
+     TIM1_OC1Init(TIM1_OCMODE_PWM1, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  TIM1_OUTPUTNSTATE_ENABLE, 
+                  1000, 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCNPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET, 
+                  TIM1_OCNIDLESTATE_RESET);
+                
+    TIM1_CtrlPWMOutputs(ENABLE);
+    TIM1_Cmd(ENABLE);
+}
+
 /*
  * Configure Timer 4 as general purpose fixed time-base reference
  * Timer 4 & 6 are 8-bit basic timers
@@ -237,13 +260,16 @@ void timer_config_task_rate(void)
  * Control "Enable" signal of each channel, sequencing thru each of 
  *  3 phases. (this was for DRV8813 but we could still do an "Enable" 
  * on each channel thus allowing PWM to be controlled independently - PWM basically just left "ON")
- * Let the timer3 period be dynamically adjusted to the "speed pot"
- * Presently, to set this up to allow "RPM" range ruffly 60-400 Hz.  ***
- * (***actual RPM would be calculated from cycle-time reduced by factor of 3 since 3 phases -> 1 RPM)
+ * Drive the /SD pins of the IR2104s to enable each field in sequence. 
+ * Temp, test:
+ *  Let the timer3 period be dynamically adjusted to the "speed pot"
+ *  Presently, to set this up to allow "RPM" range ruffly 60-400 Hz.  ***
+ *  (***actual RPM would be calculated from cycle-time reduced by factor of 3 since 3 phases -> 1 RPM)
  *
- *  1 Count Time = 0.0000005 * 32 = 0.000016 Sec
- *  (1/500) == 125 counts * 0.000016 
- *   (1/60) == 1014 counts * 0.000016
+ *  1/2Mhz = 0.0000005
+ *  1 Count Time = 0.0000005 * (2^5) = 0.000016 Sec
+ *    125 counts * 0.000016 -> 500Hz
+ *   1014 counts * 0.000016 ->  60Hz
  *
  *   hmmm this is dumb ... forcing range of channel timer/counter to that of anlg input 
  */
@@ -252,12 +278,10 @@ void timer_config_channel_time(u16 period)
     if (period < 1){
         period = 1;  // protect against setting a 0 period
     }
-//period=78;
-TIM3->PSCR = 0x05;  // PSC==5 -> 1.25mS
-//period=936;
-TIM3->PSCR = 0x05;  // PSC==5 -> 15mS
-    //period=936+78;//=1014;
-    TIM3->PSCR = 0x05;  // PSC==5 -> 16.125mS
+ // PSC==5 period==78    ->  1.25 mS
+ // PSC==5 period==936   -> 15.0 mS
+ // PSC==5 period=936+78=1014 -> 16.125 mS
+    TIM3->PSCR = 0x05;
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
@@ -278,6 +302,8 @@ void periodic_task(void)
     a_input = readADC1( AINCH_COMMUATION_PD );
 //a_input = 1014;
     period = a_input; // the timer pre-scale is set such that 10-bit range of the ainput 
+//if (period < 90)
+//  period=90; // don't know whats going on here ... funky pot?
     timer_config_channel_time( period );
 
 // 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(

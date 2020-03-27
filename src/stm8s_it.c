@@ -274,8 +274,8 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
     count20ms += 1;
 
-/* create a reference signal @50Hz/20mS ... set LED0 for visual reference 
- * of duty cycle percentage to be set by the "speed pot"
+/*
+ * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing) 
  */
     if (count20ms > TIM2_T20_MS)
     {
@@ -316,36 +316,37 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
      it is recommended to set a breakpoint on the following instruction.
   */
     static u8 toggle = 0;
-    static u8 phase = 0;
-//    toggle ^= 1;  // wiggle test pin
-  phase += 1;
-  if (phase >= N_PHASES){
-    phase = 0;
+    static u8 step = 0;
+
+  step += 1;
+
+  if (step >= N_CSTEPS){
+    step = 0;
   }
 
   // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 
-// TMP TEST 
-////  CN2 1-3-5  PE5, PC2, PC4
-	switch(phase){
-		default:
-		case 0:
+
+// PE5, PC2, PC4 tmp test
+  switch(step){
+    default:
+    case 0:
       GPIOE->ODR |=  (1<<5); 				//  PE5
       GPIOC->ODR &=  ~(1<<2); 				//  PC2
       GPIOC->ODR &=  ~(1<<4); 				//  PC4
-		break;
-		case 1:
+    break;
+    case 1:
       GPIOE->ODR &=  ~(1<<5); 				//  PE5
       GPIOC->ODR |=  (1<<2); 				//  PC2
       GPIOC->ODR &=  ~(1<<4); 				//  PC4
-		break;
-	  case 2:
+    break;
+    case 2:
       GPIOE->ODR &=  ~(1<<5); 				//  PE5
       GPIOC->ODR &=  ~(1<<2); 				//  PC2
       GPIOC->ODR |=  (1<<4); 				//  PC4
-		break;
-	}
+    break;
+  }
 
 #if 1
 toggle ^= 1;
@@ -514,7 +515,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     */
 #if 0
 static u8 toggle = 0; 
-    toggle ^= 1;          //  LED/OUT/CH3.TIM2.PWM on PC7
+    toggle ^= 1;          //  LED  on PC7
     if (toggle){
         GPIOC->ODR &= ~(1<<7);
     }else {
