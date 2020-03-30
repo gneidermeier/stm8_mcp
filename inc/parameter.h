@@ -42,7 +42,7 @@
 #define TIM2_T20_MS  (4000 / 50) // 80
 
 // nbr of steps required to commutate 3 phase 
-#define N_CSTEPS  3  // 6 ... 
+#define N_CSTEPS   6  
 
 
 #define LED  0

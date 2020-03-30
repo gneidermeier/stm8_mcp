@@ -332,20 +332,35 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   switch(step){
     default:
     case 0:
-      GPIOE->ODR |=  (1<<5); 				//  PE5
-      GPIOC->ODR &=  ~(1<<2); 				//  PC2
-      GPIOC->ODR &=  ~(1<<4); 				//  PC4
-    break;
-    case 1:
-      GPIOE->ODR &=  ~(1<<5); 				//  PE5
-      GPIOC->ODR |=  (1<<2); 				//  PC2
-      GPIOC->ODR &=  ~(1<<4); 				//  PC4
-    break;
-    case 2:
       GPIOE->ODR &=  ~(1<<5); 				//  PE5
       GPIOC->ODR &=  ~(1<<2); 				//  PC2
       GPIOC->ODR |=  (1<<4); 				//  PC4
     break;
+    case 1:
+      GPIOE->ODR |=  (1<<5); 				//  PE5
+      GPIOC->ODR &=  ~(1<<2); 				//  PC2
+      GPIOC->ODR |=  (1<<4); 				//  PC4
+    break;
+    case 2:
+      GPIOE->ODR |=  (1<<5); 				//  PE5
+      GPIOC->ODR &=  ~(1<<2); 				//  PC2
+      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+    break;
+    case 3:
+      GPIOE->ODR |=  (1<<5); 				//  PE5
+      GPIOC->ODR |=  (1<<2); 				//  PC2
+      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+    break;
+    case 4:
+      GPIOE->ODR &=  ~(1<<5); 				//  PE5
+      GPIOC->ODR |=  (1<<2); 				//  PC2
+      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+    break;
+    case 5:
+      GPIOE->ODR &=  ~(1<<5); 				//  PE5
+      GPIOC->ODR |=  (1<<2); 				//  PC2
+      GPIOC->ODR |=  (1<<4); 				//  PC4
+    break;		
   }
 
 #if 1
