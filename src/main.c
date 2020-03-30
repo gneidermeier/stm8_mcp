@@ -21,7 +21,7 @@
 
 
 /* Includes ------------------------------------------------------------------*/
-
+#include <string.h>
 #include "stm8s.h"
 
 #include "parameter.h" // app defines
@@ -97,6 +97,14 @@ void GPIO_Config(void)
     GPIOA->DDR |= (1 << 5);  // PD.n as output
     GPIOA->CR1 |= (1 << 5);  // push pull output
     GPIOA->ODR &= ~(1 << 5); // set "off" (not driven) to use as hi-side of button
+
+
+// UART2 D5: Rx, D6: Tx 
+    GPIOD->DDR &= ~(1 << 5); // PD.5 as input
+    GPIOD->CR1 |= (1 << 5);  // pull up w/o interrupts
+    GPIOD->DDR |= (1 << 6);  // PD.6 as output
+    GPIOD->CR1 |= (1 << 6);  // push pull output
+    GPIOD->ODR |= (1 << 6);  // use as hi-side of button
 
 // PE3/2 as test switch input 
 //    GPIOE->DDR &= ~(1 << 2); // PE.2 as input
@@ -292,11 +300,47 @@ void timer_config_channel_time(u16 period)
 }
 
 /*
+ * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
+ */
+void UART_setup(void)
+{
+     UART2_DeInit();
+                
+     UART2_Init(115200, 
+                UART2_WORDLENGTH_8D, 
+                UART2_STOPBITS_1, 
+                UART2_PARITY_NO, 
+                UART2_SYNCMODE_CLOCK_DISABLE, 
+                UART2_MODE_TXRX_ENABLE);
+                
+     UART2_Cmd(ENABLE);
+}
+
+/*
+ * 
+ */
+//
+//  Send a message to the debug port (UART1).  
+//    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+//
+void UARTputs(char *message)
+{
+    char *ch = message;
+    while (*ch)
+    {
+        UART2->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
+        while ( 0 == (UART2->SR & UART2_SR_TXE) ); //  Wait for transmission to complete.
+        ch++;                               //  Grab the next character.
+    }
+}
+
+/*
  * 
  */
 //u16 a_input; // tmp
 void periodic_task(void)
 {
+//static unsigned char ch = 0x30; // tmp
     u16 period;
     u16 a_input;
     a_input = readADC1( AINCH_COMMUATION_PD );
@@ -308,6 +352,12 @@ void periodic_task(void)
 
 // 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
     duty_cycle_pcnt_20ms =   (TIM2_T20_MS/2) * a_input / (1024/2);
+
+//ch+=1;
+//if (ch > 127)
+//  ch = 0x30;
+//       UART2->DR =  ch;     //  Put the next character into the data transmission register.
+//        while ( 0 == (UART2->SR & UART2_SR_TXE) );          //  Wait for transmission to complete.
 }
 
 /*
@@ -315,7 +365,13 @@ void periodic_task(void)
  */
 main()
 {
+static unsigned char cnt = 0x30;
+char sbuf[32] ;
+char cbuf[2] = { 0, 0 };
+
     GPIO_Config();
+
+    UART_setup();
 
 // initialize to 50% DC (just because) 
     PWM_Config( TIM2_PWM_PD / 2 );
@@ -339,9 +395,17 @@ main()
 // WIP ... reconfig PWM on button push.
             ainp = readADC1( AINCH_PWM_DC );
 
-// 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
-            pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8);
+            // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
+            pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8); // todo;  reorder,  intermediate cast elim. /8
             PWM_Config( pwm_dc_count );
+// tmp test UART
+cnt = cnt < 126 ? cnt + 1 : 0x30;
+sbuf[0] = 0;
+strcat(sbuf, "hello");
+cbuf[0] = cnt;
+strcat(sbuf, cbuf);
+strcat(sbuf, "\r\n");
+UARTputs(sbuf);
         }
 
 // while( FALSE == TaskRdy )
