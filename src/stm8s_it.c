@@ -363,7 +363,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     break;		
   }
 
-#if 1
+#if 0
 toggle ^= 1;
     if ( toggle ){
         GPIOC->ODR &= ~(1<<7);
@@ -496,12 +496,28 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   * @param  None
   * @retval None
   */
+
+extern uint16_t A1 ;//tmp
+
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
 {
 
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+#if 1
+static u8 toggle = 0; 
+    toggle ^= 1;          //  LED  on PC7
+    if (toggle){
+        GPIOC->ODR &= ~(1<<7);
+    }else {
+        GPIOC->ODR |=  (1<<7);
+    }
+#endif // 1	
+
+    A1 = ADC1_GetConversionValue();
+
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
 }
 #endif /*STM8S208 or STM8S207 or STM8AF52Ax or STM8AF62Ax */
 

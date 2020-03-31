@@ -302,6 +302,11 @@ Child=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_adc1.c]
 ElemType=File
 PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_adc1.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c
 Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c
 
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c]
@@ -312,6 +317,11 @@ Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim2.c]
 ElemType=File
 PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim2.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c
 
 [Root.STM8_TouchSensing_Lib]
 ElemType=Folder

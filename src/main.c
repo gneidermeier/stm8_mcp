@@ -28,12 +28,19 @@
 
 #include "parameter.h" // app defines
 
+//#define TEST_ADC // WIP scanning ADC input
+//#define ADC_SCAN
 
 /* Private defines -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
 u8 duty_cycle_pcnt_20ms;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
+
+uint16_t A0 = 0x1234;//tmp
+uint16_t A1 = 0xabcd;//tmp
+
+u16 pwm_dc_count;
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -251,7 +258,7 @@ unsigned int readADC1(unsigned int channel)
 void ADC1_setup(void)
 {
     ADC1_DeInit();
-#if 0
+#ifdef ADC_SCAN
     ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
               ADC1_CHANNEL_8,
               ADC1_PRESSEL_FCPU_D18,
@@ -280,10 +287,16 @@ void ADC1_setup(void)
               ADC1_EXTTRIG_GPIO,
               DISABLE,
               ADC1_ALIGN_RIGHT,
-              ADC1_SCHMITTTRIG_CHANNEL0,
+              ADC1_SCHMITTTRIG_CHANNEL9,
               DISABLE);
 #endif
+
+    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
+
     ADC1_Cmd(ENABLE);
+
+// only need started once if interrupt is enabled
+  ADC1_StartConversion();
 }
 
 /**
@@ -298,10 +311,7 @@ void PWM_Config(uint16_t uDC)
     uint16_t TIM2_pulse_0 ;// = *(p_DC + 0);
     uint16_t TIM2_pulse_1 ;// = *(p_DC + 1);
     uint16_t TIM2_pulse_2 ;// = *(p_DC + 2);
-    TIM2_pulse_0 = \
-                   TIM2_pulse_1 = \
-                                  TIM2_pulse_2 = uDC;
-//return; // tmp test
+    TIM2_pulse_0 =  TIM2_pulse_1 =  TIM2_pulse_2 = uDC;
 
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
@@ -338,6 +348,7 @@ void PWM_Config(uint16_t uDC)
 #endif
 }
 
+// tmp test
 // from:
 //   http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
 void TIM1_setup(void)
@@ -416,6 +427,9 @@ void timer_config_channel_time(u16 period)
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
+ * GN:  by default  microcontroller uses   internal 16MHz RC oscillator 
+ * ("HSI", or high-speed internal) divided by eight  as a clock source. This results in a base timer frequency of 2MHz.
+ * Using this function just to show the library way to explicit clock setup.
  */
 void clock_setup(void)
 {
@@ -426,7 +440,6 @@ void clock_setup(void)
     CLK_HSICmd(ENABLE);
     while(CLK_GetFlagStatus(CLK_FLAG_HSIRDY) == FALSE);
     CLK_ClockSwitchCmd(ENABLE);
-// GN: By default, the microcontroller uses its internal 16MHz RC oscillator ("HSI", or high-speed internal) divided by eight as a clock source. This results in a base timer frequency of 2MHz.
 //   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV2);
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV8); //GN:
 //   CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV4);
@@ -446,39 +459,51 @@ void clock_setup(void)
 /*
  * 
  */
-//#define TEST_ADC // the "new" polled ADC input
-unsigned int A0 = 0x1234;//tmp
-unsigned int A1 = 0xabcd;//tmp
 void periodic_task(void)
 {
 //static unsigned char ch = 0x30; // tmp
+// unsigned int csr = 0;
+
     u16 period;
-    u16 a_input;
 
 #ifdef TEST_ADC
-//ADC1_ScanModeCmd(ENABLE);
+ #ifdef ADC_SCAN
+    ADC1_ScanModeCmd(ENABLE);
     ADC1_StartConversion();
+///*
+    while(ADC1_GetFlagStatus(ADC1_FLAG_EOC) == FALSE);
+
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
+//*/
+    A0 = ADC1_GetBufferValue(AINCH_PWM_DC);
+    A1 = ADC1_GetBufferValue(AINCH_COMMUATION_PD);
+
+            // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
+            pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
+
+//            PWM_Config( pwm_dc_count );    // // WIP ... reconfig PWM on button push.
+
+ #else
+//     ADC1_StartConversion();
+/* do in interrupt
     while(ADC1_GetFlagStatus(ADC1_FLAG_EOC) == FALSE);
 
     A1 = ADC1_GetConversionValue();
     ADC1_ClearFlag(ADC1_FLAG_EOC);
-// A0 = ADC1_GetBufferValue(AINCH_PWM_DC);
-// A1 = ADC1_GetBufferValue(AINCH_COMMUATION_PD);
-    a_input = A1;
+*/
+ #endif
+
 #else
-    a_input = readADC1( AINCH_COMMUATION_PD );
+    A1 = readADC1( AINCH_COMMUATION_PD );
     A0 = -1;
-    A1 = a_input;
 #endif
 
 //a_input = 1014;
-    period = a_input; // the timer pre-scale is set such that 10-bit range of the ainput 
-//if (period < 90)
-//  period=90; // don't know whats going on here ... funky pot?
+    period = A1; // the timer pre-scale is set such that 10-bit range of the ainput 
     timer_config_channel_time( period );
 
 // 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
-    duty_cycle_pcnt_20ms =   (TIM2_T20_MS/2) * a_input / (1024/2);
+    duty_cycle_pcnt_20ms =   (TIM2_T20_MS/2) * period / (1024/2);
 
 //ch+=1;
 //if (ch > 127)
@@ -539,18 +564,21 @@ main()
     while(1)
     {
         u16 ainp;
-        u16 pwm_dc_count;
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
 // WIP ... reconfig PWM on button push.
-#ifndef TEST_ADC
+#ifdef TEST_ADC
+ ainp = A0;
+#else
             ainp = readADC1( AINCH_PWM_DC );
-#endif
+
             // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
             pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8); // todo;  reorder,  intermediate cast elim. /8
+#endif
+//   on button -push ? 
             PWM_Config( pwm_dc_count );
 
 						testUART();// tmp test
