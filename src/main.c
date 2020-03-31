@@ -22,6 +22,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
+//#include <stdio.h>
+//#include <stdlib.h>
 #include "stm8s.h"
 
 #include "parameter.h" // app defines
@@ -43,11 +45,48 @@ const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
 
 /* Private functions ---------------------------------------------------------*/
 
+/*
+ * home-made itoa function (16-bits only, hex-only)
+ * seems Cosmic only provide atoi in stdlib and not itoa
+ */
+char * itoa(uint16_t u16in, char *sbuf, int base)
+{
+    int x;
+    int shift = 16 - 4;	/* 4-bits to 1 nibble */
+    uint16_t n16 = u16in;
+
+    if (16 != base)
+    {
+        return NULL;
+    }
+
+    x = 0;
+    while (x < 4 /* 4 nibbles in 16-bit word */ )
+    {
+        unsigned char c = (n16 >> shift) & 0x000F;
+
+        if (c > 9)
+        {
+            c -= 10;
+            c += 'A';
+        }
+        else
+        {
+            c += '0';
+        }
+        sbuf[x++] = c;
+        shift -= 4;
+    }
+    sbuf[x] = 0;
+
+    return sbuf;
+}
+
 void GPIO_Config(void)
-{ 
+{
 // OUTPUTS
 // built-in LED
-    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)	
+    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
 
@@ -63,7 +102,6 @@ void GPIO_Config(void)
     GPIOC->ODR &=  ~(1<<4); 				//  PC4
     GPIOC->DDR |=  (1<<4);
     GPIOC->CR1 |=  (1<<4);
-
 
 
 // test LED C6+C7
@@ -136,9 +174,44 @@ void GPIO_Config(void)
 }
 
 /*
+ * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
+ */
+void UART_setup(void)
+{
+    UART2_DeInit();
+
+    UART2_Init(115200,
+               UART2_WORDLENGTH_8D,
+               UART2_STOPBITS_1,
+               UART2_PARITY_NO,
+               UART2_SYNCMODE_CLOCK_DISABLE,
+               UART2_MODE_TXRX_ENABLE);
+
+    UART2_Cmd(ENABLE);
+}
+
+/*
+ *
+ */
+//
+//  Send a message to the debug port (UART1).
+//    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+//
+void UARTputs(char *message)
+{
+    char *ch = message;
+    while (*ch)
+    {
+        UART2->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
+        while ( 0 == (UART2->SR & UART2_SR_TXE) ); //  Wait for transmission to complete.
+        ch++;                               //  Grab the next character.
+    }
+}
+
+/*
  * http://www.electroons.com/blog/stm8-tutorials-3-adc-interfacing/
  */
-unsigned int readADC1(unsigned int channel) 
+unsigned int readADC1(unsigned int channel)
 {
     unsigned int csr = 0;
     unsigned int val = 0;
@@ -158,11 +231,11 @@ unsigned int readADC1(unsigned int channel)
 
 /*  correct way to clear the EOC flag in continuous scan mode is to load a byte in the ADC_CSR register from a RAM variable, clearing the EOC flag and reloading the last channel number for the scan sequence */
     csr = ADC1->CSR; // GN:   carefully clear EOC!
-    csr &= ~(1<<7); 
+    csr &= ~(1<<7);
     ADC1->CSR = csr;
 /*
-         val |= (unsigned int)ADC1->DRL;
-         val |= (unsigned int)ADC1->DRH<<8;
+             val |= (unsigned int)ADC1->DRL;
+             val |= (unsigned int)ADC1->DRH<<8;
 */
     val = ADC1_GetBufferValue(channel); // AINx
 
@@ -172,6 +245,46 @@ unsigned int readADC1(unsigned int channel)
     return (val);
 }
 
+/*
+ * http://embedded-lab.com/blog/continuing-stm8-microcontroller-expedition/2/
+ */
+void ADC1_setup(void)
+{
+    ADC1_DeInit();
+#if 0
+    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
+              ADC1_CHANNEL_8,
+              ADC1_PRESSEL_FCPU_D18,
+              ADC1_EXTTRIG_GPIO,
+              DISABLE,
+              ADC1_ALIGN_RIGHT,
+              ADC1_SCHMITTTRIG_CHANNEL8,
+              DISABLE);
+    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
+              ADC1_CHANNEL_9,
+              ADC1_PRESSEL_FCPU_D18,
+              ADC1_EXTTRIG_GPIO,
+              DISABLE,
+              ADC1_ALIGN_RIGHT,
+              ADC1_SCHMITTTRIG_CHANNEL9,
+              DISABLE);
+    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS,
+                          ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
+    ADC1_DataBufferCmd(ENABLE);
+#else
+// this example, single channel polling :
+//  http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
+    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
+              ADC1_CHANNEL_9,
+              ADC1_PRESSEL_FCPU_D18,
+              ADC1_EXTTRIG_GPIO,
+              DISABLE,
+              ADC1_ALIGN_RIGHT,
+              ADC1_SCHMITTTRIG_CHANNEL0,
+              DISABLE);
+#endif
+    ADC1_Cmd(ENABLE);
+}
 
 /**
   * @brief Validation firmware main entry point.
@@ -220,7 +333,8 @@ void PWM_Config(uint16_t uDC)
 
 #if 1
 // GN: tmp test
-    TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt 
+    TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt (sets manually-counted
+                               // pwm at 20mS with DC related to commutation/test-pot))
 #endif
 }
 
@@ -228,19 +342,19 @@ void PWM_Config(uint16_t uDC)
 //   http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
 void TIM1_setup(void)
 {
-     TIM1_DeInit();
-                
-     TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 1);
-                
-     TIM1_OC1Init(TIM1_OCMODE_PWM1, 
-                  TIM1_OUTPUTSTATE_ENABLE, 
-                  TIM1_OUTPUTNSTATE_ENABLE, 
-                  1000, 
-                  TIM1_OCPOLARITY_LOW, 
-                  TIM1_OCNPOLARITY_LOW, 
-                  TIM1_OCIDLESTATE_RESET, 
-                  TIM1_OCNIDLESTATE_RESET);
-                
+    TIM1_DeInit();
+
+    TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 1);
+
+    TIM1_OC1Init(TIM1_OCMODE_PWM1,
+                 TIM1_OUTPUTSTATE_ENABLE,
+                 TIM1_OUTPUTNSTATE_ENABLE,
+                 1000,
+                 TIM1_OCPOLARITY_LOW,
+                 TIM1_OCNPOLARITY_LOW,
+                 TIM1_OCIDLESTATE_RESET,
+                 TIM1_OCNIDLESTATE_RESET);
+
     TIM1_CtrlPWMOutputs(ENABLE);
     TIM1_Cmd(ENABLE);
 }
@@ -283,12 +397,13 @@ void timer_config_task_rate(void)
  */
 void timer_config_channel_time(u16 period)
 {
-    if (period < 1){
+    if (period < 1)
+    {
         period = 1;  // protect against setting a 0 period
     }
- // PSC==5 period==78    ->  1.25 mS
- // PSC==5 period==936   -> 15.0 mS
- // PSC==5 period=936+78=1014 -> 16.125 mS
+// PSC==5 period==78    ->  1.25 mS
+// PSC==5 period==936   -> 15.0 mS
+// PSC==5 period=936+78=1014 -> 16.125 mS
     TIM3->PSCR = 0x05;
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
@@ -300,50 +415,62 @@ void timer_config_channel_time(u16 period)
 }
 
 /*
- * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
+ * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
  */
-void UART_setup(void)
+void clock_setup(void)
 {
-     UART2_DeInit();
-                
-     UART2_Init(115200, 
-                UART2_WORDLENGTH_8D, 
-                UART2_STOPBITS_1, 
-                UART2_PARITY_NO, 
-                UART2_SYNCMODE_CLOCK_DISABLE, 
-                UART2_MODE_TXRX_ENABLE);
-                
-     UART2_Cmd(ENABLE);
+    CLK_DeInit();
+
+    CLK_HSECmd(DISABLE);
+    CLK_LSICmd(DISABLE);
+    CLK_HSICmd(ENABLE);
+    while(CLK_GetFlagStatus(CLK_FLAG_HSIRDY) == FALSE);
+    CLK_ClockSwitchCmd(ENABLE);
+// GN: By default, the microcontroller uses its internal 16MHz RC oscillator ("HSI", or high-speed internal) divided by eight as a clock source. This results in a base timer frequency of 2MHz.
+//   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV2);
+    CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV8); //GN:
+//   CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV4);
+    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI,
+                          DISABLE, CLK_CURRENTCLOCKSTATE_ENABLE);
+
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER1, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
 /*
  * 
  */
-//
-//  Send a message to the debug port (UART1).  
-//    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
-//
-void UARTputs(char *message)
-{
-    char *ch = message;
-    while (*ch)
-    {
-        UART2->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
-        while ( 0 == (UART2->SR & UART2_SR_TXE) ); //  Wait for transmission to complete.
-        ch++;                               //  Grab the next character.
-    }
-}
-
-/*
- * 
- */
-//u16 a_input; // tmp
+//#define TEST_ADC // the "new" polled ADC input
+unsigned int A0 = 0x1234;//tmp
+unsigned int A1 = 0xabcd;//tmp
 void periodic_task(void)
 {
 //static unsigned char ch = 0x30; // tmp
     u16 period;
     u16 a_input;
+
+#ifdef TEST_ADC
+//ADC1_ScanModeCmd(ENABLE);
+    ADC1_StartConversion();
+    while(ADC1_GetFlagStatus(ADC1_FLAG_EOC) == FALSE);
+
+    A1 = ADC1_GetConversionValue();
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
+// A0 = ADC1_GetBufferValue(AINCH_PWM_DC);
+// A1 = ADC1_GetBufferValue(AINCH_COMMUATION_PD);
+    a_input = A1;
+#else
     a_input = readADC1( AINCH_COMMUATION_PD );
+    A0 = -1;
+    A1 = a_input;
+#endif
+
 //a_input = 1014;
     period = a_input; // the timer pre-scale is set such that 10-bit range of the ainput 
 //if (period < 90)
@@ -359,24 +486,50 @@ void periodic_task(void)
 //       UART2->DR =  ch;     //  Put the next character into the data transmission register.
 //        while ( 0 == (UART2->SR & UART2_SR_TXE) );          //  Wait for transmission to complete.
 }
+/*
+ * temp, todo better function
+ */
+void testUART(void){
+    static unsigned char cnt = 0x30;
+    char sbuf[32] ;
+    char cbuf[8] = { 0, 0 };
+
+            cnt = cnt < 126 ? cnt + 1 : 0x30;
+            sbuf[0] = 0;
+
+            strcat(sbuf, "hello");
+            cbuf[0] = cnt;
+            cbuf[1] = 0;
+            strcat(sbuf, cbuf);
+
+            strcat(sbuf, " A0= ");
+            itoa(A0, cbuf, 16);
+            strcat(sbuf, cbuf);
+            strcat(sbuf, " A1= ");
+            itoa(A1, cbuf, 16);
+            strcat(sbuf, cbuf);
+
+            strcat(sbuf, "\r\n");
+            UARTputs(sbuf);
+}
 
 /*
  * mainly looping
  */
 main()
 {
-static unsigned char cnt = 0x30;
-char sbuf[32] ;
-char cbuf[2] = { 0, 0 };
+    clock_setup();
 
     GPIO_Config();
 
     UART_setup();
-
+#ifdef TEST_ADC
+    ADC1_setup();
+#endif
 // initialize to 50% DC (just because) 
     PWM_Config( TIM2_PWM_PD / 2 );
 
-    timer_config_task_rate(  ); // fixed at 5mS 
+    timer_config_task_rate(); // fixed at 5mS 
 
     timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
@@ -390,22 +543,17 @@ char cbuf[2] = { 0, 0 };
 //  button input
         if (! (( GPIOA->IDR)&(1<<6)))
         {
-            while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce
+            while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
 // WIP ... reconfig PWM on button push.
+#ifndef TEST_ADC
             ainp = readADC1( AINCH_PWM_DC );
-
+#endif
             // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
             pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8); // todo;  reorder,  intermediate cast elim. /8
             PWM_Config( pwm_dc_count );
-// tmp test UART
-cnt = cnt < 126 ? cnt + 1 : 0x30;
-sbuf[0] = 0;
-strcat(sbuf, "hello");
-cbuf[0] = cnt;
-strcat(sbuf, cbuf);
-strcat(sbuf, "\r\n");
-UARTputs(sbuf);
+
+						testUART();// tmp test
         }
 
 // while( FALSE == TaskRdy )
