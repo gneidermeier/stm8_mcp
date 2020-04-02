@@ -28,8 +28,8 @@
 
 #include "parameter.h" // app defines
 
-//#define TEST_ADC // WIP scanning ADC input
-//#define ADC_SCAN
+#define TEST_ADC // WIP scanning ADC input
+
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -253,50 +253,33 @@ unsigned int readADC1(unsigned int channel)
 }
 
 /*
- * http://embedded-lab.com/blog/continuing-stm8-microcontroller-expedition/2/
+ * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
  */
 void ADC1_setup(void)
 {
+
+// Port B[0..7]=floating input no interr
+// STM8 Discovery, all PortB pins are on CN3
+    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT);
+
     ADC1_DeInit();
-#ifdef ADC_SCAN
-    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
-              ADC1_CHANNEL_8,
-              ADC1_PRESSEL_FCPU_D18,
-              ADC1_EXTTRIG_GPIO,
-              DISABLE,
-              ADC1_ALIGN_RIGHT,
-              ADC1_SCHMITTTRIG_CHANNEL8,
-              DISABLE);
-    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
-              ADC1_CHANNEL_9,
-              ADC1_PRESSEL_FCPU_D18,
-              ADC1_EXTTRIG_GPIO,
-              DISABLE,
-              ADC1_ALIGN_RIGHT,
-              ADC1_SCHMITTTRIG_CHANNEL9,
-              DISABLE);
-    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS,
-                          ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
-    ADC1_DataBufferCmd(ENABLE);
-#else
+
 // this example, single channel polling :
-//  http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
-    ADC1_Init(ADC1_CONVERSIONMODE_CONTINUOUS,
+    ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
               ADC1_CHANNEL_9,
               ADC1_PRESSEL_FCPU_D18,
-              ADC1_EXTTRIG_GPIO,
+              ADC1_EXTTRIG_TIM   //  ADC1_EXTTRIG_GPIO
               DISABLE,
               ADC1_ALIGN_RIGHT,
-              ADC1_SCHMITTTRIG_CHANNEL9,
+              ADC1_SCHMITTTRIG_ALL,
               DISABLE);
-#endif
 
-    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
+//    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
 
+    ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
+
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
     ADC1_Cmd(ENABLE);
-
-// only need started once if interrupt is enabled
-  ADC1_StartConversion();
 }
 
 /**
@@ -457,7 +440,8 @@ void clock_setup(void)
 }
 
 /*
- * 
+ * all user code should go here - timed to 5mS timer, but stack context is
+ * 'main()' and not in the interrupt
  */
 void periodic_task(void)
 {
@@ -466,32 +450,28 @@ void periodic_task(void)
 
     u16 period;
 
+
+    PWM_Config( pwm_dc_count );
+
+
 #ifdef TEST_ADC
- #ifdef ADC_SCAN
-    ADC1_ScanModeCmd(ENABLE);
+
+// todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
+
+// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence 
     ADC1_StartConversion();
-///*
-    while(ADC1_GetFlagStatus(ADC1_FLAG_EOC) == FALSE);
+
+// Wait until the conversion is done (no timeout => ... to be done)
+    while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET );
+
+//    A1 = ADC1_GetConversionValue();
+    A0 = ADC1_GetBufferValue( AINCH_PWM_DC );
+    A1 = ADC1_GetBufferValue( AINCH_COMMUATION_PD );
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
-//*/
-    A0 = ADC1_GetBufferValue(AINCH_PWM_DC);
-    A1 = ADC1_GetBufferValue(AINCH_COMMUATION_PD);
 
             // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
             pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
-
-//            PWM_Config( pwm_dc_count );    // // WIP ... reconfig PWM on button push.
-
- #else
-//     ADC1_StartConversion();
-/* do in interrupt
-    while(ADC1_GetFlagStatus(ADC1_FLAG_EOC) == FALSE);
-
-    A1 = ADC1_GetConversionValue();
-    ADC1_ClearFlag(ADC1_FLAG_EOC);
-*/
- #endif
 
 #else
     A1 = readADC1( AINCH_COMMUATION_PD );
@@ -568,18 +548,6 @@ main()
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-
-// WIP ... reconfig PWM on button push.
-#ifdef TEST_ADC
- ainp = A0;
-#else
-            ainp = readADC1( AINCH_PWM_DC );
-
-            // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
-            pwm_dc_count = (TIM2_PWM_PD/8) * ainp / (1024/8); // todo;  reorder,  intermediate cast elim. /8
-#endif
-//   on button -push ? 
-            PWM_Config( pwm_dc_count );
 
 						testUART();// tmp test
         }
