@@ -97,7 +97,7 @@ void GPIO_Config(void)
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
 
-// HB driver "ENABLES" (/SD input pin of IR2104) on PE5, PC2, PC4
+// spare outputs
     GPIOE->ODR &=  ~(1<<5); 				//  PE5
     GPIOE->DDR |=  (1<<5);
     GPIOE->CR1 |=  (1<<5);
@@ -110,15 +110,31 @@ void GPIO_Config(void)
     GPIOC->DDR |=  (1<<4);
     GPIOC->CR1 |=  (1<<4);
 
+// HB driver "ENABLES" (/SD input pin of IR2104) on PC5, PC7, PG1
+///////////  // tried E2, E0, D1 but E2 not work as output ... ??? 
+// C5, C7, and G1 are CN2 pin 6,8 ,12 so 3 leads can go in one connector shell ;)
+// also this is to expose PC2 which is TIM1 CH2 output.
+    GPIOC->ODR &=  ~(1<<5);
+    GPIOC->DDR |=  (1<<5);
+    GPIOC->CR1 |=  (1<<5);
 
-// test LED C6+C7
-    GPIOC->ODR &= ~(1<<7); 				//  LED toggle on PC7
+    GPIOC->ODR &=  ~(1<<7);
     GPIOC->DDR |=  (1<<7);
     GPIOC->CR1 |=  (1<<7);
+
+    GPIOG->ODR &=  ~(1<<1);
+    GPIOG->DDR |=  (1<<1);
+    GPIOG->CR1 |=  (1<<1);
+////////////
+// test LED  
+    GPIOG->ODR &= ~(1<<0);
+    GPIOG->DDR |=  (1<<0);
+    GPIOG->CR1 |=  (1<<0);
 
     GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6 
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
+
 
 #if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
 // 3 PWM Channels 
@@ -268,7 +284,7 @@ void ADC1_setup(void)
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
               ADC1_CHANNEL_9,
               ADC1_PRESSEL_FCPU_D18,
-              ADC1_EXTTRIG_TIM   //  ADC1_EXTTRIG_GPIO
+              ADC1_EXTTRIG_TIM,   //  ADC1_EXTTRIG_GPIO
               DISABLE,
               ADC1_ALIGN_RIGHT,
               ADC1_SCHMITTTRIG_ALL,

@@ -331,44 +331,46 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 // PE5, PC2, PC4 tmp test
   switch(step){
     default:
+
+// so we have C5, C7, and G1
     case 0:
-      GPIOE->ODR &=  ~(1<<5); 				//  PE5
-      GPIOC->ODR &=  ~(1<<2); 				//  PC2
-      GPIOC->ODR |=  (1<<4); 				//  PC4
+      GPIOC->ODR &=  ~(1<<5);
+      GPIOC->ODR &=  ~(1<<7);
+      GPIOG->ODR |=  (1<<1);
     break;
     case 1:
-      GPIOE->ODR |=  (1<<5); 				//  PE5
-      GPIOC->ODR &=  ~(1<<2); 				//  PC2
-      GPIOC->ODR |=  (1<<4); 				//  PC4
+      GPIOC->ODR |=  (1<<5);
+      GPIOC->ODR &=  ~(1<<7);
+      GPIOG->ODR |=  (1<<1);
     break;
     case 2:
-      GPIOE->ODR |=  (1<<5); 				//  PE5
-      GPIOC->ODR &=  ~(1<<2); 				//  PC2
-      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+      GPIOC->ODR |=  (1<<5);
+      GPIOC->ODR &=  ~(1<<7);
+      GPIOG->ODR &=  ~(1<<1);
     break;
     case 3:
-      GPIOE->ODR |=  (1<<5); 				//  PE5
-      GPIOC->ODR |=  (1<<2); 				//  PC2
-      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+      GPIOC->ODR |=  (1<<5);
+      GPIOC->ODR |=  (1<<7);
+      GPIOG->ODR &=  ~(1<<1);
     break;
     case 4:
-      GPIOE->ODR &=  ~(1<<5); 				//  PE5
-      GPIOC->ODR |=  (1<<2); 				//  PC2
-      GPIOC->ODR &=  ~(1<<4); 				//  PC4
+      GPIOC->ODR &=  ~(1<<5);
+      GPIOC->ODR |=  (1<<7);
+      GPIOG->ODR &=  ~(1<<1);
     break;
     case 5:
-      GPIOE->ODR &=  ~(1<<5); 				//  PE5
-      GPIOC->ODR |=  (1<<2); 				//  PC2
-      GPIOC->ODR |=  (1<<4); 				//  PC4
-    break;		
+      GPIOC->ODR &=  ~(1<<5);
+      GPIOC->ODR |=  (1<<7);
+      GPIOG->ODR |=  (1<<1);
+    break;
+#endif
   }
-
-#if 0
+#if 1
 toggle ^= 1;
     if ( toggle ){
-        GPIOC->ODR &= ~(1<<7);
+        GPIOG->ODR &= ~(1<<0);
     }else {
-        GPIOC->ODR |=  (1<<7);
+        GPIOG->ODR |=  (1<<0);
     }
 #endif
 }
@@ -497,6 +499,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   * @retval None
   */
 
+extern uint16_t A0 ;//tmp
 extern uint16_t A1 ;//tmp
 
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
@@ -505,18 +508,6 @@ extern uint16_t A1 ;//tmp
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-#if 1
-static u8 toggle = 0; 
-    toggle ^= 1;          //  LED  on PC7
-    if (toggle){
-        GPIOC->ODR &= ~(1<<7);
-    }else {
-        GPIOC->ODR |=  (1<<7);
-    }
-#endif // 1	
-
-    A1 = ADC1_GetConversionValue();
-
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 }
 #endif /*STM8S208 or STM8S207 or STM8AF52Ax or STM8AF62Ax */
