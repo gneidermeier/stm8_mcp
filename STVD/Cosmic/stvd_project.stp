@@ -414,7 +414,7 @@ PathName=STM8_TouchSensing_Lib\src
 [Root.Source Files]
 ElemType=Folder
 PathName=Source Files
-Child=Root.Source Files...\..\src\main.c
+Child=Root.Source Files...\..\src\driver.c
 Next=Root.Include Files
 Config.0=Root.Source Files.Config.0
 Config.1=Root.Source Files.Config.1
@@ -484,6 +484,11 @@ String.3.0=
 String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
+
+[Root.Source Files...\..\src\driver.c]
+ElemType=File
+PathName=..\..\src\driver.c
+Next=Root.Source Files...\..\src\main.c
 
 [Root.Source Files...\..\src\main.c]
 ElemType=File

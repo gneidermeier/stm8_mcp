@@ -24,10 +24,6 @@
 #include "parameter.h" // GN: app defines
 
 
-extern u8 duty_cycle_pcnt_20ms;
-extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-
-
 /** @addtogroup I2C_EEPROM
   * @{
   */
@@ -316,55 +312,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
      it is recommended to set a breakpoint on the following instruction.
   */
     static u8 toggle = 0;
-    static u8 step = 0;
-
-  step += 1;
-
-  if (step >= N_CSTEPS){
-    step = 0;
-  }
-
-  // must reset the tmer interrupt flag
-    TIM3->SR1 &= ~TIM3_SR1_UIF;
-
-
-// PE5, PC2, PC4 tmp test
-  switch(step){
-    default:
-
-// so we have C5, C7, and G1
-    case 0:
-      GPIOC->ODR &=  ~(1<<5);
-      GPIOC->ODR &=  ~(1<<7);
-      GPIOG->ODR |=  (1<<1);
-    break;
-    case 1:
-      GPIOC->ODR |=  (1<<5);
-      GPIOC->ODR &=  ~(1<<7);
-      GPIOG->ODR |=  (1<<1);
-    break;
-    case 2:
-      GPIOC->ODR |=  (1<<5);
-      GPIOC->ODR &=  ~(1<<7);
-      GPIOG->ODR &=  ~(1<<1);
-    break;
-    case 3:
-      GPIOC->ODR |=  (1<<5);
-      GPIOC->ODR |=  (1<<7);
-      GPIOG->ODR &=  ~(1<<1);
-    break;
-    case 4:
-      GPIOC->ODR &=  ~(1<<5);
-      GPIOC->ODR |=  (1<<7);
-      GPIOG->ODR &=  ~(1<<1);
-    break;
-    case 5:
-      GPIOC->ODR &=  ~(1<<5);
-      GPIOC->ODR |=  (1<<7);
-      GPIOG->ODR |=  (1<<1);
-    break;
-#endif
-  }
 #if 1
 toggle ^= 1;
     if ( toggle ){
@@ -373,6 +320,11 @@ toggle ^= 1;
         GPIOG->ODR |=  (1<<0);
     }
 #endif
+
+    set_outputs();
+
+    // must reset the tmer interrupt flag
+    TIM3->SR1 &= ~TIM3_SR1_UIF;
 }
 
 /**
@@ -498,10 +450,6 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   * @param  None
   * @retval None
   */
-
-extern uint16_t A0 ;//tmp
-extern uint16_t A1 ;//tmp
-
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
 {
 

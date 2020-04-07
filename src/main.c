@@ -22,25 +22,19 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
-//#include <stdio.h>
-//#include <stdlib.h>
 #include "stm8s.h"
-
 #include "parameter.h" // app defines
-
-#define TEST_ADC // WIP scanning ADC input
 
 
 /* Private defines -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
+u8 PWM_Is_Active = 0;
 u8 duty_cycle_pcnt_20ms;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 
 uint16_t A0 = 0x1234;//tmp
 uint16_t A1 = 0xabcd;//tmp
-
-u16 pwm_dc_count;
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -135,7 +129,6 @@ void GPIO_Config(void)
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
 
-
 #if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
 // 3 PWM Channels 
 // T2.PWM.CH3 
@@ -173,7 +166,6 @@ void GPIO_Config(void)
 //    GPIOE->DDR |= (1 << 3);  // PD.n as output
 //    GPIOE->CR1 |= (1 << 3);  // push pull output
 //    GPIOE->ODR |= (1 << 3);  // use as hi-side of button
-
 
 // PE.6 AIN9
     GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
@@ -214,12 +206,9 @@ void UART_setup(void)
 }
 
 /*
- *
- */
-//
-//  Send a message to the debug port (UART1).
-//    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
-//
+*  Send a message to the debug port (UART1).
+*    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+*/
 void UARTputs(char *message)
 {
     char *ch = message;
@@ -257,8 +246,8 @@ unsigned int readADC1(unsigned int channel)
     csr &= ~(1<<7);
     ADC1->CSR = csr;
 /*
-             val |= (unsigned int)ADC1->DRL;
-             val |= (unsigned int)ADC1->DRH<<8;
+                 val |= (unsigned int)ADC1->DRL;
+                 val |= (unsigned int)ADC1->DRH<<8;
 */
     val = ADC1_GetBufferValue(channel); // AINx
 
@@ -273,7 +262,6 @@ unsigned int readADC1(unsigned int channel)
  */
 void ADC1_setup(void)
 {
-
 // Port B[0..7]=floating input no interr
 // STM8 Discovery, all PortB pins are on CN3
     GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT);
@@ -298,54 +286,6 @@ void ADC1_setup(void)
     ADC1_Cmd(ENABLE);
 }
 
-/**
-  * @brief Validation firmware main entry point.
-  * @par Parameters:
-  * None
-  * @retval void None
-  *   GN: from UM0834 PWM example
-  */
-void PWM_Config(uint16_t uDC)
-{
-    uint16_t TIM2_pulse_0 ;// = *(p_DC + 0);
-    uint16_t TIM2_pulse_1 ;// = *(p_DC + 1);
-    uint16_t TIM2_pulse_2 ;// = *(p_DC + 2);
-    TIM2_pulse_0 =  TIM2_pulse_1 =  TIM2_pulse_2 = uDC;
-
-    /* TIM2 Peripheral Configuration */
-    TIM2_DeInit();
-
-    /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
-//    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  ); // PS==1, 999   ->  2khz (period == .000500)
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  4khz (period == .000250)
-//    TIM2_TimeBaseInit(TIM2_PRESCALER_1, 249  ); // PS==1, 249 ->  8khz (period == .000125)
-
-    /* Channel 1 PWM configuration */
-    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0, TIM2_OCPOLARITY_LOW );
-    TIM2_OC1PreloadConfig(ENABLE);
-
-
-    /* Channel 2 PWM configuration */
-    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_1, TIM2_OCPOLARITY_LOW );
-    TIM2_OC2PreloadConfig(ENABLE);
-
-
-    /* Channel 3 PWM configuration */
-    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_2, TIM2_OCPOLARITY_LOW );
-    TIM2_OC3PreloadConfig(ENABLE);
-
-    /* Enables TIM2 peripheral Preload register on ARR */
-    TIM2_ARRPreloadConfig(ENABLE);
-
-    /* Enable TIM2 */
-    TIM2_Cmd(ENABLE);
-
-#if 1
-// GN: tmp test
-    TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt (sets manually-counted
-                               // pwm at 20mS with DC related to commutation/test-pot))
-#endif
-}
 
 // tmp test
 // from:
@@ -389,12 +329,7 @@ void timer_config_task_rate(void)
 
 // Timers 2 3 & 5 are 16-bit general purpose timers
 /*
- * Control "Enable" signal of each channel, sequencing thru each of 
- *  3 phases. (this was for DRV8813 but we could still do an "Enable" 
- * on each channel thus allowing PWM to be controlled independently - PWM basically just left "ON")
- * Drive the /SD pins of the IR2104s to enable each field in sequence. 
- * Temp, test:
- *  Let the timer3 period be dynamically adjusted to the "speed pot"
+ * Uses a pot to manually set the commutation timing.
  *  Presently, to set this up to allow "RPM" range ruffly 60-400 Hz.  ***
  *  (***actual RPM would be calculated from cycle-time reduced by factor of 3 since 3 phases -> 1 RPM)
  *
@@ -421,7 +356,7 @@ void timer_config_channel_time(u16 period)
 
     TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
     TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
-    TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM4
+    TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
 
 /*
@@ -463,14 +398,8 @@ void periodic_task(void)
 {
 //static unsigned char ch = 0x30; // tmp
 // unsigned int csr = 0;
-
     u16 period;
-
-
-    PWM_Config( pwm_dc_count );
-
-
-#ifdef TEST_ADC
+    u16 pwm_dc_count;
 
 // todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
 
@@ -486,16 +415,13 @@ void periodic_task(void)
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 
-            // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
-            pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
+    // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
+    pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
 
-#else
-    A1 = readADC1( AINCH_COMMUATION_PD );
-    A0 = -1;
-#endif
 
 //a_input = 1014;
     period = A1; // the timer pre-scale is set such that 10-bit range of the ainput 
+//if (period >
     timer_config_channel_time( period );
 
 // 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
@@ -506,32 +432,40 @@ void periodic_task(void)
 //  ch = 0x30;
 //       UART2->DR =  ch;     //  Put the next character into the data transmission register.
 //        while ( 0 == (UART2->SR & UART2_SR_TXE) );          //  Wait for transmission to complete.
+
+    if (0 == PWM_Is_Active)
+    {
+        pwm_dc_count = 0;
+    }
+    PWM_Config( pwm_dc_count );
 }
+
 /*
  * temp, todo better function
  */
-void testUART(void){
+void testUART(void)
+{
     static unsigned char cnt = 0x30;
     char sbuf[32] ;
     char cbuf[8] = { 0, 0 };
 
-            cnt = cnt < 126 ? cnt + 1 : 0x30;
-            sbuf[0] = 0;
+    cnt = cnt < 126 ? cnt + 1 : 0x30;
+    sbuf[0] = 0;
 
-            strcat(sbuf, "hello");
-            cbuf[0] = cnt;
-            cbuf[1] = 0;
-            strcat(sbuf, cbuf);
+    strcat(sbuf, "hello");
+    cbuf[0] = cnt;
+    cbuf[1] = 0;
+    strcat(sbuf, cbuf);
 
-            strcat(sbuf, " A0= ");
-            itoa(A0, cbuf, 16);
-            strcat(sbuf, cbuf);
-            strcat(sbuf, " A1= ");
-            itoa(A1, cbuf, 16);
-            strcat(sbuf, cbuf);
+    strcat(sbuf, " A0= ");
+    itoa(A0, cbuf, 16);
+    strcat(sbuf, cbuf);
+    strcat(sbuf, " A1= ");
+    itoa(A1, cbuf, 16);
+    strcat(sbuf, cbuf);
 
-            strcat(sbuf, "\r\n");
-            UARTputs(sbuf);
+    strcat(sbuf, "\r\n");
+    UARTputs(sbuf);
 }
 
 /*
@@ -539,19 +473,16 @@ void testUART(void){
  */
 main()
 {
+    static u8 button_down = 0;
+
     clock_setup();
-
     GPIO_Config();
-
     UART_setup();
-#ifdef TEST_ADC
     ADC1_setup();
-#endif
 // initialize to 50% DC (just because) 
     PWM_Config( TIM2_PWM_PD / 2 );
 
     timer_config_task_rate(); // fixed at 5mS 
-
     timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
@@ -565,7 +496,10 @@ main()
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-						testUART();// tmp test
+// toggle "output active"
+            PWM_Is_Active ^= 1;
+
+            testUART();// tmp test
         }
 
 // while( FALSE == TaskRdy )
@@ -591,7 +525,7 @@ main()
   * @retval : None
   */
 void assert_failed(u8* file, u32 line)
-{ 
+{
     /* User can add his own implementation to report the file name and line number,
        ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 

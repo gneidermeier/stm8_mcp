@@ -12,6 +12,13 @@
   * <h2><center>&copy; COPYRIGHT 2112 asdf</center></h2>
   ******************************************************************************
   */
+#ifndef PARAMETER_H
+#define PARAMETER_H
+
+
+/*
+ * defines
+ */
 
 // Setting up TIM2, presently to use 4kHz PWM frequency (or maybe even 6 or 7 kHz ?)
 
@@ -44,5 +51,21 @@
 // nbr of steps required to commutate 3 phase 
 #define N_CSTEPS   6  
 
-
 #define LED  0
+
+
+/*
+ * variables
+ */
+extern u8 duty_cycle_pcnt_20ms;
+extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
+
+
+/*
+ * prototypes
+ */
+void PWM_Config(uint16_t uDC);
+void set_outputs(void);
+
+
+#endif // PARAMETER_H
