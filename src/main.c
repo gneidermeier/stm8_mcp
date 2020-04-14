@@ -342,9 +342,10 @@ void timer_config_task_rate(void)
  */
 void timer_config_channel_time(u16 period)
 {
-    if (period < 1)
+    const u8 MIN_SWITCH_TIME = 16; //  7; // 7 * .000016 = 112uS .... 1/125uS = 8kHz (one elect. cycle is 1/6 of that)
+    if (period < MIN_SWITCH_TIME)
     {
-        period = 1;  // protect against setting a 0 period
+        period = MIN_SWITCH_TIME;  // protect against setting a 0 period
     }
 // PSC==5 period==78    ->  1.25 mS
 // PSC==5 period==936   -> 15.0 mS
@@ -403,7 +404,7 @@ void periodic_task(void)
 
 // todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
 
-// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence 
+// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
     ADC1_StartConversion();
 
 // Wait until the conversion is done (no timeout => ... to be done)
@@ -415,13 +416,14 @@ void periodic_task(void)
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 
-    // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
-    pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
 
-
-//a_input = 1014;
-    period = A1; // the timer pre-scale is set such that 10-bit range of the ainput 
-//if (period >
+// the timer pre-scale is set such that 10-bit range of the ainput  ... 0.125mS <-> 16mS
+// ... now adjusting to use half that range and off by 2 mS to get in more useful range of commtation rate
+    period = A1 ;
+  if (period > 0x02F0){
+   period = 0x02F0; // keep  the low end away from the lower limit (barely visible blinking)
+  }
+//period = ( A1 + (24 * 2) ) / 2 ; //getting about 900Hz switch rate down to about 55Hz
     timer_config_channel_time( period );
 
 // 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
@@ -433,10 +435,24 @@ void periodic_task(void)
 //       UART2->DR =  ch;     //  Put the next character into the data transmission register.
 //        while ( 0 == (UART2->SR & UART2_SR_TXE) );          //  Wait for transmission to complete.
 
-    if (0 == PWM_Is_Active)
+    pwm_dc_count = 0;
+
+    if (0 != PWM_Is_Active)
     {
-        pwm_dc_count = 0;
+        // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
+//A0 = 512;
+        pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
+
+#define PWM_DC_MIN 30
+#define PWM_DC_MAX (TIM2_PWM_PD - 30)
+        if (pwm_dc_count < PWM_DC_MIN)
+            pwm_dc_count = PWM_DC_MIN;
     }
+    if (pwm_dc_count > PWM_DC_MAX)
+    {
+        pwm_dc_count = PWM_DC_MAX;
+    }
+
     PWM_Config( pwm_dc_count );
 }
 
