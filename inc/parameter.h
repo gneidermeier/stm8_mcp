@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
   * @file parameter.h
-  * @brief This file contains the parameters for ADC.
+  * @brief  
   * @author
   * @version 
   * @date    
@@ -26,30 +26,23 @@
 // @2Mhz, fMASTER period ==  0.5uS
 //  1 / 2Mhz = 0.5uS
 
-// 1/4kHz = 250uS
-// 250uS / 0.5uS = 500 counts
+// 1/8kHz = 125uS
+// 125uS / 0.5uS = 250 counts
 
-//  0.5uS * 500 counts = 250uS
-//  1 / 250uS = 4000Hz
+//  0.5uS * 250 counts = 125uS
+//  1 / 125uS = 8kHz
 
 //set prescaler with "(period - 1)" (see datasheet)
-//#define TIM2_PWM_PD (125 - 0)    // 16k
-#define TIM2_PWM_PD (250 - 0)  //  8k
-//#define TIM2_PWM_PD (500 - 0)  //  4k
-//#define TIM2_PWM_PD (1000 - 0) //  2k
-//#define TIM2_PWM_PD (2000 - 0) //  1kHz ... test 290k*470pf -> Tau==136uSec
+//#define TIM2_PWM_PD         (125 - 0)  // 16k
+#define TIM2_PWM_PD           (126 - 0)  //  .... might as well make the math divisible by 2 see periodic task
+//#define TIM2_PWM_PD         (250 - 0)  //  8k
 
-// Using TIM2 to count up to 20mS time base 
-// 20mS / 250uS = 80
 
-// 1/50Hz = 0.020 S
-// 1/250uS = 4000Hz
-// 20mS / 250uS = 20mS * 1/250uS = (1/50) * 4000 = 80
+// Using the TIM2 counter as time base for open-loop commutation time  
+// arbitrary period (n * 125uS ^H^H^H 62.5uS) to PWM the user LED0
+#define TIM2_COUNT_LED0_PD   80
 
-#define TIM2_T20_MS  (4000 / 50) // 80
 
-// nbr of steps required to commutate 3 phase 
-#define N_CSTEPS   6  
 
 #define LED  0
 
@@ -57,9 +50,9 @@
 /*
  * variables
  */
-extern u8 duty_cycle_pcnt_20ms;
+extern u8 Duty_cycle_pcnt_LED0; // for test output on LED0 (builtin STM8-discover)
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-
+extern u8 PWM_Is_Active;
 
 /*
  * prototypes

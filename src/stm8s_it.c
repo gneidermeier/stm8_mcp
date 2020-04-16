@@ -266,6 +266,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+    static u8 toggle;
     static u8 count20ms = 0;
 
     count20ms += 1;
@@ -273,15 +274,25 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 /*
  * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing) 
  */
-    if (count20ms > TIM2_T20_MS)
+#if 0 
+    if (count20ms > TIM2_COUNT_LED0_PD)
     {
         count20ms = 0;
         GPIOD->ODR |= (1 << LED);
     }
-    else if (count20ms > duty_cycle_pcnt_20ms)
+    else if (count20ms > Duty_cycle_pcnt_LED0)
     {
         GPIOD->ODR &= ~(1 << LED);
     }
+#else
+// test code to verify frequency of TIM2 counter update
+    toggle ^= 1;
+    if (toggle){
+        GPIOD->ODR |= (1 << LED);
+    } else {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+#endif
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;

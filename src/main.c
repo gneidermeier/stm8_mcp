@@ -30,7 +30,7 @@
 
 /* Public variables  ---------------------------------------------------------*/
 u8 PWM_Is_Active = 0;
-u8 duty_cycle_pcnt_20ms;
+u8 Duty_cycle_pcnt_LED0;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 
 uint16_t A0 = 0x1234;//tmp
@@ -223,7 +223,7 @@ void UARTputs(char *message)
 /*
  * http://www.electroons.com/blog/stm8-tutorials-3-adc-interfacing/
  */
-unsigned int readADC1(unsigned int channel)
+unsigned int _readADC1(unsigned int channel)
 {
     unsigned int csr = 0;
     unsigned int val = 0;
@@ -329,24 +329,40 @@ void timer_config_task_rate(void)
 
 // Timers 2 3 & 5 are 16-bit general purpose timers
 /*
- * Uses a pot to manually set the commutation timing.
- *  Presently, to set this up to allow "RPM" range ruffly 60-400 Hz.  ***
- *  (***actual RPM would be calculated from cycle-time reduced by factor of 3 since 3 phases -> 1 RPM)
- *
+ *  Sets the open-loop commutation switching period.
+ *  Input: [0:1023]   (input may be set from analog trim-pot for test/dev)
+
+ * @2Mhz, fMASTER period ==  0.5uS
+ *  Timer Step: 
+ *    step = 1/2Mhz * prescaler = 0.0000005 * (2^5) = 0.000016 seconds 
+
  *  1/2Mhz = 0.0000005
  *  1 Count Time = 0.0000005 * (2^5) = 0.000016 Sec
  *    125 counts * 0.000016 -> 500Hz
  *   1014 counts * 0.000016 ->  60Hz
  *
- *   hmmm this is dumb ... forcing range of channel timer/counter to that of anlg input 
+ *  1016:    0.016256 measure 0.0165 sec. ( precision 0.5mS at this range)
+ *    12:         210 uS
+ *    11:   wth ???????????
  */
-void timer_config_channel_time(u16 period)
+void timer_config_channel_time(u16 u16period)
 {
-    const u8 MIN_SWITCH_TIME = 16; //  7; // 7 * .000016 = 112uS .... 1/125uS = 8kHz (one elect. cycle is 1/6 of that)
+// 0x02F0 experimental
+    const u8 MAX_SWITCH_TIME = 0x2f0;//  0x3F8 
+    const u8 MIN_SWITCH_TIME = 12; //  one elect. cycle is 1/6 of that)
+    u16 period = u16period;
+
     if (period < MIN_SWITCH_TIME)
     {
         period = MIN_SWITCH_TIME;  // protect against setting a 0 period
     }
+// TODO: remap this so the output period ranged accordingly (e.g. final range  [1:0x300] should be easy and suitable ???
+    if (period > MAX_SWITCH_TIME) 
+    {
+        period = MAX_SWITCH_TIME; // keep  the low end away from the lower limit (barely visible blinking)
+    }
+
+
 // PSC==5 period==78    ->  1.25 mS
 // PSC==5 period==936   -> 15.0 mS
 // PSC==5 period=936+78=1014 -> 16.125 mS
@@ -417,40 +433,29 @@ void periodic_task(void)
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 
 
-// the timer pre-scale is set such that 10-bit range of the ainput  ... 0.125mS <-> 16mS
-// ... now adjusting to use half that range and off by 2 mS to get in more useful range of commtation rate
+// open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
     period = A1 ;
-  if (period > 0x02F0){
-   period = 0x02F0; // keep  the low end away from the lower limit (barely visible blinking)
-  }
-//period = ( A1 + (24 * 2) ) / 2 ; //getting about 900Hz switch rate down to about 55Hz
     timer_config_channel_time( period );
 
-// 8-bit voodoo ... divide out factor of 2 so that (80/2 * 1024) fit in 16-bit :(
-    duty_cycle_pcnt_20ms =   (TIM2_T20_MS/2) * period / (1024/2);
 
-//ch+=1;
-//if (ch > 127)
-//  ch = 0x30;
-//       UART2->DR =  ch;     //  Put the next character into the data transmission register.
-//        while ( 0 == (UART2->SR & UART2_SR_TXE) );          //  Wait for transmission to complete.
+// use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
+    Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
 
     pwm_dc_count = 0;
 
-    if (0 != PWM_Is_Active)
+    if (0 != PWM_Is_Active) // also enables the /SD lines ... see driver.c
     {
-        // 8-bit voodoo ... divide out factor of 8 so that (500/8 * 1024) fit in 16-bit :(
-//A0 = 512;
-        pwm_dc_count = (TIM2_PWM_PD/8) * A0 / (1024/8); // todo;  reorder,  intermediate cast elim. /8
+        // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit 
+        pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2); 
 
-#define PWM_DC_MIN 30
-#define PWM_DC_MAX (TIM2_PWM_PD - 30)
-        if (pwm_dc_count < PWM_DC_MIN)
-            pwm_dc_count = PWM_DC_MIN;
-    }
-    if (pwm_dc_count > PWM_DC_MAX)
-    {
-        pwm_dc_count = PWM_DC_MAX;
+        if (pwm_dc_count < 30)
+        {
+            pwm_dc_count = 30;
+        }
+        else if (pwm_dc_count > (TIM2_PWM_PD-30) )
+        {
+            pwm_dc_count = (TIM2_PWM_PD-30);
+        }
     }
 
     PWM_Config( pwm_dc_count );
