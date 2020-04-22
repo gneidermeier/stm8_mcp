@@ -28,11 +28,13 @@ uint16_t TIM2_pulse_2 ;
 
 /* Private variables ---------------------------------------------------------*/
 uint16_t global_uDC;
+u8 bldc_step = 0;
 
 /* Private function prototypes -----------------------------------------------*/
+void _PWM_Config(void);
+void bldc_move(void);
 
 /* Private functions ---------------------------------------------------------*/
-void _PWM_Config(void);
 
 /**
   * @brief  .
@@ -64,7 +66,7 @@ void PWM_set_outputs(u8 state0, u8 state1, u8 state2)
     TIM2_pulse_1 = state1 != 0 ? global_uDC : 0;
     TIM2_pulse_2 = state2 != 0 ? global_uDC : 0;
 
-    _PWM_Config(); // seems to work here!
+    _PWM_Config();
 }
 
 /**
@@ -114,18 +116,31 @@ void _PWM_Config(void)
 /*
  * drive /SD outputs and PWM channels
  */
-void set_outputs(void)
+void BLDC_Step(void)
 {
-    static u8 step = 0;
-
-    step += 1;
-    step %= N_CSTEPS;
+    bldc_step += 1;
+    bldc_step %= N_CSTEPS;
 
     if ( PWM_Is_Active)
     {
+        bldc_move();
+    }
+    else // motor drive output has been disabled
+    {
+        GPIOC->ODR &=  ~(1<<5);
+        GPIOC->ODR &=   ~(1<<7);
+        GPIOG->ODR &=   ~(1<<1);
+        PWM_set_outputs(0, 0, 0);
+    }
+}
+
+void bldc_move(void)
+{
+//    if ( PWM_Is_Active)
+    {
 // /SD outputs on C5, C7, and G1
 // wait until switch time arrives (watching for voltage on the floating line to cross 0)
-        switch(step)
+        switch(bldc_step)
         {
         default:
 
@@ -166,12 +181,5 @@ void set_outputs(void)
             PWM_set_outputs(0, 0, 1);
             break;
         }
-    }
-    else // motor drive output has been disabled
-    {
-        GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR &=   ~(1<<7);
-        GPIOG->ODR &=   ~(1<<1);
-        PWM_set_outputs(0, 0, 0);
     }
 }

@@ -332,7 +332,7 @@ toggle ^= 1;
     }
 #endif
 
-    set_outputs();
+    BLDC_Step();
 
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
