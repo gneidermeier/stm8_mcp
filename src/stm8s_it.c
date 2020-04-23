@@ -217,6 +217,23 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+static u8 toggle;
+#if 1
+// test code to verify frequency of TIM2 counter update
+    toggle ^= 1;
+    if (toggle){
+        GPIOD->ODR |= (1 << LED);
+    } else {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+#endif
+#if 0
+    BLDC_Step();
+#endif
+
+    // must reset the tmer interrupt flag
+    TIM1->SR1 &= ~TIM1_SR1_UIF;
+//TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
 }
 
 /**
@@ -284,14 +301,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     {
         GPIOD->ODR &= ~(1 << LED);
     }
-#else
-// test code to verify frequency of TIM2 counter update
-    toggle ^= 1;
-    if (toggle){
-        GPIOD->ODR |= (1 << LED);
-    } else {
-        GPIOD->ODR &= ~(1 << LED);
-    }
 #endif
 
     // must reset the tmer interrupt flag
@@ -319,9 +328,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
     static u8 toggle = 0;
 #if 1
 toggle ^= 1;
@@ -331,9 +337,9 @@ toggle ^= 1;
         GPIOG->ODR |=  (1<<0);
     }
 #endif
-
+#if 1
     BLDC_Step();
-
+#endif
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 }
@@ -491,16 +497,13 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 {
-    /* In order to detect unexpected events during development,
-       it is recommended to set a breakpoint on the following instruction.
-    */
+    static u8 toggle = 0;
 #if 0
-static u8 toggle = 0; 
-    toggle ^= 1;          //  LED  on PC7
-    if (toggle){
-        GPIOC->ODR &= ~(1<<7);
+toggle ^= 1;
+    if ( toggle ){
+        GPIOG->ODR &= ~(1<<0);
     }else {
-        GPIOC->ODR |=  (1<<7);
+        GPIOG->ODR |=  (1<<0);
     }
 #endif
 

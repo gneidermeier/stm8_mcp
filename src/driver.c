@@ -13,6 +13,12 @@
 #include "parameter.h" // app defines
 
 /* Private defines -----------------------------------------------------------*/
+
+// see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
+//#define PWM_TPRESCALER  TIM2_PRESCALER_1 //
+// @ 8 Mhz
+#define PWM_TPRESCALER  TIM2_PRESCALER_8 // 125 uS
+
 #define PWM_DC_MIN 30
 #define PWM_DC_MAX (TIM2_PWM_PD - 30)
 
@@ -69,7 +75,7 @@ void PWM_Config(void)
     TIM2_DeInit();
 
     /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
-    TIM2_TimeBaseInit(TIM2_PRESCALER_1, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
+    TIM2_TimeBaseInit(PWM_TPRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
     TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0, TIM2_OCPOLARITY_LOW );

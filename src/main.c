@@ -274,26 +274,41 @@ void ADC1_setup(void)
     ADC1_Cmd(ENABLE);
 }
 
-
-// tmp test
-// from:
-//   http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
+/*
+ * Timer 1 Setup
+ * from:
+ *   http://www.emcu.it/STM8/STM8-Discovery/Tim1eTim4/TIM1eTIM4.html
+ *
+ * manual mode (ramp-up) commutation timing?
+ * based on OTS ESC analysic, rampup start at 
+ *  pd = 0.008  sec
+ *       0.003  sec  rampup to 3000 RPM
+ *       0.004  sec  settle to 2500 RPM
+ *       0.008  sec  1250 RPM slowest attainable after initial sync
+ *
+ *       0.0012 sec
+*/
 void TIM1_setup(void)
 {
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
     TIM1_DeInit();
 
-    TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 1);
+//fCK_CNT = fCK_PSC/(PSCR[15:0]+1) 
+    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000060
+    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000048
+//    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    NG
+//    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    .000030
 
-    TIM1_OC1Init(TIM1_OCMODE_PWM1,
-                 TIM1_OUTPUTSTATE_ENABLE,
-                 TIM1_OUTPUTNSTATE_ENABLE,
-                 1000,
-                 TIM1_OCPOLARITY_LOW,
-                 TIM1_OCNPOLARITY_LOW,
-                 TIM1_OCIDLESTATE_RESET,
-                 TIM1_OCNIDLESTATE_RESET);
+// @8Mhz
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 15, 0);    //    ~0.000004 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 39, 0);    //    ~0.000010 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 19, 0);    //    ~0.000005 S
 
-    TIM1_CtrlPWMOutputs(ENABLE);
+//  think the TIM3 interrupt (bldc_step() is taking 20 or 30 uS !!!!! wtf so slow this down for now	
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //    ~0.000050 S	
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    ~0.000400 S	
+
+    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
 }
 
@@ -307,10 +322,13 @@ void TIM1_setup(void)
  */
 void timer_config_task_rate(void)
 {
-    /* Prescaler = 128 */
-    TIM4->PSCR = 0x07; // 0b00000111;
-    /* Period = 5ms */
-    TIM4->ARR = 77;
+// @2Mhz... 4.992 mS
+    TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78  -> 1.248mS
+    TIM4->ARR = 77;    // @2Mhz  Period = 5ms 
+
+//    TIM4->PSCR = 0x06; // Prescaler = 64    @8Mhz ... arr=(124+1)  -> 1.0 mS
+//    TIM4->ARR = 124;    // @8Mhz  Period = 1.0ms 
+
     TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
 }
@@ -350,11 +368,13 @@ void timer_config_channel_time(u16 u16period)
         period = MAX_SWITCH_TIME; // keep  the low end away from the lower limit (barely visible blinking)
     }
 
+//period = (4-1); // 64 uS
 
 // PSC==5 period==78    ->  1.25 mS
 // PSC==5 period==936   -> 15.0 mS
 // PSC==5 period=936+78=1014 -> 16.125 mS
     TIM3->PSCR = 0x05;
+    TIM3->PSCR = 0x07; // 128 ......    @ 8Mhz -> 1 bit-time == 0.000016 Sec
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
@@ -373,7 +393,7 @@ void timer_config_channel_time(u16 u16period)
 void clock_setup(void)
 {
     CLK_DeInit();
-
+#ifdef INTCLOCK
     CLK_HSECmd(DISABLE);
     CLK_LSICmd(DISABLE);
     CLK_HSICmd(ENABLE);
@@ -384,7 +404,12 @@ void clock_setup(void)
 //   CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV4);
     CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI,
                           DISABLE, CLK_CURRENTCLOCKSTATE_ENABLE);
-
+#else
+    // Configure Quartz Clock
+    CLK_DeInit();
+    CLK_HSECmd(ENABLE);
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // GN: DIV2 -> 8Mhz ... 1/0.000000125
+#endif
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
@@ -488,6 +513,7 @@ main()
     GPIO_Config();
     UART_setup();
     ADC1_setup();
+    TIM1_setup();
 
     PWM_Set_DC( 0 );
 
