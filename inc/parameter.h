@@ -52,13 +52,12 @@
  */
 extern u8 Duty_cycle_pcnt_LED0; // for test output on LED0 (builtin STM8-discover)
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-extern u8 PWM_Is_Active;
 
 /*
  * prototypes
  */
-void PWM_Config(uint16_t uDC);
-void set_outputs(void);
+void BLDC_Step(void);
+void PWM_Set_DC(uint16_t uDC);
 
 
 #endif // PARAMETER_H

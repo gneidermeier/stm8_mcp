@@ -17,7 +17,7 @@
 /* Private defines -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
-u8 PWM_Is_Active = 0;
+u8 PWM_Is_Active;
 u8 Duty_cycle_pcnt_LED0;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 
@@ -337,7 +337,7 @@ void timer_config_channel_time(u16 u16period)
 {
 // 0x02F0 experimental
     const u8 MAX_SWITCH_TIME = 0x2f0;//  0x3F8 
-    const u8 MIN_SWITCH_TIME = 12; //  one elect. cycle is 1/6 of that)
+    const u8 MIN_SWITCH_TIME = 12; // note: I think is (n+1)
     u16 period = u16period;
 
     if (period < MIN_SWITCH_TIME)
@@ -396,7 +396,7 @@ void clock_setup(void)
 }
 
 /*
- * all user code should go here - timed to 5mS timer, but stack context is
+ * periodic task is timed to 5mS timer, but stack context is
  * 'main()' and not in the interrupt
  */
 void periodic_task(void)
@@ -429,24 +429,26 @@ void periodic_task(void)
 // use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
     Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
 
-    pwm_dc_count = 0;
+/// TODO: only use this for test ... needs to be on a +/- button
+    // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
+    pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
 
-    if (0 != PWM_Is_Active) // also enables the /SD lines ... see driver.c
+    if (pwm_dc_count < 30)
     {
-        // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit 
-        pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2); 
-
-        if (pwm_dc_count < 30)
-        {
-            pwm_dc_count = 30;
-        }
-        else if (pwm_dc_count > (TIM2_PWM_PD-30) )
-        {
-            pwm_dc_count = (TIM2_PWM_PD-30);
-        }
+        pwm_dc_count = 30;
+    }
+    else if (pwm_dc_count > (TIM2_PWM_PD-30) )
+    {
+        pwm_dc_count = (TIM2_PWM_PD-30);
     }
 
-    PWM_Config( pwm_dc_count );
+    if (0 == PWM_Is_Active) // also enables the /SD lines ... see driver.c
+    {
+        pwm_dc_count = 0; // sets PWM 0 and clears IR2104 /SD pins
+    }
+
+    PWM_Set_DC( pwm_dc_count );
+///
 }
 
 /*
@@ -482,20 +484,19 @@ void testUART(void)
  */
 main()
 {
-    static u8 button_down = 0;
-
     clock_setup();
     GPIO_Config();
     UART_setup();
     ADC1_setup();
-// initialize to 50% DC (just because) 
-    PWM_Config( TIM2_PWM_PD / 2 );
+
+    PWM_Set_DC( 0 );
 
     timer_config_task_rate(); // fixed at 5mS 
-    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
+//    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
+    PWM_Is_Active = 0; // start w/ outputs off
 
     while(1)
     {
@@ -505,7 +506,7 @@ main()
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-// toggle "output active"
+// toggle "output active"    (todo: up/down button states)
             PWM_Is_Active ^= 1;
 
             testUART();// tmp test

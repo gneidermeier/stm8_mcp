@@ -31,7 +31,7 @@ uint16_t global_uDC;
 u8 bldc_step = 0;
 
 /* Private function prototypes -----------------------------------------------*/
-void _PWM_Config(void);
+void PWM_Config(void);
 void bldc_move(void);
 
 /* Private functions ---------------------------------------------------------*/
@@ -41,32 +41,19 @@ void bldc_move(void);
   * @par Parameters:
   * None
   * @retval void None
-  *   GN: from UM0834 PWM example
   */
-void PWM_Config(uint16_t pwm_dc)
+void PWM_Set_DC(uint16_t pwm_dc)
 {
-    uint16_t uDC = pwm_dc;
-#if 0
-    if (uDC < PWM_DC_MIN)
-    {
-        uDC = PWM_DC_MIN;
-    }
-    if (uDC > PWM_DC_MAX)
-    {
-        uDC = PWM_DC_MAX;
-    }
-#endif
-    global_uDC = uDC;
+    global_uDC = pwm_dc;
 }
 
 void PWM_set_outputs(u8 state0, u8 state1, u8 state2)
 {
-
     TIM2_pulse_0 = state0 != 0 ? global_uDC : 0;
     TIM2_pulse_1 = state1 != 0 ? global_uDC : 0;
     TIM2_pulse_2 = state2 != 0 ? global_uDC : 0;
 
-    _PWM_Config();
+    PWM_Config();
 }
 
 /**
@@ -76,10 +63,8 @@ void PWM_set_outputs(u8 state0, u8 state1, u8 state2)
   * @retval void None
   *   GN: from UM0834 PWM example
   */
-void _PWM_Config(void)
+void PWM_Config(void)
 {
-//    TIM2_pulse_0 =  TIM2_pulse_1 =  TIM2_pulse_2 = global_uDC;
-
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
 
@@ -121,65 +106,62 @@ void BLDC_Step(void)
     bldc_step += 1;
     bldc_step %= N_CSTEPS;
 
-    if ( PWM_Is_Active)
+    if (global_uDC > 0)
     {
         bldc_move();
     }
     else // motor drive output has been disabled
     {
         GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR &=   ~(1<<7);
-        GPIOG->ODR &=   ~(1<<1);
+        GPIOC->ODR &=  ~(1<<7);
+        GPIOG->ODR &=  ~(1<<1);
         PWM_set_outputs(0, 0, 0);
     }
 }
 
 void bldc_move(void)
 {
-//    if ( PWM_Is_Active)
-    {
 // /SD outputs on C5, C7, and G1
 // wait until switch time arrives (watching for voltage on the floating line to cross 0)
-        switch(bldc_step)
-        {
-        default:
+    switch(bldc_step)
+    {
+    default:
 
-        case 0:
-            GPIOC->ODR |=   (1<<5);
-            GPIOC->ODR |=   (1<<7);
-            GPIOG->ODR &=  ~(1<<1);
-            PWM_set_outputs(1, 0, 0);
-            break;
-        case 1:
-            GPIOC->ODR |=   (1<<5);
-            GPIOC->ODR &=  ~(1<<7);
-            GPIOG->ODR |=   (1<<1);
-            PWM_set_outputs(1, 0, 0);
-            break;
-        case 2:
-            GPIOC->ODR &=  ~(1<<5);
-            GPIOC->ODR |=   (1<<7);
-            GPIOG->ODR |=   (1<<1);
-            PWM_set_outputs(0, 1, 0);
-            break;
-        case 3:
-            GPIOC->ODR |=   (1<<5);
-            GPIOC->ODR |=   (1<<7);
-            GPIOG->ODR &=  ~(1<<1);
-            PWM_set_outputs(0, 1, 0);
-            break;
-        case 4:
-            GPIOC->ODR |=   (1<<5);
-            GPIOC->ODR &=  ~(1<<7);
-            GPIOG->ODR |=   (1<<1);
-            PWM_set_outputs(0, 0, 1);
-            break;
-        case 5:
-            GPIOC->ODR &=  ~(1<<5);
-            GPIOC->ODR |=   (1<<7);
-            GPIOG->ODR |=   (1<<1);
-            PWM_set_outputs(0, 0, 1);
-            break;
-        }
+    case 0:
+        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR |=   (1<<7);
+        GPIOG->ODR &=  ~(1<<1);
+        PWM_set_outputs(1, 0, 0);
+        break;
+    case 1:
+        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR &=  ~(1<<7);
+        GPIOG->ODR |=   (1<<1);
+        PWM_set_outputs(1, 0, 0);
+        break;
+    case 2:
+        GPIOC->ODR &=  ~(1<<5);
+        GPIOC->ODR |=   (1<<7);
+        GPIOG->ODR |=   (1<<1);
+        PWM_set_outputs(0, 1, 0);
+        break;
+    case 3:
+        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR |=   (1<<7);
+        GPIOG->ODR &=  ~(1<<1);
+        PWM_set_outputs(0, 1, 0);
+        break;
+    case 4:
+        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR &=  ~(1<<7);
+        GPIOG->ODR |=   (1<<1);
+        PWM_set_outputs(0, 0, 1);
+        break;
+    case 5:
+        GPIOC->ODR &=  ~(1<<5);
+        GPIOC->ODR |=   (1<<7);
+        GPIOG->ODR |=   (1<<1);
+        PWM_set_outputs(0, 0, 1);
+        break;
     }
 }
