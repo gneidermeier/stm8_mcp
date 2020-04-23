@@ -23,6 +23,7 @@
 #include "stm8s_it.h"
 #include "parameter.h" // GN: app defines
 
+//#define BLDC_TIM1_TEST
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -214,22 +215,23 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+static u8 TMP_LIM = 8; // tmp test this will run the motor OL
 static u8 toggle;
-#if 1
-// test code to verify frequency of TIM2 counter update
-    toggle ^= 1;
-    if (toggle){
+static u8 count;
+
+  if ( ++count >= TMP_LIM ) {
+    count = 0;
+
+#ifdef BLDC_TIM1_TEST
+    BLDC_Step();
+#endif
+    toggle ^= 1; // tmp test 
+  }
+    if (toggle){ 
         GPIOD->ODR |= (1 << LED);
     } else {
         GPIOD->ODR &= ~(1 << LED);
     }
-#endif
-#if 0
-    BLDC_Step();
-#endif
 
     // must reset the tmer interrupt flag
     TIM1->SR1 &= ~TIM1_SR1_UIF;
@@ -337,7 +339,8 @@ toggle ^= 1;
         GPIOG->ODR |=  (1<<0);
     }
 #endif
-#if 1
+
+#ifndef BLDC_TIM1_TEST
     BLDC_Step();
 #endif
     // must reset the tmer interrupt flag
