@@ -26,11 +26,21 @@
 #define N_CSTEPS   6
 
 
+// presently using T1 pd = 64uS
+#define BLDC_OL_LO   254  // so slooo 
+#define BLDC_OL_HI    32  // almost doesnt start
+//static u8 TMP_LIM = 24; // bah
+
+
+
 /* Public variables  ---------------------------------------------------------*/
 uint16_t TIM2_pulse_0 ;
 uint16_t TIM2_pulse_1 ;
 uint16_t TIM2_pulse_2 ;
 
+u16 BLDC_comm_ct;
+
+BLDC_STATE_T BLDC_State;
 
 /* Private variables ---------------------------------------------------------*/
 uint16_t global_uDC;
@@ -102,6 +112,50 @@ void PWM_Config(void)
     TIM2->IER |= TIM2_IER_UIE; // Enable Update Interrupt (sets manually-counted
     // pwm at 20mS with DC related to commutation/test-pot))
 #endif
+}
+
+/*
+ * BLDC Update: handle the BLDC state e.g. rampup
+ */
+
+void BLDC_Update(void)
+{
+    static u16 count;
+
+    if ( ++count >= BLDC_comm_ct ) {
+    // reset counter and step the BLDC state
+        count = 0;
+
+        BLDC_Step();
+    }
+
+    if (BLDC_OFF == BLDC_State)
+    {
+        BLDC_comm_ct = BLDC_OL_LO;
+    }
+
+    if (BLDC_ON == BLDC_State)
+    {
+    // do ON stuff
+    } // else 
+
+    // ramp the speed if in rampup state 
+    if (BLDC_RAMPUP == BLDC_State)
+    {
+        u16 rampstep = 1;
+
+        if (BLDC_comm_ct > BLDC_OL_HI)
+        {
+            if (BLDC_comm_ct > rampstep)
+            {
+              BLDC_comm_ct -= rampstep;
+            }
+            else
+            {
+               BLDC_State = BLDC_ON;
+            }
+        }
+    }
 }
 
 /*

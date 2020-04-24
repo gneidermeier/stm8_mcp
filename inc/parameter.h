@@ -48,15 +48,27 @@
 
 
 /*
+ * Types
+ */
+typedef  enum {
+  BLDC_OFF,
+  BLDC_RAMPUP,
+  BLDC_ON
+} BLDC_STATE_T;
+
+
+/*
  * variables
  */
-extern u8 Duty_cycle_pcnt_LED0; // for test output on LED0 (builtin STM8-discover)
+extern BLDC_STATE_T BLDC_State;
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
+extern u16 BLDC_comm_ct;
 
 /*
  * prototypes
  */
 void BLDC_Step(void);
+void BLDC_Update(void);
 void PWM_Set_DC(uint16_t uDC);
 
 

@@ -304,9 +304,12 @@ void TIM1_setup(void)
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 39, 0);    //    ~0.000010 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 19, 0);    //    ~0.000005 S
 
-//  think the TIM3 interrupt (bldc_step() is taking 20 or 30 uS !!!!! wtf so slow this down for now	
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //    ~0.000050 S	
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    ~0.000400 S	
+//  think the ISR is taking ~50 uS because of BLDC_Step()	
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 255, 0);    //    0.000064 S
+//    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
 
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
@@ -517,12 +520,16 @@ main()
 
     PWM_Set_DC( 0 );
 
-    timer_config_task_rate(); // fixed at 5mS 
+    timer_config_task_rate(); // fixed at 5mS
 //    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
+
+
+// setup BLDC/PWM
+    PWM_Is_Active = 0; // start w/ outputs off
+    BLDC_State = BLDC_OFF;
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
-    PWM_Is_Active = 0; // start w/ outputs off
 
     while(1)
     {
@@ -532,14 +539,23 @@ main()
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-// toggle "output active"    (todo: up/down button states)
+// toggle "output active"    (todo: up/down button states) ... either button would transition from OFF->RAMP
             PWM_Is_Active ^= 1;
 
             testUART();// tmp test
+
+            if (0 != PWM_Is_Active)
+            {
+                BLDC_State = BLDC_RAMPUP;
+            }
+            else
+            {
+                BLDC_State = BLDC_OFF;
+            }
         }
 
 // while( FALSE == TaskRdy )
-        if ( FALSE == TaskRdy )  // idk .. don't block here in case there were actually some background tasks to do 
+        if ( FALSE == TaskRdy )  // idk .. don't block here in case there were actually some background tasks to do
         {
             nop();
         }

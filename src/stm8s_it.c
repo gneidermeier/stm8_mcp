@@ -23,7 +23,7 @@
 #include "stm8s_it.h"
 #include "parameter.h" // GN: app defines
 
-//#define BLDC_TIM1_TEST
+#define BLDC_TIM1_TEST
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -215,23 +215,18 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-static u8 TMP_LIM = 8; // tmp test this will run the motor OL
 static u8 toggle;
-static u8 count;
 
-  if ( ++count >= TMP_LIM ) {
-    count = 0;
+    BLDC_Update();
 
-#ifdef BLDC_TIM1_TEST
-    BLDC_Step();
-#endif
     toggle ^= 1; // tmp test 
-  }
+#if 1 // tmp test
     if (toggle){ 
         GPIOD->ODR |= (1 << LED);
     } else {
         GPIOD->ODR &= ~(1 << LED);
     }
+#endif
 
     // must reset the tmer interrupt flag
     TIM1->SR1 &= ~TIM1_SR1_UIF;
