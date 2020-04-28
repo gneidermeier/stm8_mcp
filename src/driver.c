@@ -26,12 +26,6 @@
 #define N_CSTEPS   6
 
 
-// presently using T1 pd = 64uS
-#define BLDC_OL_LO   254  // so slooo 
-#define BLDC_OL_HI    32  // almost doesnt start
-//static u8 TMP_LIM = 24; // bah
-
-
 
 /* Public variables  ---------------------------------------------------------*/
 uint16_t TIM2_pulse_0 ;
@@ -117,43 +111,54 @@ void PWM_Config(void)
 /*
  * BLDC Update: handle the BLDC state e.g. rampup
  */
-
 void BLDC_Update(void)
 {
+//    static const u16 SUBCOUNT = 0x0010;
+    static u16 SUBCOUNT = 0x1000;
+    static u16 subcount;
     static u16 count;
 
-    if ( ++count >= BLDC_comm_ct ) {
-    // reset counter and step the BLDC state
+    if ( ++count >= BLDC_comm_ct )
+    {
+        // reset counter and step the BLDC state
         count = 0;
-
         BLDC_Step();
     }
 
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_comm_ct = BLDC_OL_LO;
+        subcount = SUBCOUNT;
     }
 
     if (BLDC_ON == BLDC_State)
     {
-    // do ON stuff
-    } // else 
+        // do ON stuff
+    } // else
 
-    // ramp the speed if in rampup state 
+    // ramp the speed if in rampup state
     if (BLDC_RAMPUP == BLDC_State)
     {
-        u16 rampstep = 1;
+        const u16 rampstep = 1;
 
         if (BLDC_comm_ct > BLDC_OL_HI)
         {
             if (BLDC_comm_ct > rampstep)
             {
-              BLDC_comm_ct -= rampstep;
+                subcount -= 1;
+                if ( 0 == subcount )
+                {
+                    if (SUBCOUNT > 0x0010){
+                        SUBCOUNT >>= 1;
+                    }
+                    BLDC_comm_ct -= rampstep;
+                    subcount = SUBCOUNT;
+                }
             }
-            else
-            {
-               BLDC_State = BLDC_ON;
-            }
+        }
+        else
+        {
+            BLDC_State = BLDC_ON;
         }
     }
 }

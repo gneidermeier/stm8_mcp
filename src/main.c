@@ -79,18 +79,6 @@ void GPIO_Config(void)
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
 
-// spare outputs
-    GPIOE->ODR &=  ~(1<<5); 				//  PE5
-    GPIOE->DDR |=  (1<<5);
-    GPIOE->CR1 |=  (1<<5);
-
-    GPIOC->ODR &=  ~(1<<2); 				//  PC2
-    GPIOC->DDR |=  (1<<2);
-    GPIOC->CR1 |=  (1<<2);
-
-    GPIOC->ODR &=  ~(1<<4); 				//  PC4
-    GPIOC->DDR |=  (1<<4);
-    GPIOC->CR1 |=  (1<<4);
 
 // HB driver "ENABLES" (/SD input pin of IR2104) on PC5, PC7, PG1
 ///////////  // tried E2, E0, D1 but E2 not work as output ... ??? 
@@ -132,13 +120,25 @@ void GPIO_Config(void)
     GPIOD->DDR |=  (1<<4);
     GPIOD->CR1 |=  (1<<4);
 #endif
+
 // INPUTS
+// PA4 as button input 
+    GPIOA->DDR &= ~(1 << 4); // PA.6 as input
+    GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
+
 // PA5/6 as button input 
-    GPIOA->DDR &= ~(1 << 6); // PB.2 as input
+    GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
     GPIOA->DDR |= (1 << 5);  // PD.n as output
     GPIOA->CR1 |= (1 << 5);  // push pull output
-    GPIOA->ODR &= ~(1 << 5); // set "off" (not driven) to use as hi-side of button
+    GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
+
+// PE5 as button input 
+    GPIOE->DDR &= ~(1 << 5); // PE.5 as input
+    GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
+    GPIOC->DDR |= (1 << 2);  // PC.2 as output
+    GPIOC->CR1 |= (1 << 2);  // push pull output
+    GPIOC->ODR &= ~(1 << 2); // set pin off to use as gnd of button
 
 
 // UART2 D5: Rx, D6: Tx 
@@ -148,12 +148,6 @@ void GPIO_Config(void)
     GPIOD->CR1 |= (1 << 6);  // push pull output
     GPIOD->ODR |= (1 << 6);  // use as hi-side of button
 
-// PE3/2 as test switch input 
-//    GPIOE->DDR &= ~(1 << 2); // PE.2 as input
-//    GPIOE->CR1 |= (1 << 2);  // pull up w/o interrupts
-//    GPIOE->DDR |= (1 << 3);  // PD.n as output
-//    GPIOE->CR1 |= (1 << 3);  // push pull output
-//    GPIOE->ODR |= (1 << 3);  // use as hi-side of button
 
 // PE.6 AIN9
     GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
@@ -485,7 +479,7 @@ void periodic_task(void)
 void testUART(void)
 {
     static unsigned char cnt = 0x30;
-    char sbuf[32] ;
+    char sbuf[40] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
     cnt = cnt < 126 ? cnt + 1 : 0x30;
@@ -499,8 +493,13 @@ void testUART(void)
     strcat(sbuf, " A0= ");
     itoa(A0, cbuf, 16);
     strcat(sbuf, cbuf);
+
     strcat(sbuf, " A1= ");
     itoa(A1, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " C= ");
+    itoa(BLDC_comm_ct, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, "\r\n");
@@ -533,24 +532,53 @@ main()
 
     while(1)
     {
+        u16 debounce_ct;
         u16 ainp;
-//  button input
+//  button input either button would transition from OFF->RAMP
+        if (! (( GPIOA->IDR)&(1<<4)))
+        {
+            while( ! (( GPIOA->IDR)&(1<<4)) ); // wait for debounce (sorta works)
+                BLDC_State = BLDC_OFF;
+                PWM_Is_Active = 0;
+        }
+
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-
 // toggle "output active"    (todo: up/down button states) ... either button would transition from OFF->RAMP
-            PWM_Is_Active ^= 1;
+            testUART();// tmp test
+
+            if (BLDC_OFF == BLDC_State)
+            {
+                BLDC_State = BLDC_RAMPUP;
+                PWM_Is_Active = 1;
+            }
+            else 
+            {
+                if (BLDC_ON == BLDC_State  && BLDC_comm_ct > 5 /* BLDC_OL_HI */ )
+                {
+                    BLDC_comm_ct -= 1; // faster
+                }
+            }
+        }
+
+        if ( ! (( GPIOE->IDR)&(1<<5)))
+        {
+            while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
 
             testUART();// tmp test
 
-            if (0 != PWM_Is_Active)
+            if (BLDC_OFF == BLDC_State)
             {
                 BLDC_State = BLDC_RAMPUP;
+                PWM_Is_Active = 1;
             }
             else
             {
-                BLDC_State = BLDC_OFF;
+                if (BLDC_ON == BLDC_State  && BLDC_comm_ct < BLDC_OL_LO)
+                {
+                    BLDC_comm_ct += 1; // slower
+                }
             }
         }
 

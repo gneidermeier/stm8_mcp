@@ -42,6 +42,10 @@
 // arbitrary period (n * 125uS ^H^H^H 62.5uS) to PWM the user LED0
 #define TIM2_COUNT_LED0_PD   80
 
+// presently using T1 pd = 64uS
+#define BLDC_OL_LO   254  // so slooo 
+#define BLDC_OL_HI    32  // almost doesnt start
+//static u8 TMP_LIM = 24; // bah
 
 
 #define LED  0
