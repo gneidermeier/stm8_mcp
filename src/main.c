@@ -16,6 +16,10 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+// minimum PWM DC duration (manual adjustment)
+#define PWM_DC_MIN  20   // (10/125)-> 8%
+
+
 /* Public variables  ---------------------------------------------------------*/
 u8 PWM_Is_Active;
 u8 Duty_cycle_pcnt_LED0;
@@ -203,43 +207,6 @@ void UARTputs(char *message)
 }
 
 /*
- * http://www.electroons.com/blog/stm8-tutorials-3-adc-interfacing/
- */
-unsigned int _readADC1(unsigned int channel)
-{
-    unsigned int csr = 0;
-    unsigned int val = 0;
-    //using ADC in single conversion mode
-    ADC1->CSR  = 0;                // GN: singly read each channel for now
-    ADC1->CSR |= ((0x0F)&channel); // select channel
-
-//Single scan mode is started by setting the ADON bit while the SCAN bit is set and the CONT bit is cleared.
-    ADC1->CR1 &= ~(1<<1); // CONT OFF
-    ADC1->CR2 |=  (1<<1); // SCAN ON 
-
-    ADC1->CR2 |= (1<<3); // Right Aligned Data
-    ADC1->CR1 |= (1<<0); // ADC ON 
-    ADC1->CR1 |= (1<<0); // ADC Start Conversion
-
-    while(((ADC1->CSR)&(1<<7))== 0); // Wait till EOC
-
-/*  correct way to clear the EOC flag in continuous scan mode is to load a byte in the ADC_CSR register from a RAM variable, clearing the EOC flag and reloading the last channel number for the scan sequence */
-    csr = ADC1->CSR; // GN:   carefully clear EOC!
-    csr &= ~(1<<7);
-    ADC1->CSR = csr;
-/*
-                 val |= (unsigned int)ADC1->DRL;
-                 val |= (unsigned int)ADC1->DRH<<8;
-*/
-    val = ADC1_GetBufferValue(channel); // AINx
-
-    ADC1->CR1 &= ~(1<<0); // ADC Stop Conversion
-
-    val &= 0x03ff;
-    return (val);
-}
-
-/*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
  */
 void ADC1_setup(void)
@@ -320,7 +287,7 @@ void TIM1_setup(void)
 void timer_config_task_rate(void)
 {
 // @2Mhz... 4.992 mS
-    TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78  -> 1.248mS
+    TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78        -> 1.248mS
     TIM4->ARR = 77;    // @2Mhz  Period = 5ms 
 
 //    TIM4->PSCR = 0x06; // Prescaler = 64    @8Mhz ... arr=(124+1)  -> 1.0 mS
@@ -420,7 +387,7 @@ void clock_setup(void)
 /*
  * periodic task is timed to 5mS timer, but stack context is
  * 'main()' and not in the interrupt
- */
+ */ 
 void periodic_task(void)
 {
 //static unsigned char ch = 0x30; // tmp
@@ -451,17 +418,18 @@ void periodic_task(void)
 // use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
     Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
 
+#ifdef PWM_DC_TEST
 /// TODO: only use this for test ... needs to be on a +/- button
     // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
     pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
 
-    if (pwm_dc_count < 30)
+    if (pwm_dc_count < PWM_DC_MIN)
     {
-        pwm_dc_count = 30;
+        pwm_dc_count = PWM_DC_MIN;
     }
-    else if (pwm_dc_count > (TIM2_PWM_PD-30) )
+    else if (pwm_dc_count > (TIM2_PWM_PD - PWM_DC_MIN) )
     {
-        pwm_dc_count = (TIM2_PWM_PD-30);
+        pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
     }
 
     if (0 == PWM_Is_Active) // also enables the /SD lines ... see driver.c
@@ -470,8 +438,12 @@ void periodic_task(void)
     }
 
     PWM_Set_DC( pwm_dc_count );
-///
+#endif 
 }
+
+
+// hack, temp
+extern u16 BLDC_OL_comm_tm;
 
 /*
  * temp, todo better function
@@ -499,7 +471,7 @@ void testUART(void)
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " C= ");
-    itoa(BLDC_comm_ct, cbuf, 16);
+    itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, "\r\n");
@@ -517,7 +489,6 @@ main()
     ADC1_setup();
     TIM1_setup();
 
-    PWM_Set_DC( 0 );
 
     timer_config_task_rate(); // fixed at 5mS
 //    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
@@ -537,7 +508,7 @@ main()
 //  button input either button would transition from OFF->RAMP
         if (! (( GPIOA->IDR)&(1<<4)))
         {
-            while( ! (( GPIOA->IDR)&(1<<4)) ); // wait for debounce (sorta works)
+//            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
                 BLDC_State = BLDC_OFF;
                 PWM_Is_Active = 0;
         }
@@ -555,10 +526,7 @@ main()
             }
             else 
             {
-                if (BLDC_ON == BLDC_State  && BLDC_comm_ct > 5 /* BLDC_OL_HI */ )
-                {
-                    BLDC_comm_ct -= 1; // faster
-                }
+                BLDC_Spd_inc();
             }
         }
 
@@ -575,10 +543,7 @@ main()
             }
             else
             {
-                if (BLDC_ON == BLDC_State  && BLDC_comm_ct < BLDC_OL_LO)
-                {
-                    BLDC_comm_ct += 1; // slower
-                }
+                BLDC_Spd_dec();	
             }
         }
 

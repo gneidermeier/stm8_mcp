@@ -20,6 +20,10 @@
  * defines
  */
 
+#define PWM_DC_TEST     // test code
+#define BLDC_COMM_TEST  // test code
+
+
 // Setting up TIM2, presently to use 4kHz PWM frequency (or maybe even 6 or 7 kHz ?)
 
 // Using TIM2 prescale value of 1, so period TIM2 == period fMaster
@@ -42,10 +46,6 @@
 // arbitrary period (n * 125uS ^H^H^H 62.5uS) to PWM the user LED0
 #define TIM2_COUNT_LED0_PD   80
 
-// presently using T1 pd = 64uS
-#define BLDC_OL_LO   254  // so slooo 
-#define BLDC_OL_HI    32  // almost doesnt start
-//static u8 TMP_LIM = 24; // bah
 
 
 #define LED  0
@@ -66,11 +66,13 @@ typedef  enum {
  */
 extern BLDC_STATE_T BLDC_State;
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-extern u16 BLDC_comm_ct;
+
 
 /*
  * prototypes
  */
+void BLDC_Spd_inc(void);
+void BLDC_Spd_dec(void);
 void BLDC_Step(void);
 void BLDC_Update(void);
 void PWM_Set_DC(uint16_t uDC);
