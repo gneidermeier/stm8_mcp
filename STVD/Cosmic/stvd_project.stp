@@ -61,7 +61,7 @@ String.100.2=STM8 Cosmic
 String.100.3=ST7 Metrowerks V1.1
 String.100.4=Raisonance
 String.101.0=STM8 Cosmic
-String.102.0=C:\Program Files (x86)\COSMIC\FSE_Compilers\CXSTM8
+String.102.0=
 String.103.0=
 String.104.0=Hstm8
 String.105.0=Lib
@@ -144,7 +144,7 @@ String.100.2=STM8 Cosmic
 String.100.3=ST7 Metrowerks V1.1
 String.100.4=Raisonance
 String.101.0=STM8 Cosmic
-String.102.0=C:\Program Files (x86)\COSMIC\FSE_Compilers\CXSTM8
+String.102.0=
 String.103.0=
 String.104.0=Hstm8
 String.105.0=Lib
@@ -302,11 +302,31 @@ Child=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_adc1.c]
 ElemType=File
 PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_adc1.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_clk.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_gpio.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_gpio.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_gpio.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c
 Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim2.c
 
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim2.c]
 ElemType=File
 PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim2.c
+Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_uart2.c
 
 [Root.STM8_TouchSensing_Lib]
 ElemType=Folder
@@ -394,7 +414,7 @@ PathName=STM8_TouchSensing_Lib\src
 [Root.Source Files]
 ElemType=Folder
 PathName=Source Files
-Child=Root.Source Files...\..\src\main.c
+Child=Root.Source Files...\..\src\driver.c
 Next=Root.Include Files
 Config.0=Root.Source Files.Config.0
 Config.1=Root.Source Files.Config.1
@@ -465,6 +485,11 @@ String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
 
+[Root.Source Files...\..\src\driver.c]
+ElemType=File
+PathName=..\..\src\driver.c
+Next=Root.Source Files...\..\src\main.c
+
 [Root.Source Files...\..\src\main.c]
 ElemType=File
 PathName=..\..\src\main.c
@@ -482,7 +507,7 @@ PathName=..\..\src\stm8s_it.c
 [Root.Include Files]
 ElemType=Folder
 PathName=Include Files
-Child=Root.Include Files...\..\inc\stm8s_it.h
+Child=Root.Include Files...\..\inc\parameter.h
 Config.0=Root.Include Files.Config.0
 Config.1=Root.Include Files.Config.1
 
@@ -551,6 +576,11 @@ String.3.0=
 String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
+
+[Root.Include Files...\..\inc\parameter.h]
+ElemType=File
+PathName=..\..\inc\parameter.h
+Next=Root.Include Files...\..\inc\stm8s_it.h
 
 [Root.Include Files...\..\inc\stm8s_it.h]
 ElemType=File

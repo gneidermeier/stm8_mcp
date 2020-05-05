@@ -21,12 +21,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
-//#include "parameter.h" // GN: app defines
+#include "parameter.h" // GN: app defines
 
-extern u8 latch_T4_is_zero;
-extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
-extern u16 T4counter ;
-extern u16 T4_count_pd;
+#define BLDC_TIM1_TEST
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -218,9 +215,22 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+static u8 toggle;
+
+    BLDC_Update();
+
+    toggle ^= 1; // tmp test 
+#if 1 // tmp test
+    if (toggle){ 
+        GPIOD->ODR |= (1 << LED);
+    } else {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+#endif
+
+    // must reset the tmer interrupt flag
+    TIM1->SR1 &= ~TIM1_SR1_UIF;
+//TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
 }
 
 /**
@@ -267,9 +277,31 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+    /* In order to detect unexpected events during development,
+       it is recommended to set a breakpoint on the following instruction.
+    */
+    static u8 toggle;
+    static u8 count20ms = 0;
+
+    count20ms += 1;
+
+/*
+ * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing) 
+ */
+#if 0 
+    if (count20ms > TIM2_COUNT_LED0_PD)
+    {
+        count20ms = 0;
+        GPIOD->ODR |= (1 << LED);
+    }
+    else if (count20ms > Duty_cycle_pcnt_LED0)
+    {
+        GPIOD->ODR &= ~(1 << LED);
+    }
+#endif
+
+    // must reset the tmer interrupt flag
+    TIM2->SR1 &= ~TIM2_SR1_UIF;
 }
 
 /**
@@ -293,9 +325,21 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+    static u8 toggle = 0;
+#if 1
+toggle ^= 1;
+    if ( toggle ){
+        GPIOG->ODR &= ~(1<<0);
+    }else {
+        GPIOG->ODR |=  (1<<0);
+    }
+#endif
+
+#ifndef BLDC_TIM1_TEST
+    BLDC_Step();
+#endif
+    // must reset the tmer interrupt flag
+    TIM3->SR1 &= ~TIM3_SR1_UIF;
 }
 
 /**
@@ -427,6 +471,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
 }
 #endif /*STM8S208 or STM8S207 or STM8AF52Ax or STM8AF62Ax */
 
@@ -450,28 +495,20 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 {
-    /* In order to detect unexpected events during development,
-       it is recommended to set a breakpoint on the following instruction.
-    */
-//    static u8 toggle = 0;
-//    toggle ^= 1;  // wiggle test pin
-//        if (0 != toggle)//        if ( T4counter  % 2 )      //  50% DC
+    static u8 toggle = 0;
+#if 0
+toggle ^= 1;
+    if ( toggle ){
+        GPIOG->ODR &= ~(1<<0);
+    }else {
+        GPIOG->ODR |=  (1<<0);
+    }
+#endif
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
 
-//        duty_cycle = readADC1( AINx ); // needs to  use  AIN interrupt to read sample
     TaskRdy = TRUE;     // notify background process
-
-
-    T4counter  += 1;
-
-    // using counter period to cycle LED0, slo enuff rate to see it
-    if (T4counter >= T4_count_pd)
-    {
-        T4counter = 0;
-        latch_T4_is_zero = TRUE;
-    }
 }
 #endif /*STM8S903*/
 

@@ -1,384 +1,481 @@
 /**
   ******************************************************************************
   * @file main.c
-  * @brief This file contains the main function for this template.
-  * @author STMicroelectronics - MCD Application Team
-  * @version V2.0.0
-  * @date 15-March-2011
-  ******************************************************************************
-  *
-  * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-  * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
-  * TIME. AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY
-  * DIRECT, INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING
-  * FROM THE CONTENT OF SUCH FIRMWARE AND/OR THE USE MADE BY CUSTOMERS OF THE
-  * CODING INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-  *
-  * <h2><center>&copy; COPYRIGHT 2009 STMicroelectronics</center></h2>
-  * @image html logo.bmp
+  * @brief This file contains the main function for the BLDC motor control
+  * @author Neidermeier
+  * @version 
+  * @date March-2020
   ******************************************************************************
   */
 
-
 /* Includes ------------------------------------------------------------------*/
-
+#include <string.h>
 #include "stm8s.h"
+#include "parameter.h" // app defines
+
 
 /* Private defines -----------------------------------------------------------*/
-#define N_PHASES  3 
+
+// minimum PWM DC duration (manual adjustment)
+#define PWM_DC_MIN  20   // (10/125)-> 8%
+
 
 /* Public variables  ---------------------------------------------------------*/
-
-u8 forceCommutation; // switch input to test "commutation" logic
-u8 latch_T4_is_zero;
+u8 PWM_Is_Active;
+u8 Duty_cycle_pcnt_LED0;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
-u16 T4counter = 0;
-//unsigned int T4_count_pd = 20; // LED0 @ 10 Hz so 20 steps of 5mS for DC?
-u16 T4_count_pd = 65; // seems to be limited to around 70 counts ?? wtf
-u16 duty_cycle;
+
+uint16_t A0 = 0x1234;//tmp
+uint16_t A1 = 0xabcd;//tmp
 
 
 /* Private variables ---------------------------------------------------------*/
-unsigned const char LED = 0;
-s8 buttonState = 0;
+const u8 AINCH_COMMUATION_PD = 9;   // adjust pot to set "commutation" period
+const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
 
 
 /* Private function prototypes -----------------------------------------------*/
+
 /* Private functions ---------------------------------------------------------*/
 
+/*
+ * home-made itoa function (16-bits only, hex-only)
+ * seems Cosmic only provide atoi in stdlib and not itoa
+ */
+char * itoa(uint16_t u16in, char *sbuf, int base)
+{
+    int x;
+    int shift = 16 - 4;	/* 4-bits to 1 nibble */
+    uint16_t n16 = u16in;
+
+    if (16 != base)
+    {
+        return NULL;
+    }
+
+    x = 0;
+    while (x < 4 /* 4 nibbles in 16-bit word */ )
+    {
+        unsigned char c = (n16 >> shift) & 0x000F;
+
+        if (c > 9)
+        {
+            c -= 10;
+            c += 'A';
+        }
+        else
+        {
+            c += '0';
+        }
+        sbuf[x++] = c;
+        shift -= 4;
+    }
+    sbuf[x] = 0;
+
+    return sbuf;
+}
+
 void GPIO_Config(void)
-{ 
-// built-in LED    
-		 GPIOD->DDR |= (1 << LED); //PD.n as output
-     GPIOD->CR1 |= (1 << LED); //push pull output
+{
+// OUTPUTS
+// built-in LED
+    GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
+    GPIOD->DDR |= (1 << LED); //PD.n as output
+    GPIOD->CR1 |= (1 << LED); //push pull output
 
-// test LED
-	GPIOC->ODR &= ~(1<<7); 				//  drive  low (GND)
-	GPIOC->DDR |=  (1<<7);
-	GPIOC->CR1 |=  (1<<7);
 
-	GPIOC->ODR |=  (1<<6); 				//  LED on C6   7
-	GPIOC->DDR |=  (1<<6);
-	GPIOC->CR1 |=  (1<<6);
+// HB driver "ENABLES" (/SD input pin of IR2104) on PC5, PC7, PG1
+///////////  // tried E2, E0, D1 but E2 not work as output ... ??? 
+// C5, C7, and G1 are CN2 pin 6,8 ,12 so 3 leads can go in one connector shell ;)
+// also this is to expose PC2 which is TIM1 CH2 output.
+    GPIOC->ODR &=  ~(1<<5);
+    GPIOC->DDR |=  (1<<5);
+    GPIOC->CR1 |=  (1<<5);
 
-// 3 LEDs 
-// PA4 
-	GPIOA->ODR &= ~(1<<4); 				//  drive  low (GND for LED on PDx)
-	GPIOA->DDR |=  (1<<4);
-	GPIOA->CR1 |=  (1<<4);
+    GPIOC->ODR &=  ~(1<<7);
+    GPIOC->DDR |=  (1<<7);
+    GPIOC->CR1 |=  (1<<7);
 
-	GPIOA->ODR |=  (1<<3); 				//  LED/OUT/CH1.TIM2.PWM on PA3
-	GPIOA->DDR |=  (1<<3);
-	GPIOA->CR1 |=  (1<<3);
+    GPIOG->ODR &=  ~(1<<1);
+    GPIOG->DDR |=  (1<<1);
+    GPIOG->CR1 |=  (1<<1);
+////////////
+// test LED  
+    GPIOG->ODR &= ~(1<<0);
+    GPIOG->DDR |=  (1<<0);
+    GPIOG->CR1 |=  (1<<0);
 
-// PD2
-	GPIOD->ODR &= ~(1<<2); 				//  drive  low (GND for LED on PDx)
-	GPIOD->DDR |=  (1<<2);
-	GPIOD->CR1 |=  (1<<2);
+    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6 
+    GPIOC->DDR |=  (1<<6);
+    GPIOC->CR1 |=  (1<<6);
 
-	GPIOD->ODR |=  (1<<3); 				//  VDD for LED/OUT/CH2.TIM2.PWM on PD3
-	GPIOD->DDR |=  (1<<3);
-	GPIOD->CR1 |=  (1<<3);
+#if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
+// 3 PWM Channels 
+// T2.PWM.CH3 
+    GPIOA->ODR |=  (1<<3);  // PA3
+    GPIOA->DDR |=  (1<<3);
+    GPIOA->CR1 |=  (1<<3);
+// T2.PWM.CH2 
+    GPIOD->ODR |=  (1<<3);  // PD3
+    GPIOD->DDR |=  (1<<3);
+    GPIOD->CR1 |=  (1<<3);
+// T2.PWM.CH1 
+    GPIOD->ODR |=  (1<<4);  // PD4
+    GPIOD->DDR |=  (1<<4);
+    GPIOD->CR1 |=  (1<<4);
+#endif
 
-// PD5
-	GPIOD->ODR &= ~(1<<5); 				//  drive  low (GND for LED on PDx)
-	GPIOD->DDR |=  (1<<5);
-	GPIOD->CR1 |=  (1<<5);
-
-	GPIOD->ODR |=  (1<<4); 				//  VDD for LED/OUT/CH3.TIM2.PWM on PD4
-	GPIOD->DDR |=  (1<<4);
-	GPIOD->CR1 |=  (1<<4);
+// INPUTS
+// PA4 as button input 
+    GPIOA->DDR &= ~(1 << 4); // PA.6 as input
+    GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
 
 // PA5/6 as button input 
-		GPIOA->DDR &= ~(1 << 6); // PB.2 as input
-		GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-		GPIOA->DDR |= (1 << 5); //PD.n as output
-		GPIOA->CR1 |= (1 << 5); //push pull output
-		GPIOA->ODR &= ~(1 << 5); // set "off" (not driven) to use as hi-side of button
+    GPIOA->DDR &= ~(1 << 6); // PA.6 as input
+    GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
+    GPIOA->DDR |= (1 << 5);  // PD.n as output
+    GPIOA->CR1 |= (1 << 5);  // push pull output
+    GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
 
-// PE3/2 as test switch input 
-		GPIOE->DDR &= ~(1 << 2); // PE.2 as input
-		GPIOE->CR1 |= (1 << 2);  // pull up w/o interrupts
-		GPIOE->DDR |= (1 << 3); //PD.n as output
-		GPIOE->CR1 |= (1 << 3); //push pull output
-		GPIOE->ODR |= (1 << 3); // use as hi-side of button		
+// PE5 as button input 
+    GPIOE->DDR &= ~(1 << 5); // PE.5 as input
+    GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
+    GPIOC->DDR |= (1 << 2);  // PC.2 as output
+    GPIOC->CR1 |= (1 << 2);  // push pull output
+    GPIOC->ODR &= ~(1 << 2); // set pin off to use as gnd of button
+
+
+// UART2 D5: Rx, D6: Tx 
+    GPIOD->DDR &= ~(1 << 5); // PD.5 as input
+    GPIOD->CR1 |= (1 << 5);  // pull up w/o interrupts
+    GPIOD->DDR |= (1 << 6);  // PD.6 as output
+    GPIOD->CR1 |= (1 << 6);  // push pull output
+    GPIOD->ODR |= (1 << 6);  // use as hi-side of button
 
 
 // PE.6 AIN9
-		GPIOE->DDR &= ~(1 << 6); // PE.6 as input
-		GPIOE->CR1 &= ~(1 << 6);  //  floating input
-		GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
-		
+    GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
+    GPIOE->CR1 &= ~(1 << 6);  // floating input
+    GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
+
 // PE.7 AIN8
-		GPIOE->DDR &= ~(1 << 7); // PE.7 as input
-		GPIOE->CR1 &= ~(1 << 7);  //  floating input
-		GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
+    GPIOE->DDR &= ~(1 << 7);  // PE.7 as input
+    GPIOE->CR1 &= ~(1 << 7);  // floating input
+    GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
 // PB.6 AIN6
-		GPIOB->DDR &= ~(1 << 6); // PE.7 as input
-		GPIOB->CR1 &= ~(1 << 6);  //  floating input
-		GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
+    GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
+    GPIOB->CR1 &= ~(1 << 6);  // floating input
+    GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
 
 // PB.0 AIN0
-		GPIOB->DDR &= ~(1 << 0); // PB.0 as input
-		GPIOB->CR1 &= ~(1 << 0);  //  floating input
-		GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
+    GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
+    GPIOB->CR1 &= ~(1 << 0);  // floating input
+    GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
 }
 
 /*
- * http://www.electroons.com/blog/stm8-tutorials-3-adc-interfacing/
+ * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
  */
-unsigned int readADC1(unsigned int channel) 
+void UART_setup(void)
 {
-     unsigned int csr=0;	
-     unsigned int val=0;
-     //using ADC in single conversion mode
-ADC1->CSR  = 0; // GN: idfk		...................HERE IT IS !!!! ??? !!! 
-     ADC1->CSR |= ((0x0F)&channel); // select channel
+    UART2_DeInit();
 
-//Single scan mode is started by setting the ADON bit while the SCAN bit is set and the CONT bit is cleared.
-     ADC1->CR1 &= ~(1<<1); // CONT OFF
-     ADC1->CR2 |=  (1<<1); // SCAN ON 
+    UART2_Init(115200,
+               UART2_WORDLENGTH_8D,
+               UART2_STOPBITS_1,
+               UART2_PARITY_NO,
+               UART2_SYNCMODE_CLOCK_DISABLE,
+               UART2_MODE_TXRX_ENABLE);
 
-     ADC1->CR2 |= (1<<3); // Right Aligned Data
-     ADC1->CR1 |= (1<<0); // ADC ON 
-     ADC1->CR1 |= (1<<0); // ADC Start Conversion
-		 
-     while(((ADC1->CSR)&(1<<7))== 0); // Wait till EOC
-
-/*  correct way to clear the EOC flag in continuous scan mode is to load a byte in the ADC_CSR register from a RAM variable, clearing the EOC flag and reloading the last channel number for the scan sequence */
-csr = ADC1->CSR; // GN:   carefully clear EOC!
-csr &= ~(1<<7); 
-ADC1->CSR = csr;
-/*
-     val |= (unsigned int)ADC1->DRL;
-     val |= (unsigned int)ADC1->DRH<<8;
-*/
-     val = ADC1_GetBufferValue(channel); // AINx
-
-
-     ADC1->CR1 &= ~(1<<0); // ADC Stop Conversion
-
-     val &= 0x03ff;
-     return (val);
+    UART2_Cmd(ENABLE);
 }
 
+/*
+*  Send a message to the debug port (UART1).
+*    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+*/
+void UARTputs(char *message)
+{
+    char *ch = message;
+    while (*ch)
+    {
+        UART2->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
+        while ( 0 == (UART2->SR & UART2_SR_TXE) ); //  Wait for transmission to complete.
+        ch++;                               //  Grab the next character.
+    }
+}
 
-/**
-  * @brief Validation firmware main entry point.
-  * @par Parameters:
-  * None
-  * @retval void None
-  *   GN: from UM0834 PWM example
-  */
-#define CCR1_Val  ((u16)500) // Configure channel 1 Pulse Width
-#define CCR2_Val  ((u16)250) // Configure channel 2 Pulse Width
-#define CCR3_Val  ((u16)750) // Configure channel 3 Pulse Width
+/*
+ * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
+ */
+void ADC1_setup(void)
+{
+// Port B[0..7]=floating input no interr
+// STM8 Discovery, all PortB pins are on CN3
+    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT);
 
-void PWM_Config(uint16_t uDC, uint16_t *p_DC){
+    ADC1_DeInit();
 
-uint16_t TIM2_pulse_0 ;// = *(p_DC + 0);
-uint16_t TIM2_pulse_1 ;// = *(p_DC + 1);
-uint16_t TIM2_pulse_2 ;// = *(p_DC + 2);
-TIM2_pulse_0 = \
-TIM2_pulse_1 = \
-TIM2_pulse_2 = uDC;
+// this example, single channel polling :
+    ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
+              ADC1_CHANNEL_9,
+              ADC1_PRESSEL_FCPU_D18,
+              ADC1_EXTTRIG_TIM,   //  ADC1_EXTTRIG_GPIO
+              DISABLE,
+              ADC1_ALIGN_RIGHT,
+              ADC1_SCHMITTTRIG_ALL,
+              DISABLE);
 
+//    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
 
-//return; // tmp test
+    ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
 
-/* TIM2 Peripheral Configuration */ 
-  TIM2_DeInit();
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+    ADC1_Cmd(ENABLE);
+}
 
-  /* Set TIM2 Frequency to 2Mhz */ 
-  TIM2_TimeBaseInit(TIM2_PRESCALER_1, 999  );
-//TIM2_TimeBaseInit(TIM2_PRESCALER_1, 10  );   // appears 1 cycle = 1uS, so fMASTER period == @ 0.5uS
+/*
+ * Timer 1 Setup
+ * from:
+ *   http://www.emcu.it/STM8/STM8-Discovery/Tim1eTim4/TIM1eTIM4.html
+ *
+ * manual mode (ramp-up) commutation timing?
+ * based on OTS ESC analysic, rampup start at 
+ *  pd = 0.008  sec
+ *       0.003  sec  rampup to 3000 RPM
+ *       0.004  sec  settle to 2500 RPM
+ *       0.008  sec  1250 RPM slowest attainable after initial sync
+ *
+ *       0.0012 sec
+*/
+void TIM1_setup(void)
+{
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
+    TIM1_DeInit();
 
-	/* Channel 1 PWM configuration */
-//TIM2_Pulse	= CCR1_Val;
-  TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0 /* CCR1_Val */, TIM2_OCPOLARITY_LOW ); 
-//TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 5, TIM2_OCPOLARITY_LOW );	
-  TIM2_OC1PreloadConfig(ENABLE);
+//fCK_CNT = fCK_PSC/(PSCR[15:0]+1) 
+    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000060
+    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000048
+//    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    NG
+//    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    .000030
 
+// @8Mhz
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 15, 0);    //    ~0.000004 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 39, 0);    //    ~0.000010 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 19, 0);    //    ~0.000005 S
 
-	/* Channel 2 PWM configuration */
-//TIM2_Pulse	= CCR2_Val;	
-  TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_1, TIM2_OCPOLARITY_LOW );
-  TIM2_OC2PreloadConfig(ENABLE);
+//  think the ISR is taking ~50 uS because of BLDC_Step()	
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
+    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 255, 0);    //    0.000064 S
+//    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
 
-
-	/* Channel 3 PWM configuration */
-//TIM2_Pulse	= CCR3_Val;	
-	TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_2, TIM2_OCPOLARITY_LOW );
-  TIM2_OC3PreloadConfig(ENABLE);
-
-	/* Enables TIM2 peripheral Preload register on ARR */
-	TIM2_ARRPreloadConfig(ENABLE);
-	
-  /* Enable TIM2 */
-  TIM2_Cmd(ENABLE);
+    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+    TIM1_Cmd(ENABLE);
 }
 
 /*
  * Configure Timer 4 as general purpose fixed time-base reference
+ * Timer 4 & 6 are 8-bit basic timers
  *
  *   https://lujji.github.io/blog/bare-metal-programming-stm8/
  *
  * Default setup for STM8S Discovery is 2Mhz HSI ... leave period @ 5mS for now I guesss.....
  */
-void TIM4_Config(void){
-    /* Prescaler = 128 */
-    TIM4->PSCR = 0x07; // 0b00000111;
-    /* Period = 5ms */
-    TIM4->ARR = 77;
-    TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
-    TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4	
-}
-
-/*
-*/
-u16 updateChannels(s8 selectedChannel)
+void timer_config_task_rate(void)
 {
-    unsigned const int AIN9 = 9;  // PE6
-    unsigned const int AIN8 = 8;  // PE7
-    unsigned const int AIN6 = 6;  // PB6
+// @2Mhz... 4.992 mS
+    TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78        -> 1.248mS
+    TIM4->ARR = 77;    // @2Mhz  Period = 5ms 
 
-    unsigned  int AINch;
-    unsigned int AINx;
+//    TIM4->PSCR = 0x06; // Prescaler = 64    @8Mhz ... arr=(124+1)  -> 1.0 mS
+//    TIM4->ARR = 124;    // @8Mhz  Period = 1.0ms 
 
-// set the lo-sides (HI) to turn off LED (pulls cathodes hi)...
-// PA4  (VDD for LED/OUT/CH1.TIM2.PWM on PA3)
-    GPIOA->ODR |= (1<<4);
-// PD2  (VDD for LED/OUT/CH2.TIM2.PWM on PD3)
-    GPIOD->ODR |= (1<<2);
-// PD5  (VDD for LED/OUT/CH3.TIM2.PWM on PD4)
-    GPIOD->ODR |= (1<<5);
+    TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
+    TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
+}
 
-    switch (selectedChannel)
+// Timers 2 3 & 5 are 16-bit general purpose timers
+/*
+ *  Sets the open-loop commutation switching period.
+ *  Input: [0:1023]   (input may be set from analog trim-pot for test/dev)
+
+ * @2Mhz, fMASTER period ==  0.5uS
+ *  Timer Step: 
+ *    step = 1/2Mhz * prescaler = 0.0000005 * (2^5) = 0.000016 seconds 
+
+ *  1/2Mhz = 0.0000005
+ *  1 Count Time = 0.0000005 * (2^5) = 0.000016 Sec
+ *    125 counts * 0.000016 -> 500Hz
+ *   1014 counts * 0.000016 ->  60Hz
+ *
+ *  1016:    0.016256 measure 0.0165 sec. ( precision 0.5mS at this range)
+ *    12:         210 uS
+ *    11:   wth ???????????
+ */
+void timer_config_channel_time(u16 u16period)
+{
+// 0x02F0 experimental
+    const u8 MAX_SWITCH_TIME = 0x2f0;//  0x3F8 
+    const u8 MIN_SWITCH_TIME = 12; // note: I think is (n+1)
+    u16 period = u16period;
+
+    if (period < MIN_SWITCH_TIME)
     {
-    case 0:
-        AINch = AIN9;
-        GPIOA->ODR &= ~(1<<4);
-        break;
-    case 1:
-        AINch = AIN8;
-        GPIOD->ODR &= ~(1<<2);
-        break;
-    case 2:
-        AINch = AIN6;
-        GPIOD->ODR &= ~(1<<5);
-        break;
-    default:
-        break;
+        period = MIN_SWITCH_TIME;  // protect against setting a 0 period
+    }
+// TODO: remap this so the output period ranged accordingly (e.g. final range  [1:0x300] should be easy and suitable ???
+    if (period > MAX_SWITCH_TIME) 
+    {
+        period = MAX_SWITCH_TIME; // keep  the low end away from the lower limit (barely visible blinking)
     }
 
-//    if (ADSampRdy == TRUE)   // idfk how to use ADC interrupt to read sample
-    {
-        AINx = readADC1( AINch );
-//        ADSampRdy = FALSE;
-    }
+//period = (4-1); // 64 uS
 
-    return AINx;
+// PSC==5 period==78    ->  1.25 mS
+// PSC==5 period==936   -> 15.0 mS
+// PSC==5 period=936+78=1014 -> 16.125 mS
+    TIM3->PSCR = 0x05;
+    TIM3->PSCR = 0x07; // 128 ......    @ 8Mhz -> 1 bit-time == 0.000016 Sec
+
+    TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
+    TIM3->ARRL = period & 0xff;
+
+    TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
+    TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
+    TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
 
 /*
- * determine duty-cycle counts based on analog input (ratio for 10 bit A/d)
+ * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
+ * GN:  by default  microcontroller uses   internal 16MHz RC oscillator 
+ * ("HSI", or high-speed internal) divided by eight  as a clock source. This results in a base timer frequency of 2MHz.
+ * Using this function just to show the library way to explicit clock setup.
  */
-void updateLED0(u16 dwell){
-
-  u16 dc_counts =  ( T4_count_pd * dwell ) / 1024;    // 10-bit A/D input
-
-  if ( T4counter < dc_counts )
-  {
-    GPIOD->ODR |= (1 << LED);
-  }
-  else
-  {
-    GPIOD->ODR &= ~(1 << LED);
-  }
+void clock_setup(void)
+{
+    CLK_DeInit();
+#ifdef INTCLOCK
+    CLK_HSECmd(DISABLE);
+    CLK_LSICmd(DISABLE);
+    CLK_HSICmd(ENABLE);
+    while(CLK_GetFlagStatus(CLK_FLAG_HSIRDY) == FALSE);
+    CLK_ClockSwitchCmd(ENABLE);
+//   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV2);
+    CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV8); //GN:
+//   CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV4);
+    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI,
+                          DISABLE, CLK_CURRENTCLOCKSTATE_ENABLE);
+#else
+    // Configure Quartz Clock
+    CLK_DeInit();
+    CLK_HSECmd(ENABLE);
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // GN: DIV2 -> 8Mhz ... 1/0.000000125
+#endif
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER1, DISABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
 /*
- * Tests the input analog reading to determine the "zero crossing"
- * Test LED output shows trim adjustment (solid when trimmed to neutral/half)
- */
-u8 getZeroCross(u16 ainp, u16 counter_period){
-
-  // set the LED off time (nearly 90% of the period) so that when not
-  // trimmed, the LED will be flashing, albeit at a dimmed intensity
-    u16 dwell_counter = (counter_period * 7) / 8;
-
-// commutation experiment
-    u8 zeroX = FALSE;
-
-    if (ainp >= (512-50) && ainp <= (512+50) )
-    {
-        zeroX = TRUE;
-    }
-
-    if (FALSE != zeroX)
-    {
-// show "zero crossing" by making the test LED briter
-//        dwell_counter = (counter_period * 1) / 8;     //  1/8 off time
-        dwell_counter = 1 ; // practically nearly solid briteness
-    }
-
-    if ( T4counter < dwell_counter )
-    {
-        GPIOC->ODR |= (1 << 7); // drive hi i.e. LED off, as this is lo (cathode)side
-    }
-    else
-    {
-        GPIOC->ODR &= ~(1 << 7);
-    }
-
-    return zeroX;
-}
-
-/*
- * 
- */
+ * periodic task is timed to 5mS timer, but stack context is
+ * 'main()' and not in the interrupt
+ */ 
 void periodic_task(void)
 {
-    u16 a_input =  updateChannels(buttonState);
-    u8 zero_x = FALSE;
+//static unsigned char ch = 0x30; // tmp
+// unsigned int csr = 0;
+    u16 period;
+    u16 pwm_dc_count;
 
-    updateLED0(a_input);
+// todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
 
-// duty_cycle global to feed it to PWM config
-    duty_cycle = a_input;
+// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
+    ADC1_StartConversion();
 
-    zero_x = getZeroCross(a_input, T4_count_pd);
+// Wait until the conversion is done (no timeout => ... to be done)
+    while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET );
 
-//button input test enable commutation
-    forceCommutation = FALSE;
-    if ( GPIOE->IDR & (1<<2) )   //if closed the switch
+//    A1 = ADC1_GetConversionValue();
+    A0 = ADC1_GetBufferValue( AINCH_PWM_DC );
+    A1 = ADC1_GetBufferValue( AINCH_COMMUATION_PD );
+
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
+
+
+// open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
+    period = A1 ;
+    timer_config_channel_time( period );
+
+
+// use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
+    Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
+
+#ifdef PWM_DC_TEST
+/// TODO: only use this for test ... needs to be on a +/- button
+    // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
+    pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
+
+    if (pwm_dc_count < PWM_DC_MIN)
     {
-        forceCommutation = TRUE;
+        pwm_dc_count = PWM_DC_MIN;
+    }
+    else if (pwm_dc_count > (TIM2_PWM_PD - PWM_DC_MIN) )
+    {
+        pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
     }
 
-    if (FALSE != forceCommutation )
+    if (0 == PWM_Is_Active) // also enables the /SD lines ... see driver.c
     {
-        // do "commutation" at "time 0"
-        if ( FALSE != latch_T4_is_zero )
-        {
-            latch_T4_is_zero = FALSE; // lame ... need to use a dedicated timer/counter
-
-            if (FALSE != zero_x)
-            {
-                buttonState += 1;
-            }
-
-            if (buttonState >= N_PHASES)
-            {
-                buttonState = 0;
-            }
-            else  if (buttonState < 0)
-            {
-                buttonState = (N_PHASES - 1);
-            }
-        }
+        pwm_dc_count = 0; // sets PWM 0 and clears IR2104 /SD pins
     }
+
+    PWM_Set_DC( pwm_dc_count );
+#endif 
+}
+
+
+// hack, temp
+extern u16 BLDC_OL_comm_tm;
+
+/*
+ * temp, todo better function
+ */
+void testUART(void)
+{
+    static unsigned char cnt = 0x30;
+    char sbuf[40] ;                     // am i big enuff?
+    char cbuf[8] = { 0, 0 };
+
+    cnt = cnt < 126 ? cnt + 1 : 0x30;
+    sbuf[0] = 0;
+
+    strcat(sbuf, "hello");
+    cbuf[0] = cnt;
+    cbuf[1] = 0;
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " A0= ");
+    itoa(A0, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " A1= ");
+    itoa(A1, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " C= ");
+    itoa(BLDC_OL_comm_tm, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, "\r\n");
+    UARTputs(sbuf);
 }
 
 /*
@@ -386,61 +483,80 @@ void periodic_task(void)
  */
 main()
 {
-    uint16_t duty_cycles[N_PHASES] =
-    {
-        CCR1_Val, CCR2_Val, CCR3_Val
-    } ;
-
-
+    clock_setup();
     GPIO_Config();
+    UART_setup();
+    ADC1_setup();
+    TIM1_setup();
 
-    PWM_Config( duty_cycles[0], &duty_cycles[0] );
 
-    TIM4_Config();
+    timer_config_task_rate(); // fixed at 5mS
+//    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
-    // Enable interrupts (no, really). Interrupts are globally disabled by default
-    enableInterrupts();
 
-// PC6  (VDD for LED/OUT/CH3.TIM2.PWM on PC7)
-    GPIOC->ODR |= (1<<6);
+// setup BLDC/PWM
+    PWM_Is_Active = 0; // start w/ outputs off
+    BLDC_State = BLDC_OFF;
+
+    enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
 
     while(1)
     {
-//  button input
+        u16 debounce_ct;
+        u16 ainp;
+//  button input either button would transition from OFF->RAMP
+        if (! (( GPIOA->IDR)&(1<<4)))
+        {
+//            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
+                BLDC_State = BLDC_OFF;
+                PWM_Is_Active = 0;
+        }
+
         if (! (( GPIOA->IDR)&(1<<6)))
         {
-            while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce
+            while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
+// toggle "output active"    (todo: up/down button states) ... either button would transition from OFF->RAMP
+            testUART();// tmp test
 
-// WIP ... reconfig PWM only on button push.
-// Before switch "channel":
-//   store duty cycle of the presently selected  channel
-/*
-            duty_cycles[buttonState] = duty_cycle;   
-*/
-// let (ALL) PWM channels update to present DC setting
-            PWM_Config(duty_cycle, &duty_cycles[0]);
-
-            if (! forceCommutation)  // tmp test "commutation" enabled by switch/button
+            if (BLDC_OFF == BLDC_State)
             {
-                buttonState += 1;
-                if (buttonState >= N_PHASES)
-                {
-                    buttonState = 0;
-                }
+                BLDC_State = BLDC_RAMPUP;
+                PWM_Is_Active = 1;
+            }
+            else 
+            {
+                BLDC_Spd_inc();
+            }
+        }
+
+        if ( ! (( GPIOE->IDR)&(1<<5)))
+        {
+            while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
+
+            testUART();// tmp test
+
+            if (BLDC_OFF == BLDC_State)
+            {
+                BLDC_State = BLDC_RAMPUP;
+                PWM_Is_Active = 1;
+            }
+            else
+            {
+                BLDC_Spd_dec();	
             }
         }
 
 // while( FALSE == TaskRdy )
-        if ( FALSE == TaskRdy )  // idk .. don't block here in case there were actually some background tasks to do 
+        if ( FALSE == TaskRdy )  // idk .. don't block here in case there were actually some background tasks to do
         {
             nop();
         }
-				else
-				{
-          TaskRdy = TRUE;
-          periodic_task();
-			  }
+        else
+        {
+            TaskRdy = FALSE;
+            periodic_task();
+        }
     } // while 1
 }
 
@@ -454,14 +570,14 @@ main()
   * @retval : None
   */
 void assert_failed(u8* file, u32 line)
-{ 
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+{
+    /* User can add his own implementation to report the file name and line number,
+       ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
-  /* Infinite loop */
-  while (1)
-  {
-  }
+    /* Infinite loop */
+    while (1)
+    {
+    }
 }
 #endif
 
