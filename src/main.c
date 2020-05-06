@@ -21,7 +21,6 @@
 
 
 /* Public variables  ---------------------------------------------------------*/
-u8 PWM_Is_Active;
 u8 Duty_cycle_pcnt_LED0;
 u8 TaskRdy;           // flag for timer interrupt for BG task timing
 
@@ -133,7 +132,7 @@ void GPIO_Config(void)
 // PA5/6 as button input 
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-    GPIOA->DDR |= (1 << 5);  // PD.n as output
+    GPIOA->DDR |= (1 << 5);  // PD.5 as output
     GPIOA->CR1 |= (1 << 5);  // push pull output
     GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
 
@@ -261,10 +260,6 @@ void TIM1_setup(void)
 //    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    .000030
 
 // @8Mhz
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 15, 0);    //    ~0.000004 S
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 39, 0);    //    ~0.000010 S
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 19, 0);    //    ~0.000005 S
-
 //  think the ISR is taking ~50 uS because of BLDC_Step()	
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
@@ -432,11 +427,6 @@ void periodic_task(void)
         pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
     }
 
-    if (0 == PWM_Is_Active) // also enables the /SD lines ... see driver.c
-    {
-        pwm_dc_count = 0; // sets PWM 0 and clears IR2104 /SD pins
-    }
-
     PWM_Set_DC( pwm_dc_count );
 #endif 
 }
@@ -488,15 +478,9 @@ main()
     UART_setup();
     ADC1_setup();
     TIM1_setup();
-
-
     timer_config_task_rate(); // fixed at 5mS
-//    timer_config_channel_time( 1 /* value doesn't matter, is periodically reconfigured anyway */);
 
-
-// setup BLDC/PWM
-    PWM_Is_Active = 0; // start w/ outputs off
-    BLDC_State = BLDC_OFF;
+    BLDC_Stop();
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
@@ -509,25 +493,15 @@ main()
         if (! (( GPIOA->IDR)&(1<<4)))
         {
 //            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
-                BLDC_State = BLDC_OFF;
-                PWM_Is_Active = 0;
+                BLDC_Stop();
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-// toggle "output active"    (todo: up/down button states) ... either button would transition from OFF->RAMP
-            testUART();// tmp test
 
-            if (BLDC_OFF == BLDC_State)
-            {
-                BLDC_State = BLDC_RAMPUP;
-                PWM_Is_Active = 1;
-            }
-            else 
-            {
-                BLDC_Spd_inc();
-            }
+            testUART();// tmp test
+            BLDC_Spd_inc();
         }
 
         if ( ! (( GPIOE->IDR)&(1<<5)))
@@ -535,16 +509,7 @@ main()
             while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
 
             testUART();// tmp test
-
-            if (BLDC_OFF == BLDC_State)
-            {
-                BLDC_State = BLDC_RAMPUP;
-                PWM_Is_Active = 1;
-            }
-            else
-            {
-                BLDC_Spd_dec();	
-            }
+            BLDC_Spd_dec();	
         }
 
 // while( FALSE == TaskRdy )

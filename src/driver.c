@@ -71,9 +71,14 @@ void PWM_Set_DC(uint16_t pwm_dc)
 {
     global_uDC = pwm_dc;
 
-    if ( BLDC_RAMPUP == BLDC_State ){
+    if ( BLDC_RAMPUP == BLDC_State )
+    {
 // special sauce for rampup current  proably needs a current ramp too
         global_uDC = PWM_DC_RAMPUP;
+    }
+    else if ( BLDC_OFF == BLDC_State )
+    {
+        global_uDC = 0;	
     }
 }
 
@@ -132,14 +137,26 @@ void PWM_Config(void)
 /*
  *
  */
+void BLDC_Stop()
+{
+    BLDC_State = BLDC_OFF;
+}
+
+/*
+ *
+ */
 void BLDC_Spd_dec()
 {
-#ifdef BLDC_COMM_TEST 
+    if (BLDC_OFF == BLDC_State)
+    {
+        BLDC_State = BLDC_RAMPUP;
+    }
+#ifdef BLDC_COMM_TEST
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < BLDC_OL_TM_LO_SPD)
     {
         BLDC_OL_comm_tm += 1; // slower
     }
-#endif 
+#endif
 }
 
 /*
@@ -147,12 +164,16 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-#ifdef BLDC_COMM_TEST 
+    if (BLDC_OFF == BLDC_State)
+    {
+        BLDC_State = BLDC_RAMPUP;
+    }
+#ifdef BLDC_COMM_TEST
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm >= BLDC_OL_TM_MANUAL_HI_LIM )
     {
         BLDC_OL_comm_tm -= 1; // faster
     }
-#endif 
+#endif
 }
 
 
@@ -204,19 +225,19 @@ void BLDC_Update(void)
     // state-machine: switch-case?
     if (BLDC_OFF == BLDC_State)
     {
-        // reset commutation timer and ramp-up counters ready for ramp-up		
+        // reset commutation timer and ramp-up counters ready for ramp-up
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         Ramp_Step_Tm = RAMP_STEP_TIME0;
+        PWM_Set_DC( 0 );
     }
-    else
-    if (BLDC_ON == BLDC_State)
+    else if (BLDC_ON == BLDC_State)
     {
         // do ON stuff
     } // else
     else
-    // ramp the speed if in rampup state
-    if (BLDC_RAMPUP == BLDC_State)
-    {
+        // ramp the speed if in rampup state
+        if (BLDC_RAMPUP == BLDC_State)
+        {
 // TODO: the actual transition to ON state would be seeing the ramp-to speed 
 // achieved in closed-loop operation 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
@@ -224,10 +245,10 @@ void BLDC_Update(void)
             BLDC_ramp_update();
         }
         else
-        {
-            BLDC_State = BLDC_ON;
+            {
+                BLDC_State = BLDC_ON;
+            }
         }
-    }
 }
 
 /*
