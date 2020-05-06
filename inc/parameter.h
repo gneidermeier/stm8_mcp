@@ -64,7 +64,6 @@ typedef  enum {
 /*
  * variables
  */
-extern BLDC_STATE_T BLDC_State;
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 
 
@@ -73,6 +72,7 @@ extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
  */
 void BLDC_Spd_inc(void);
 void BLDC_Spd_dec(void);
+void BLDC_Stop(void);
 void BLDC_Step(void);
 void BLDC_Update(void);
 void PWM_Set_DC(uint16_t uDC);
