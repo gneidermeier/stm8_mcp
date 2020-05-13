@@ -16,8 +16,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-// minimum PWM DC duration (manual adjustment)
-#define PWM_DC_MIN  20   // (10/125)-> 8%
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -417,15 +415,6 @@ void periodic_task(void)
 /// TODO: only use this for test ... needs to be on a +/- button
     // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
     pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
-
-    if (pwm_dc_count < PWM_DC_MIN)
-    {
-        pwm_dc_count = PWM_DC_MIN;
-    }
-    else if (pwm_dc_count > (TIM2_PWM_PD - PWM_DC_MIN) )
-    {
-        pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
-    }
 
     PWM_Set_DC( pwm_dc_count );
 #endif 

@@ -12,7 +12,16 @@
 #include "stm8s.h"
 #include "parameter.h" // app defines
 
+
 /* Private defines -----------------------------------------------------------*/
+//#define PWM_COMP_TEST
+//#define PWM_DC_ON_FORCE  28 // exp. determined - 1100 Kv @ 13.8v about 1A w/ popsicle stik
+//#define PWM_DC_ON_FORCE  0x0100 // exp. determined - 1100 Kv @ 13.8v about 1A w/ popsicle stik
+
+
+// minimum PWM DC duration (manual adjustment)
+#define PWM_DC_MIN  20   // (10/125)-> 8%
+
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
 //#define PWM_TPRESCALER  TIM2_PRESCALER_1 //
@@ -30,7 +39,7 @@
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
 
 // WARNING MOTOR MAY LOCK UP!!!  ramp-up current MUST be higher
-#define BLDC_OL_TM_HI_SPD    10  // looks like about 2600rpm (3.8 mS)
+#define BLDC_OL_TM_HI_SPD    30  // ... need to try w/ new pwm strategy
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
 #define BLDC_OL_TM_MANUAL_HI_LIM   5     // WARNING ... she may blow capn'
@@ -69,7 +78,19 @@ void bldc_move(void);
   */
 void PWM_Set_DC(uint16_t pwm_dc)
 {
-    global_uDC = pwm_dc;
+    if (pwm_dc < PWM_DC_MIN)
+    {
+        pwm_dc = PWM_DC_MIN;
+    }
+    else if (pwm_dc > (TIM2_PWM_PD - PWM_DC_MIN) )
+    {
+        pwm_dc = (TIM2_PWM_PD - PWM_DC_MIN);
+    }
+
+#if 0
+//    global_uDC = TIM2_PWM_PD - pwm_dc; 
+ global_uDC = PWM_DC_ON_FORCE;
+#endif
 
     if ( BLDC_RAMPUP == BLDC_State )
     {
@@ -82,12 +103,38 @@ void PWM_Set_DC(uint16_t pwm_dc)
     }
 }
 
-void PWM_set_outputs(u8 state0, u8 state1, u8 state2)
+/*
+ * intermediate function for setting PWM with positive or negative polarity
+ */
+uint16_t _set_output(int8_t state0)
 {
+    uint16_t pulse;
+    if (state0 > 0)
+    {
+        pulse = global_uDC;
+    }
+    else if (state0 < 0)
+    {
+        pulse = TIM2_PWM_PD - global_uDC;  // "inverted" PWM DC
+    }
+    else
+    {
+        pulse = 0;
+    }
+    return pulse;
+}
+
+void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
+{
+#if 1 // #ifdef PWM_COMP_TEST
+    TIM2_pulse_0 = _set_output(state0);
+    TIM2_pulse_1 = _set_output(state1);
+    TIM2_pulse_2 = _set_output(state2);
+#else
     TIM2_pulse_0 = state0 != 0 ? global_uDC : 0;
     TIM2_pulse_1 = state1 != 0 ? global_uDC : 0;
     TIM2_pulse_2 = state2 != 0 ? global_uDC : 0;
-
+#endif
     PWM_Config();
 }
 
@@ -180,6 +227,8 @@ void BLDC_Spd_inc()
 void BLDC_ramp_update(void)
 {
     static const u16 RAMP_STEP_T1 = 0x0010; // step time at end of ramp
+//    static const u16 RAMP_STEP_T1 = 0x0040; // rate of ramp-up ... less aggressive
+
     static u16 ramp_step_tmr = 0;
     // on counter zero, decrement counter, start value divided by 2
     if ( 0 == ramp_step_tmr-- )
@@ -282,39 +331,63 @@ void bldc_move(void)
 
     case 0:
         GPIOC->ODR |=   (1<<5);
-        GPIOC->ODR |=   (1<<7);
+        GPIOC->ODR |=   (1<<7);      // LO
         GPIOG->ODR &=  ~(1<<1);
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(1, -1, 0);
+#else
         PWM_set_outputs(1, 0, 0);
+#endif
         break;
     case 1:
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR &=  ~(1<<7);
-        GPIOG->ODR |=   (1<<1);
+        GPIOG->ODR |=   (1<<1);      // LO
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(1, 0, -1);
+#else
         PWM_set_outputs(1, 0, 0);
+#endif
         break;
     case 2:
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR |=   (1<<7);
-        GPIOG->ODR |=   (1<<1);
+        GPIOG->ODR |=   (1<<1);      // LO
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(0, 1, -1);
+#else
         PWM_set_outputs(0, 1, 0);
+#endif
         break;
     case 3:
-        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR |=   (1<<5);      // LO
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR &=  ~(1<<1);
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(-1, 1, 0);
+#else
         PWM_set_outputs(0, 1, 0);
+#endif
         break;
     case 4:
-        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR |=   (1<<5);      // LO
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR |=   (1<<1);
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(-1, 0, 1);
+#else
         PWM_set_outputs(0, 0, 1);
+#endif
         break;
     case 5:
         GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR |=   (1<<7);
+        GPIOC->ODR |=   (1<<7);      // LO
         GPIOG->ODR |=   (1<<1);
+#ifdef PWM_COMP_TEST
+        PWM_set_outputs(0, -1, 1);
+#else
         PWM_set_outputs(0, 0, 1);
+#endif
         break;
     }
 }
