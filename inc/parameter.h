@@ -20,8 +20,12 @@
  * defines
  */
 
-#define PWM_DC_TEST     // test code
-#define BLDC_COMM_TEST  // test code
+// comment this to let the PWM Open Loop Default value below be used (i.e. no manual adjust)
+#define PWM_IS_MANUAL
+
+// experimentally determined value (using manual adjustment) 
+// is to keep current 1.0 - 1.5A indicated on P/S w/ motor running 
+#define PWM_OL_DEFAULT  0x20   // override value
 
 
 // Setting up TIM2, presently to use 4kHz PWM frequency (or maybe even 6 or 7 kHz ?)
@@ -65,6 +69,9 @@ typedef  enum {
  * variables
  */
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
+
+
+extern  uint16_t global_uDC;   // tmp
 
 
 /*

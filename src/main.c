@@ -16,6 +16,8 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+// minimum PWM DC duration (manual adjustment)
+#define PWM_DC_MIN  20   // (10/125)-> 8%
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -411,13 +413,23 @@ void periodic_task(void)
 // use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
     Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
 
-#ifdef PWM_DC_TEST
 /// TODO: only use this for test ... needs to be on a +/- button
     // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
     pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
 
-    PWM_Set_DC( pwm_dc_count );
-#endif 
+#if 0 // ifdef MANUAL_LIMITS ?
+/* for the manual open-loop pwm adjustment, apply some limits */
+    if (pwm_dc_count < PWM_DC_MIN)
+    {
+        pwm_dc_count = PWM_DC_MIN;
+    }
+    else if (pwm_dc_count > (TIM2_PWM_PD - PWM_DC_MIN) )
+    {
+        pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
+    }
+#endif
+
+    PWM_Set_DC( pwm_dc_count ); // should be the only place this is used ;)
 }
 
 
@@ -430,7 +442,7 @@ extern u16 BLDC_OL_comm_tm;
 void testUART(void)
 {
     static unsigned char cnt = 0x30;
-    char sbuf[40] ;                     // am i big enuff?
+    char sbuf[64] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
     cnt = cnt < 126 ? cnt + 1 : 0x30;
@@ -449,8 +461,12 @@ void testUART(void)
     itoa(A1, cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " C= ");
+    strcat(sbuf, " _OL_comm_tm= ");
     itoa(BLDC_OL_comm_tm, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " global_uDC= ");
+    itoa(global_uDC, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, "\r\n");
