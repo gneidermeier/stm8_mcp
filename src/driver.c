@@ -17,6 +17,8 @@
 
 // PWM_INVERSION_TEST
 
+// if not manual define then value got from the manual pot setting
+#define PWM_NOT_MANUAL_DEF  PWM_OL_DEFAULT
 
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
@@ -273,11 +275,10 @@ void BLDC_Update(void)
             // TODO: the actual transition to ON state would be seeing the ramp-to speed
 // achieved in closed-loop operation
             BLDC_State = BLDC_ON;
-            /*
-            if manual enabled, it will use that, but if not enabled, here is what was got
-                              from the manual pot setting
-            */
+
+#ifndef PWM_IS_MANUAL
             global_uDC =    PWM_NOT_MANUAL_DEF ;
+#endif
         }
         break;
     }
