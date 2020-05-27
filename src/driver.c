@@ -15,10 +15,12 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-// PWM_INVERSION_TEST
+#define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
+#define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 
 // if not manual define then value got from the manual pot setting
 #define PWM_NOT_MANUAL_DEF  PWM_OL_DEFAULT
+
 
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
@@ -26,7 +28,6 @@
 // @ 8 Mhz
 #define PWM_TPRESCALER  TIM2_PRESCALER_8 // 125 uS
 
-#define PWM_DC_RAMPUP  52 // exp. determined
 
 // nbr of steps required to commutate 3 phase
 #define N_CSTEPS   6
@@ -76,14 +77,12 @@ void bldc_move(void);
   */
 void PWM_Set_DC(uint16_t pwm_dc)
 {
-#ifdef PWM_IS_MANUAL
     global_uDC = pwm_dc;
 
     if ( BLDC_OFF == BLDC_State )
     {
-        global_uDC = 0;
+//        global_uDC = 0;
     }
-#endif
 }
 
 /*
@@ -126,6 +125,10 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
   */
 void PWM_Config(void)
 {
+    u8 OC_1_pulse = TIM2_pulse_0;
+    u8 OC_2_pulse = TIM2_pulse_1;
+    u8 OC_3_pulse = TIM2_pulse_2;
+
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
 
@@ -133,17 +136,17 @@ void PWM_Config(void)
     TIM2_TimeBaseInit(PWM_TPRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
-    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_0, TIM2_OCPOLARITY_LOW );
+    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_1_pulse, TIM2_OCPOLARITY_LOW );
     TIM2_OC1PreloadConfig(ENABLE);
 
 
     /* Channel 2 PWM configuration */
-    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_1, TIM2_OCPOLARITY_LOW );
+    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_2_pulse, TIM2_OCPOLARITY_LOW );
     TIM2_OC2PreloadConfig(ENABLE);
 
 
     /* Channel 3 PWM configuration */
-    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, TIM2_pulse_2, TIM2_OCPOLARITY_LOW );
+    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_3_pulse, TIM2_OCPOLARITY_LOW );
     TIM2_OC3PreloadConfig(ENABLE);
 
     /* Enables TIM2 peripheral Preload register on ARR */
@@ -163,6 +166,7 @@ void PWM_Config(void)
 void BLDC_Stop()
 {
     BLDC_State = BLDC_OFF;
+    PWM_Set_DC( 0 );
 }
 
 /*
@@ -244,7 +248,7 @@ void BLDC_Update(void)
         count = 0;
         BLDC_Step();
     }
-#if 1
+
     switch (BLDC_State)
     {
     default:
@@ -253,7 +257,7 @@ void BLDC_Update(void)
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         Ramp_Step_Tm = RAMP_STEP_TIME0;
 
-        global_uDC =  0;
+//  PWM_Set_DC(0) ; // in BLDC stop
         break;
     case BLDC_ON:
         // do ON stuff
@@ -264,7 +268,8 @@ void BLDC_Update(void)
 #endif
         break;
     case BLDC_RAMPUP:
-        global_uDC =    PWM_DC_RAMPUP;
+
+         PWM_Set_DC( PWM_DC_RAMPUP ) ;
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
@@ -275,55 +280,10 @@ void BLDC_Update(void)
             // TODO: the actual transition to ON state would be seeing the ramp-to speed
 // achieved in closed-loop operation
             BLDC_State = BLDC_ON;
-
-#ifndef PWM_IS_MANUAL
-            global_uDC =    PWM_NOT_MANUAL_DEF ;
-#endif
+            PWM_Set_DC( PWM_NOT_MANUAL_DEF );
         }
         break;
     }
-#else
-    // state-machine: switch-case?
-    if (BLDC_OFF == BLDC_State)
-    {
-        // reset commutation timer and ramp-up counters ready for ramp-up
-        BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
-        Ramp_Step_Tm = RAMP_STEP_TIME0;
-
-        global_uDC =  0;
-    }
-    else if (BLDC_ON == BLDC_State)
-    {
-        // do ON stuff
-#ifndef PWM_IS_MANUAL
-// doesn't need to set global uDC every time as it would be set once in the FSM
-// transition ramp->on ... but it doesn't hurt to assert it
-//        global_uDC =  PWM_NOT_MANUAL_DEF ;
-#endif
-    }
-    else
-        // ramp the speed if in rampup state
-        if (BLDC_RAMPUP == BLDC_State)
-        {
-            global_uDC =    PWM_DC_RAMPUP;
-
-            if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
-            {
-                BLDC_ramp_update();
-            }
-            else
-            {
-                // TODO: the actual transition to ON state would be seeing the ramp-to speed
-// achieved in closed-loop operation
-                BLDC_State = BLDC_ON;
-                /*
-                if manual enabled, it will use that, but if not enabled, here is what was got
-                                  from the manual pot setting
-                */
-                global_uDC =    PWM_NOT_MANUAL_DEF ;
-            }
-        }
-#endif
 }
 
 /*

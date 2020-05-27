@@ -21,7 +21,7 @@
  */
 
 // comment this to let the PWM Open Loop Default value below be used (i.e. no manual adjust)
-#define PWM_IS_MANUAL
+//#define PWM_IS_MANUAL
 
 // experimentally determined value (using manual adjustment) 
 // is to keep current 1.0 - 1.5A indicated on P/S w/ motor running 
