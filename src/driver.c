@@ -48,7 +48,9 @@
 
 
 /* Public variables  ---------------------------------------------------------*/
-u16 BLDC_OL_comm_tm;   // could be private
+uint16_t BLDC_OL_comm_tm;   // could be private
+
+uint16_t Manual_uDC;
 
 BLDC_STATE_T BLDC_State;
 
@@ -58,10 +60,9 @@ static uint16_t TIM2_pulse_0 ;
 static uint16_t TIM2_pulse_1 ;
 static uint16_t TIM2_pulse_2 ;
 
-static u16 Ramp_Step_Tm; // reduced x2 each time but can't start any slower
-
+static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 /* static */ uint16_t global_uDC;
-static u8 bldc_step = 0;
+static uint8_t bldc_step = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 void PWM_Config(void);
@@ -99,10 +100,6 @@ uint16_t _set_output(int8_t state0)
     {
         pulse = 0;
     }
-
-#ifdef  PWM_INVERSION_TEST
-    return ( TIM2_PWM_PD - global_uDC);  // "inverted" PWM DC
-#endif
 
     return pulse;
 }
@@ -261,10 +258,12 @@ void BLDC_Update(void)
         break;
     case BLDC_ON:
         // do ON stuff
-#ifndef PWM_IS_MANUAL
+#ifdef PWM_IS_MANUAL
 // doesn't need to set global uDC every time as it would be set once in the FSM
 // transition ramp->on ... but it doesn't hurt to assert it
-//        global_uDC =  PWM_NOT_MANUAL_DEF ;
+         PWM_Set_DC( Manual_uDC ) ;
+#else
+//         PWM_Set_DC( PWM_NOT_MANUAL_DEF ) ;
 #endif
         break;
     case BLDC_RAMPUP:
@@ -309,6 +308,8 @@ void BLDC_Step(void)
 
 void bldc_move(void)
 {
+ const int8_t foo = 99; 
+
 // /SD outputs on C5, C7, and G1
 // wait until switch time arrives (watching for voltage on the floating line to cross 0)
     switch(bldc_step)
@@ -319,37 +320,37 @@ void bldc_move(void)
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR |=   (1<<7);      // LO
         GPIOG->ODR &=  ~(1<<1);
-        PWM_set_outputs(1, 0, 0);
+        PWM_set_outputs(foo, 0, 0);
         break;
     case 1:
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR |=   (1<<1);      // LO
-        PWM_set_outputs(1, 0, 0);
+        PWM_set_outputs(foo, 0, 0);
         break;
     case 2:
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR |=   (1<<1);      // LO
-        PWM_set_outputs(0, 1, 0);
+        PWM_set_outputs(0, foo, 0);
         break;
     case 3:
         GPIOC->ODR |=   (1<<5);      // LO
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR &=  ~(1<<1);
-        PWM_set_outputs(0, 1, 0);
+        PWM_set_outputs(0, foo, 0);
         break;
     case 4:
         GPIOC->ODR |=   (1<<5);      // LO
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR |=   (1<<1);
-        PWM_set_outputs(0, 0, 1);
+        PWM_set_outputs(0, 0, foo);
         break;
     case 5:
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR |=   (1<<7);      // LO
         GPIOG->ODR |=   (1<<1);
-        PWM_set_outputs(0, 0, 1);
+        PWM_set_outputs(0, 0, foo);
         break;
     }
 }

@@ -428,9 +428,8 @@ void periodic_task(void)
         pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
     }
 #endif
-#ifdef PWM_IS_MANUAL
-    PWM_Set_DC( pwm_dc_count ); // should be the only place this is used ;)
-#endif
+
+    Manual_uDC = pwm_dc_count;
 }
 
 

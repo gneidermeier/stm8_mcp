@@ -21,7 +21,7 @@
  */
 
 // comment this to let the PWM Open Loop Default value below be used (i.e. no manual adjust)
-//#define PWM_IS_MANUAL
+#define PWM_IS_MANUAL
 
 // experimentally determined value (using manual adjustment) 
 // is to keep current 1.0 - 1.5A indicated on P/S w/ motor running 
@@ -72,6 +72,7 @@ extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 
 
 extern  uint16_t global_uDC;   // tmp
+extern  uint16_t Manual_uDC;
 
 
 /*
