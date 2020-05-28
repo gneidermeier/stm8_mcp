@@ -17,6 +17,7 @@
 
 #define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
+#define PWM_MAX_LIMIT  (TIM2_PWM_PD - 1) // limitation of the manual adj. pot to set max PWM. 
 
 // if not manual define then value got from the manual pot setting
 #define PWM_NOT_MANUAL_DEF  PWM_OL_DEFAULT
@@ -133,18 +134,61 @@ void PWM_Config(void)
     TIM2_TimeBaseInit(PWM_TPRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
-    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_1_pulse, TIM2_OCPOLARITY_LOW );
-    TIM2_OC1PreloadConfig(ENABLE);
+    if (OC_1_pulse > 0 && OC_1_pulse < PWM_MAX_LIMIT)
+    {
+        TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_1_pulse, TIM2_OCPOLARITY_LOW );
+        TIM2_OC1PreloadConfig(ENABLE);
+    }
+    else if ( OC_1_pulse >= PWM_MAX_LIMIT )
+    {
+        GPIOD->ODR |=  (1<<4);  // PD4 set HI
+        GPIOD->DDR |=  (1<<4);
+        GPIOD->CR1 |=  (1<<4);
+    }
+    else
+    {
+        GPIOD->ODR &=  ~(1<<4);  // PD4 set LO
+        GPIOD->DDR |=  (1<<4);
+        GPIOD->CR1 |=  (1<<4);
+    }
 
+    if (OC_2_pulse > 0 && OC_2_pulse < PWM_MAX_LIMIT)
+    {
+        /* Channel 2 PWM configuration */
+        TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_2_pulse, TIM2_OCPOLARITY_LOW );
+        TIM2_OC2PreloadConfig(ENABLE);
+    }
+    else if ( OC_2_pulse >= PWM_MAX_LIMIT )
+    {
+        GPIOD->ODR |=  (1<<3);  // PD3 set HI
+        GPIOD->DDR |=  (1<<3);
+        GPIOD->CR1 |=  (1<<3);
+    }
+    else
+    {
+        GPIOD->ODR &=  ~(1<<3);  // PD3 set LO
+        GPIOD->DDR |=  (1<<3);
+        GPIOD->CR1 |=  (1<<3);
+    }
 
-    /* Channel 2 PWM configuration */
-    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_2_pulse, TIM2_OCPOLARITY_LOW );
-    TIM2_OC2PreloadConfig(ENABLE);
-
-
-    /* Channel 3 PWM configuration */
-    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_3_pulse, TIM2_OCPOLARITY_LOW );
-    TIM2_OC3PreloadConfig(ENABLE);
+    if (OC_3_pulse > 0 && OC_3_pulse < PWM_MAX_LIMIT)
+    {
+        /* Channel 3 PWM configuration */
+        TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_3_pulse, TIM2_OCPOLARITY_LOW );
+        TIM2_OC3PreloadConfig(ENABLE);
+    }
+    else if ( OC_3_pulse >= PWM_MAX_LIMIT)
+    {
+        GPIOA->ODR |=  (1<<3);  // PA3 set HI
+        GPIOA->DDR |=  (1<<3);
+        GPIOA->CR1 |=  (1<<3);
+    }
+    else
+    {
+        GPIOA->ODR &=  ~(1<<3);  // PA3 set LO
+        GPIOA->DDR |=  (1<<3);
+        GPIOA->CR1 |=  (1<<3);
+    }
 
     /* Enables TIM2 peripheral Preload register on ARR */
     TIM2_ARRPreloadConfig(ENABLE);
