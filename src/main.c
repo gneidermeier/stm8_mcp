@@ -264,7 +264,12 @@ void TIM1_setup(void)
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 255, 0);    //    0.000064 S
+#ifdef TRY_128
+TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.0000128 S
+//TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, (1024 - 1), 0);    //    0.0000128 S
+#else
+TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
+#endif
 //    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
 
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
@@ -313,8 +318,9 @@ void timer_config_task_rate(void)
 void timer_config_channel_time(u16 u16period)
 {
 // 0x02F0 experimental
-    const u8 MAX_SWITCH_TIME = 0x2f0;//  0x3F8 
-    const u8 MIN_SWITCH_TIME = 12; // note: I think is (n+1)
+    const u16 MAX_SWITCH_TIME = 0xffff; //  0x2f0;//  0x3F8 
+    const u16 MIN_SWITCH_TIME = 2 - 1; // 12; // note: I think is (n+1)
+
     u16 period = u16period;
 
     if (period < MIN_SWITCH_TIME)
@@ -324,9 +330,8 @@ void timer_config_channel_time(u16 u16period)
 // TODO: remap this so the output period ranged accordingly (e.g. final range  [1:0x300] should be easy and suitable ???
     if (period > MAX_SWITCH_TIME) 
     {
-        period = MAX_SWITCH_TIME; // keep  the low end away from the lower limit (barely visible blinking)
+        period = MAX_SWITCH_TIME; // lower limit 
     }
-
 //period = (4-1); // 64 uS
 
 // PSC==5 period==78    ->  1.25 mS
@@ -407,7 +412,10 @@ void periodic_task(void)
 
 // open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
     period = A1 ;
+
+#if 1  // if MANUAL 
     timer_config_channel_time( period );
+#endif
 
 
 // use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period

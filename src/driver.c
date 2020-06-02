@@ -15,14 +15,20 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+//#define PWM_IS_MANUAL
+
+
 #define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 #define PWM_MAX_LIMIT  (TIM2_PWM_PD - 1) // limitation of the manual adj. pot to set max PWM. 
 
-// if not manual define then value got from the manual pot setting
-#define PWM_NOT_MANUAL_DEF  PWM_OL_DEFAULT
 
+//#ifdef SYMETRIC_PWM
+//  #define PWM_NOT_MANUAL_DEF  (PWM_50PCNT +  15  )
 
+#ifndef PWM_IS_MANUAL
+#define PWM_NOT_MANUAL_DEF  30 //0x20 // experimentally determined value (using manual adjustment)
+#endif
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
 //#define PWM_TPRESCALER  TIM2_PRESCALER_1 //
@@ -34,18 +40,25 @@
 #define N_CSTEPS   6
 
 
-// presently using T1 pd = 64uS
-#define BLDC_OL_TM_LO_SPD   254  // start of ramp
+/*
+ * presently using T1 pd = 64uS    
+ * PS = 2 -> 128uS
+ * PS = 4 -> 256uS   
+ */
+
+#define BLDC_OL_TM_LO_SPD   (254 / BLDC_OL_PS) // start of ramp
+
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
 
 // WARNING MOTOR MAY LOCK UP!!!  ramp-up current MUST be higher
 #define BLDC_OL_TM_HI_SPD    10  // looks like about 2600rpm (3.8 mS)
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
-#define BLDC_OL_TM_MANUAL_HI_LIM   5     // WARNING ... she may blow capn'
+#define BLDC_OL_TM_MANUAL_HI_LIM   6     // WARNING ... she may blow capn'
 
 // starting step-time for ramp-up 
-#define RAMP_STEP_TIME0  0x1000
+//#define RAMP_STEP_TIME0  (0x1000 / BLDC_OL_PS)
+#define RAMP_STEP_TIME0  (0x0080 / 1)                  // shorten ramp time
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -96,6 +109,10 @@ uint16_t _set_output(int8_t state0)
     if (state0 > 0)
     {
         pulse = global_uDC;
+    }
+    else if (state0 < 0)
+    {
+        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse (for symetric PWM)
     }
     else
     {
@@ -264,6 +281,9 @@ void BLDC_ramp_update(void)
     }
 }
 
+
+void timer_config_channel_time(u16 u16period);
+
 /*
  * BLDC Update: handle the BLDC state 
  *      Off: nothing
@@ -290,6 +310,10 @@ void BLDC_Update(void)
         BLDC_Step();
     }
 
+#if 0 // ! MANUAL
+ timer_config_channel_time(BLDC_OL_comm_tm);
+#endif
+
     switch (BLDC_State)
     {
     default:
@@ -305,7 +329,7 @@ void BLDC_Update(void)
 #ifdef PWM_IS_MANUAL
 // doesn't need to set global uDC every time as it would be set once in the FSM
 // transition ramp->on ... but it doesn't hurt to assert it
-         PWM_Set_DC( Manual_uDC ) ;
+         PWM_Set_DC( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
 #else
 //         PWM_Set_DC( PWM_NOT_MANUAL_DEF ) ;
 #endif
