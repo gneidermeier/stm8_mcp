@@ -46,7 +46,7 @@
  * PS = 4 -> 256uS   
  */
 
-#define BLDC_OL_TM_LO_SPD   (254 / BLDC_OL_PS) // start of ramp
+#define BLDC_OL_TM_LO_SPD   (254 / 1 /* BLDC_OL_PS */ ) // start of ramp
 
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
 
@@ -58,7 +58,7 @@
 
 // starting step-time for ramp-up 
 //#define RAMP_STEP_TIME0  (0x1000 / BLDC_OL_PS)
-#define RAMP_STEP_TIME0  (0x0080 / 1)                  // shorten ramp time
+#define RAMP_STEP_TIME0  (0x0100 )                  // shorten/lengthen ramp time
 
 
 /* Public variables  ---------------------------------------------------------*/
