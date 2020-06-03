@@ -264,11 +264,11 @@ void TIM1_setup(void)
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
-#ifdef TRY_128
-TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.0000128 S
-//TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, (1024 - 1), 0);    //    0.0000128 S
+
+#ifdef CLOCK_16
+ TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.000064 S
 #else
-TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
+ TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
 #endif
 //    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
 
@@ -286,13 +286,13 @@ TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
  */
 void timer_config_task_rate(void)
 {
-// @2Mhz... 4.992 mS
     TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78        -> 1.248mS
-    TIM4->ARR = 77;    // @2Mhz  Period = 5ms 
 
-//    TIM4->PSCR = 0x06; // Prescaler = 64    @8Mhz ... arr=(124+1)  -> 1.0 mS
-//    TIM4->ARR = 124;    // @8Mhz  Period = 1.0ms 
-
+#ifdef CLOCK_16
+    TIM4->ARR = (256 - 1);    // @16Mhz  Period = 2.1ms 
+#else
+    TIM4->ARR = (156 - 1);    // @8Mhz  Period = 2.4ms 
+#endif
     TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
 }
@@ -337,9 +337,8 @@ void timer_config_channel_time(u16 u16period)
 // PSC==5 period==78    ->  1.25 mS
 // PSC==5 period==936   -> 15.0 mS
 // PSC==5 period=936+78=1014 -> 16.125 mS
-    TIM3->PSCR = 0x05;
     TIM3->PSCR = 0x07; // 128 ......    @ 8Mhz -> 1 bit-time == 0.000016 Sec
-
+// 16Mhz?
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
 
@@ -358,21 +357,15 @@ void clock_setup(void)
 {
     CLK_DeInit();
 #ifdef INTCLOCK
-    CLK_HSECmd(DISABLE);
-    CLK_LSICmd(DISABLE);
-    CLK_HSICmd(ENABLE);
-    while(CLK_GetFlagStatus(CLK_FLAG_HSIRDY) == FALSE);
-    CLK_ClockSwitchCmd(ENABLE);
-//   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV2);
-    CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV8); //GN:
-//   CLK_SYSCLKConfig(CLK_PRESCALER_CPUDIV4);
-    CLK_ClockSwitchConfig(CLK_SWITCHMODE_AUTO, CLK_SOURCE_HSI,
-                          DISABLE, CLK_CURRENTCLOCKSTATE_ENABLE);
 #else
     // Configure Quartz Clock
     CLK_DeInit();
     CLK_HSECmd(ENABLE);
-    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // GN: DIV2 -> 8Mhz ... 1/0.000000125
+#ifdef CLOCK_16
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1); // 16Mhz
+#else
+    CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // 8Mhz
+#endif // CLK
 #endif
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
@@ -513,16 +506,16 @@ main()
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-            testUART();// tmp test
             BLDC_Spd_inc();
+            testUART();// tmp test
         }
 
         if ( ! (( GPIOE->IDR)&(1<<5)))
         {
             while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
 
-            testUART();// tmp test
             BLDC_Spd_dec();	
+            testUART();// tmp test
         }
 
 // while( FALSE == TaskRdy )
