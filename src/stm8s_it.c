@@ -21,9 +21,12 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
-#include "parameter.h" // GN: app defines
+#include "parameter.h" //  app defines
 
-#define BLDC_TIM1_TEST
+
+// hack, temp
+extern uint16_t BLDC_OL_comm_tm;
+
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -215,8 +218,18 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-static u8 toggle;
+   static uint8_t toggle;
 
+   static uint16_t count = 0;
+
+#ifdef BLDC_TIM1_TEST
+    if ( ++count >= BLDC_OL_comm_tm )
+    {
+        // reset counter and step the BLDC state
+        count = 0;
+        BLDC_Step();
+    }
+#endif
     BLDC_Update();
 
     toggle ^= 1; // tmp test 
@@ -225,6 +238,14 @@ static u8 toggle;
         GPIOD->ODR |= (1 << LED);
     } else {
         GPIOD->ODR &= ~(1 << LED);
+    }
+#endif
+#if  0
+// tmp test
+    if (toggle){ 
+        GPIOA->ODR |= (1 << 3);
+    } else {
+        GPIOA->ODR &= ~(1 << 3);
     }
 #endif
 
@@ -280,8 +301,8 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-    static u8 toggle;
-    static u8 count20ms = 0;
+    static uint8_t toggle;
+    static uint8_t count20ms = 0;
 
     count20ms += 1;
 
@@ -325,7 +346,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-    static u8 toggle = 0;
+    static uint8_t toggle = 0;
 #if 1
 toggle ^= 1;
     if ( toggle ){
@@ -495,7 +516,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 {
-    static u8 toggle = 0;
+    static uint8_t toggle = 0;
 #if 0
 toggle ^= 1;
     if ( toggle ){

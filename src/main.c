@@ -17,7 +17,6 @@
 /* Private defines -----------------------------------------------------------*/
 
 // minimum PWM DC duration (manual adjustment)
-#define PWM_DC_MIN  20   // (10/125)-> 8%
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -315,13 +314,13 @@ void timer_config_task_rate(void)
  *    12:         210 uS
  *    11:   wth ???????????
  */
-void timer_config_channel_time(u16 u16period)
+void timer_config_channel_time(uint16_t u_period)
 {
 // 0x02F0 experimental
-    const u16 MAX_SWITCH_TIME = 0xffff; //  0x2f0;//  0x3F8 
-    const u16 MIN_SWITCH_TIME = 2 - 1; // 12; // note: I think is (n+1)
+    const uint16_t MAX_SWITCH_TIME = 0xffff; //  0x2f0;//  0x3F8 
+    const uint16_t MIN_SWITCH_TIME = 2 - 1; // 12; // note: I think is (n+1)
 
-    u16 period = u16period;
+    uint16_t period = u_period;
 
     if (period < MIN_SWITCH_TIME)
     {
@@ -337,8 +336,14 @@ void timer_config_channel_time(u16 u16period)
 // PSC==5 period==78    ->  1.25 mS
 // PSC==5 period==936   -> 15.0 mS
 // PSC==5 period=936+78=1014 -> 16.125 mS
-    TIM3->PSCR = 0x07; // 128 ......    @ 8Mhz -> 1 bit-time == 0.000016 Sec
-// 16Mhz?
+
+#ifdef CLOCK_16
+    TIM3->PSCR = 0x06; //  64 ......    @ 16Mhz -> 1 bit-time == 0.000016 Sec
+#else
+    TIM3->PSCR = 0x07; // 128 ......    @  8Mhz -> 1 bit-time == 0.000016 Sec
+#endif
+
+
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
 
@@ -383,10 +388,10 @@ void clock_setup(void)
  */ 
 void periodic_task(void)
 {
-//static unsigned char ch = 0x30; // tmp
-// unsigned int csr = 0;
-    u16 period;
-    u16 pwm_dc_count;
+    const uint16_t PWM_DC_MIN = 20;   // (10/125)-> 8%
+
+    uint16_t period;
+    uint16_t pwm_dc_count;
 
 // todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
 
@@ -406,7 +411,7 @@ void periodic_task(void)
 // open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
     period = A1 ;
 
-#if 1  // if MANUAL 
+#if 0  // if MANUAL 
     timer_config_channel_time( period );
 #endif
 
@@ -435,7 +440,7 @@ void periodic_task(void)
 
 
 // hack, temp
-extern u16 BLDC_OL_comm_tm;
+extern uint16_t BLDC_OL_comm_tm;
 
 /*
  * temp, todo better function
@@ -493,8 +498,8 @@ main()
 
     while(1)
     {
-        u16 debounce_ct;
-        u16 ainp;
+        uint16_t debounce_ct;
+        uint16_t ainp;
 //  button input either button would transition from OFF->RAMP
         if (! (( GPIOA->IDR)&(1<<4)))
         {

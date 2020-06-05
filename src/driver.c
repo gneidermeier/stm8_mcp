@@ -49,11 +49,11 @@
 #define BLDC_OL_TM_LO_SPD   (254 / 1 /* BLDC_OL_PS */ ) // start of ramp
 
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
-
-#define BLDC_OL_TM_HI_SPD    10  // looks like about 2600rpm (3.8 mS)
+//#define BLDC_OL_TM_HI_SPD    40  //  16uS * 40 * 6 -> 3.84mS
+#define BLDC_OL_TM_HI_SPD    10  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
-#define BLDC_OL_TM_MANUAL_HI_LIM   6     // WARNING ... she may blow capn'
+#define BLDC_OL_TM_MANUAL_HI_LIM   6 
 
 // starting step-time for ramp-up 
 //#define RAMP_STEP_TIME0  (0x1000 / BLDC_OL_PS)
@@ -302,16 +302,7 @@ void timer_config_channel_time(uint16_t u16period); // tmp
  */
 void BLDC_Update(void)
 {
-    static u16 count = 0;
-
-    if ( ++count >= BLDC_OL_comm_tm )
-    {
-        // reset counter and step the BLDC state
-        count = 0;
-        BLDC_Step();
-    }
-
-#if 0 // ! MANUAL
+#if 1 // ! MANUAL
  timer_config_channel_time(BLDC_OL_comm_tm);
 #endif
 
@@ -322,9 +313,8 @@ void BLDC_Update(void)
         // reset commutation timer and ramp-up counters ready for ramp-up
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         Ramp_Step_Tm = RAMP_STEP_TIME0;
-
-//  PWM_Set_DC(0) ; // in BLDC stop
         break;
+
     case BLDC_ON:
         // do ON stuff
 #ifdef PWM_IS_MANUAL
