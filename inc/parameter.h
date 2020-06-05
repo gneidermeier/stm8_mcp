@@ -20,15 +20,8 @@
  * defines
  */
 
-// comment this to let the PWM Open Loop Default value below be used (i.e. no manual adjust)
-#define PWM_IS_MANUAL
-
-// experimentally determined value (using manual adjustment) 
-// is to keep current 1.0 - 1.5A indicated on P/S w/ motor running 
-#define PWM_OL_DEFAULT  0x20   // override value
-
-
-// Setting up TIM2, presently to use 4kHz PWM frequency (or maybe even 6 or 7 kHz ?)
+//#define CLOCK_16
+#define BLDC_TIM1_TEST
 
 // Using TIM2 prescale value of 1, so period TIM2 == period fMaster
 // @2Mhz, fMASTER period ==  0.5uS
@@ -41,10 +34,13 @@
 //  1 / 125uS = 8kHz
 
 //set prescaler with "(period - 1)" (see datasheet)
-//#define TIM2_PWM_PD         (125 - 0)  // 16k
-#define TIM2_PWM_PD           (126 - 0)  //  .... might as well make the math divisible by 2 see periodic task
-//#define TIM2_PWM_PD         (250 - 0)  //  8k
+#ifdef CLOCK_16
+ #define TIM2_PWM_PD           (250 - 0)  // @16k -> 125uS
 
+#else
+//#define TIM2_PWM_PD         (125 - 0)   // @8k -> 125uS
+ #define TIM2_PWM_PD           (126 - 0)  //  .... might as well make the math divisible by 2 see periodic task#endif
+#endif
 
 // Using the TIM2 counter as time base for open-loop commutation time  
 // arbitrary period (n * 125uS ^H^H^H 62.5uS) to PWM the user LED0

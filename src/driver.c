@@ -19,6 +19,7 @@
 
 
 #define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
+#define PWM_25PCNT  ( TIM2_PWM_PD / 4 )
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 #define PWM_MAX_LIMIT  (TIM2_PWM_PD - 1) // limitation of the manual adj. pot to set max PWM. 
 
@@ -27,11 +28,10 @@
 //  #define PWM_NOT_MANUAL_DEF  (PWM_50PCNT +  15  )
 
 #ifndef PWM_IS_MANUAL
-#define PWM_NOT_MANUAL_DEF  30 //0x20 // experimentally determined value (using manual adjustment)
+#define PWM_NOT_MANUAL_DEF  PWM_25PCNT //30 //0x20 // experimentally determined value (using manual adjustment)
 #endif
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
-//#define PWM_TPRESCALER  TIM2_PRESCALER_1 //
 // @ 8 Mhz
 #define PWM_TPRESCALER  TIM2_PRESCALER_8 // 125 uS
 
@@ -50,7 +50,6 @@
 
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
 
-// WARNING MOTOR MAY LOCK UP!!!  ramp-up current MUST be higher
 #define BLDC_OL_TM_HI_SPD    10  // looks like about 2600rpm (3.8 mS)
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
@@ -262,10 +261,10 @@ void BLDC_Spd_inc()
 
 void BLDC_ramp_update(void)
 {
-    static const u16 RAMP_STEP_T1 = 0x0010; // step time at end of ramp
-//    static const u16 RAMP_STEP_T1 = 0x0040; // rate of ramp-up ... less aggressive
+    static const uint16_t RAMP_STEP_T1 = 0x0020; // step time at end of ramp
 
-    static u16 ramp_step_tmr = 0;
+    static uint16_t ramp_step_tmr = 0;
+
     // on counter zero, decrement counter, start value divided by 2
     if ( 0 == ramp_step_tmr-- )
     {
@@ -282,7 +281,9 @@ void BLDC_ramp_update(void)
 }
 
 
-void timer_config_channel_time(u16 u16period);
+
+
+void timer_config_channel_time(uint16_t u16period); // tmp
 
 /*
  * BLDC Update: handle the BLDC state 
