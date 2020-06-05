@@ -247,6 +247,9 @@ void ADC1_setup(void)
  *
  *       0.0012 sec
 */
+
+#define RAMP_PRESCALER 2
+
 void TIM1_setup(void)
 {
     CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
@@ -265,9 +268,9 @@ void TIM1_setup(void)
     TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
 
 #ifdef CLOCK_16
- TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.000064 S
+ TIM1_TimeBaseInit(( RAMP_PRESCALER-1 ), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.000064 S
 #else
- TIM1_TimeBaseInit((2-1), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
+ TIM1_TimeBaseInit(( RAMP_PRESCALER-1 ), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
 #endif
 //    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
 

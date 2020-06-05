@@ -33,7 +33,7 @@
 
 // see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
 // @ 8 Mhz
-#define PWM_TPRESCALER  TIM2_PRESCALER_8 // 125 uS
+#define PWM_PRESCALER  TIM2_PRESCALER_8 // 125 uS
 
 
 // nbr of steps required to commutate 3 phase
@@ -45,12 +45,17 @@
  * PS = 2 -> 128uS
  * PS = 4 -> 256uS   
  */
-
-#define BLDC_OL_TM_LO_SPD   (254 / 1 /* BLDC_OL_PS */ ) // start of ramp
+#ifdef BLDC_TIM1_TEST
+ #define RAMP_DIV  1
+#else
+ #define RAMP_DIV 4
+#endif
+ 
+#define BLDC_OL_TM_LO_SPD   (254 / RAMP_DIV ) // start of ramp
 
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
 //#define BLDC_OL_TM_HI_SPD    40  //  16uS * 40 * 6 -> 3.84mS
-#define BLDC_OL_TM_HI_SPD    10  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
+#define BLDC_OL_TM_HI_SPD    (10 * RAMP_DIV)  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
 #define BLDC_OL_TM_MANUAL_HI_LIM   6 
@@ -147,7 +152,7 @@ void PWM_Config(void)
     TIM2_DeInit();
 
     /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
-    TIM2_TimeBaseInit(PWM_TPRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
+    TIM2_TimeBaseInit(PWM_PRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
     if (OC_1_pulse > 0 && OC_1_pulse < PWM_MAX_LIMIT)
@@ -259,6 +264,9 @@ void BLDC_Spd_inc()
 }
 
 
+
+#if 0 // #ifdef BLDC_TIM1_TEST
+
 void BLDC_ramp_update(void)
 {
     static const uint16_t RAMP_STEP_T1 = 0x0020; // step time at end of ramp
@@ -280,7 +288,35 @@ void BLDC_ramp_update(void)
     }
 }
 
+#else
 
+// // should be 0.1 * 100 ... :(
+// #define SCALAR  10  //   100
+//#define K_PROP   1    //   0.1
+//#define K_PROP_X_SCALAR    ( SCALAR * K_PROP )    
+#define RAMP_SCALAR   32 
+
+void BLDC_ramp_update(void)
+{
+    static uint16_t ramp_step_tmr = 0;
+
+    if ( ramp_step_tmr < RAMP_SCALAR )
+    {
+        ramp_step_tmr += 1;
+    }
+    else
+    {
+        ramp_step_tmr = 0;
+
+        if (BLDC_OL_comm_tm >  BLDC_OL_TM_HI_SPD  )
+        {
+            BLDC_OL_comm_tm -= 1;
+
+//	BLDC_OL_comm_tm =  ( (BLDC_OL_comm_tm * 32) -  1 ) / 32  ;
+        }
+    }
+}
+#endif
 
 
 void timer_config_channel_time(uint16_t u16period); // tmp
@@ -302,9 +338,11 @@ void timer_config_channel_time(uint16_t u16period); // tmp
  */
 void BLDC_Update(void)
 {
-#if 1 // ! MANUAL
- timer_config_channel_time(BLDC_OL_comm_tm);
+
+#ifndef BLDC_TIM1_TEST
+    timer_config_channel_time(BLDC_OL_comm_tm);
 #endif
+
 
     switch (BLDC_State)
     {
