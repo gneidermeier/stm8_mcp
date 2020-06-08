@@ -247,32 +247,22 @@ void ADC1_setup(void)
  *
  *       0.0012 sec
 */
-
-#define RAMP_PRESCALER 2
+#ifdef CLOCK_16
+#define TIM1_PRESCALER 4
+#else
+#define TIM1_PRESCALER 2
+#endif
 
 void TIM1_setup(void)
 {
+    const uint16_t T1_Period = 255; //     0.000064 S     16-bit counter 
     CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
     TIM1_DeInit();
 
 //fCK_CNT = fCK_PSC/(PSCR[15:0]+1) 
-    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000060
-    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 23, 0);    //    .000048
-//    TIM1_TimeBaseInit((4-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    NG
-//    TIM1_TimeBaseInit((5-1), TIM1_COUNTERMODE_DOWN, 11, 0);    //    .000030
 
-// @8Mhz
-//  think the ISR is taking ~50 uS because of BLDC_Step()	
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 1599, 0);   //    0.000400 S
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 799, 0);    //    0.000200 S
-    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 399, 0);    //    0.000100 S
-
-#ifdef CLOCK_16
- TIM1_TimeBaseInit(( RAMP_PRESCALER-1 ), TIM1_COUNTERMODE_DOWN, 512 - 1, 0);    //    0.000064 S
-#else
- TIM1_TimeBaseInit(( RAMP_PRESCALER-1 ), TIM1_COUNTERMODE_DOWN, 256 - 1, 0);    //    0.000064 S
-#endif
-//    TIM1_TimeBaseInit((1), TIM1_COUNTERMODE_DOWN, 199, 0);    //  0.000050 S NFG ISR BLDC_Update overuns
+// @8Mhz  the ISR overruns ... is taking ~50 uS because of BLDC_Step()	
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
@@ -288,13 +278,15 @@ void TIM1_setup(void)
  */
 void timer_config_task_rate(void)
 {
-    TIM4->PSCR = 0x07; // Prescaler = 128    @8Mhz ... arr=78        -> 1.248mS
-
+    const uint8_t T4_Period = 255;     // @16Mhz  Period = 2.1ms 
 #ifdef CLOCK_16
-    TIM4->ARR = (256 - 1);    // @16Mhz  Period = 2.1ms 
+    TIM4->PSCR = 0x07; // Prescaler = 128
 #else
-    TIM4->ARR = (156 - 1);    // @8Mhz  Period = 2.4ms 
+    TIM4->PSCR = 0x06; // Prescaler = 64
 #endif
+
+    TIM4->ARR = T4_Period;
+
     TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
 }
@@ -320,8 +312,8 @@ void timer_config_task_rate(void)
 void timer_config_channel_time(uint16_t u_period)
 {
 // 0x02F0 experimental
-    const uint16_t MAX_SWITCH_TIME = 0xffff; //  0x2f0;//  0x3F8 
-    const uint16_t MIN_SWITCH_TIME = 2 - 1; // 12; // note: I think is (n+1)
+    const uint16_t MAX_SWITCH_TIME = 0xfffe;
+    const uint16_t MIN_SWITCH_TIME = 1;
 
     uint16_t period = u_period;
 
@@ -329,23 +321,17 @@ void timer_config_channel_time(uint16_t u_period)
     {
         period = MIN_SWITCH_TIME;  // protect against setting a 0 period
     }
-// TODO: remap this so the output period ranged accordingly (e.g. final range  [1:0x300] should be easy and suitable ???
+
     if (period > MAX_SWITCH_TIME) 
     {
         period = MAX_SWITCH_TIME; // lower limit 
     }
-//period = (4-1); // 64 uS
-
-// PSC==5 period==78    ->  1.25 mS
-// PSC==5 period==936   -> 15.0 mS
-// PSC==5 period=936+78=1014 -> 16.125 mS
 
 #ifdef CLOCK_16
-    TIM3->PSCR = 0x06; //  64 ......    @ 16Mhz -> 1 bit-time == 0.000016 Sec
+    TIM3->PSCR = 0x07; // 128 ......    @ 16Mhz -> 1 bit-time == 0.000008 S
 #else
-    TIM3->PSCR = 0x07; // 128 ......    @  8Mhz -> 1 bit-time == 0.000016 Sec
+    TIM3->PSCR = 0x06; //  64 ......    @  8Mhz ->               0.000008
 #endif
-
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
     TIM3->ARRL = period & 0xff;
@@ -412,10 +398,10 @@ void periodic_task(void)
 
 
 // open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
-    period = A1 ;
+    period = A1 >> 1; // divide A/D range [0:1023] -> [0:511] to match planned scale-facgor of 2 for comm. time
 
 #if 0  // if MANUAL 
-    timer_config_channel_time( period );
+    timer_config_channel_time( period * 2);
 #endif
 
 
