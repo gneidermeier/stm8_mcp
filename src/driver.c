@@ -31,10 +31,12 @@
 #define PWM_NOT_MANUAL_DEF  PWM_25PCNT //30 //0x20 // experimentally determined value (using manual adjustment)
 #endif
 
-// see define of TIM2 PWM PD ... it set for 125uS @ clk 2Mhz
-// @ 8 Mhz
-#define PWM_PRESCALER  TIM2_PRESCALER_8 // 125 uS
-
+// see define of TIM2 PWM PD ... it set for 8kHz (125uS)
+#ifdef CLOCK_16
+ #define PWM_PRESCALER  TIM2_PRESCALER_8 // @16Mhz
+#else
+ #define PWM_PRESCALER  TIM2_PRESCALER_4 // @8Mhz
+#endif
 
 // nbr of steps required to commutate 3 phase
 #define N_CSTEPS   6
@@ -339,7 +341,7 @@ void timer_config_channel_time(uint16_t u16period); // tmp
 void BLDC_Update(void)
 {
 
-#ifndef BLDC_TIM1_TEST
+#if 1 // if ! MANUAL TEST
     timer_config_channel_time(BLDC_OL_comm_tm);
 #endif
 
