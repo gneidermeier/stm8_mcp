@@ -21,7 +21,6 @@
 #define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
 #define PWM_25PCNT  ( TIM2_PWM_PD / 4 )
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
-#define PWM_MAX_LIMIT  (TIM2_PWM_PD - 1) // limitation of the manual adj. pot to set max PWM. 
 
 
 //#ifdef SYMETRIC_PWM
@@ -48,23 +47,34 @@
  * PS = 4 -> 256uS   
  */
 #ifdef BLDC_TIM1_TEST
- #define RAMP_DIV  1
-#else
- #define RAMP_DIV 4
-#endif
- 
-#define BLDC_OL_TM_LO_SPD   (254 / RAMP_DIV ) // start of ramp
+
+// The commutation step time is  BLDC_OL_comm_tm * TIM1 period @ 64uS 
+// will be scaling into 8-bits  i.e. 64*4 
+#define BLDC_OL_TM_LO_SPD  64  // 64 * 64uS ... it doesn't need to be run at any slower speed ...  unless ramp start needs to be less aggressive?
 
 // ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
-//#define BLDC_OL_TM_HI_SPD    40  //  16uS * 40 * 6 -> 3.84mS
-#define BLDC_OL_TM_HI_SPD    (10 * RAMP_DIV)  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
+ #define BLDC_OL_TM_HI_SPD     10   //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
 
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
-#define BLDC_OL_TM_MANUAL_HI_LIM   6 
+ #define BLDC_OL_TM_MANUAL_HI_LIM   6 
 
-// starting step-time for ramp-up 
-//#define RAMP_STEP_TIME0  (0x1000 / BLDC_OL_PS)
-#define RAMP_STEP_TIME0  (0x0100 )                  // shorten/lengthen ramp time
+#else
+// Needs a scale factor to use TIM3 effectively (all 3 TIM3 PS bits have already used)
+// The commutation step time is:
+//   BLDC_OL_comm_tm * BLDC_TIME_SCALE * TIM3 period @ 16uS 
+ #define BLDC_TIME_SCALE  4            // (256 / 4) = 64    -> range [0:63]
+
+// Allow the comm step time to have 6-bits range [0:63] and 2-bits precision
+ #define BLDC_OL_TM_LO_SPD   (64 * BLDC_TIME_SCALE ) // start of ramp
+
+// ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
+//#define BLDC_OL_TM_HI_SPD    40  //  16uS * 40 * 6 -> 3.84mS 
+ #define BLDC_OL_TM_HI_SPD    (10 * BLDC_TIME_SCALE)  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
+
+// manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
+ #define BLDC_OL_TM_MANUAL_HI_LIM   (7 * BLDC_TIME_SCALE)   // 23 is my limit ;)
+
+#endif
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -146,6 +156,10 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
   */
 void PWM_Config(void)
 {
+    const uint16_t TIM2_Pulse_MAX = (TIM2_PWM_PD - 1); // PWM_MAX_LIMIT 
+
+// dumb .. these should all be equal. 
+// todo: re-config only if delta d.c. > threshold e.g. 1 
     u8 OC_1_pulse = TIM2_pulse_0;
     u8 OC_2_pulse = TIM2_pulse_1;
     u8 OC_3_pulse = TIM2_pulse_2;
@@ -157,12 +171,12 @@ void PWM_Config(void)
     TIM2_TimeBaseInit(PWM_PRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
 
     /* Channel 1 PWM configuration */
-    if (OC_1_pulse > 0 && OC_1_pulse < PWM_MAX_LIMIT)
+    if (OC_1_pulse > 0 && OC_1_pulse < TIM2_Pulse_MAX)
     {
         TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_1_pulse, TIM2_OCPOLARITY_LOW );
         TIM2_OC1PreloadConfig(ENABLE);
     }
-    else if ( OC_1_pulse >= PWM_MAX_LIMIT )
+    else if (OC_1_pulse >= TIM2_Pulse_MAX)
     {
         GPIOD->ODR |=  (1<<4);  // PD4 set HI
         GPIOD->DDR |=  (1<<4);
@@ -175,13 +189,13 @@ void PWM_Config(void)
         GPIOD->CR1 |=  (1<<4);
     }
 
-    if (OC_2_pulse > 0 && OC_2_pulse < PWM_MAX_LIMIT)
+    if (OC_2_pulse > 0 && OC_2_pulse < TIM2_Pulse_MAX)
     {
         /* Channel 2 PWM configuration */
         TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_2_pulse, TIM2_OCPOLARITY_LOW );
         TIM2_OC2PreloadConfig(ENABLE);
     }
-    else if ( OC_2_pulse >= PWM_MAX_LIMIT )
+    else if (OC_2_pulse >= TIM2_Pulse_MAX)
     {
         GPIOD->ODR |=  (1<<3);  // PD3 set HI
         GPIOD->DDR |=  (1<<3);
@@ -194,13 +208,13 @@ void PWM_Config(void)
         GPIOD->CR1 |=  (1<<3);
     }
 
-    if (OC_3_pulse > 0 && OC_3_pulse < PWM_MAX_LIMIT)
+    if (OC_3_pulse > 0 && OC_3_pulse < TIM2_Pulse_MAX)
     {
         /* Channel 3 PWM configuration */
         TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_3_pulse, TIM2_OCPOLARITY_LOW );
         TIM2_OC3PreloadConfig(ENABLE);
     }
-    else if ( OC_3_pulse >= PWM_MAX_LIMIT)
+    else if ( OC_3_pulse >= TIM2_Pulse_MAX)
     {
         GPIOA->ODR |=  (1<<3);  // PA3 set HI
         GPIOA->DDR |=  (1<<3);
@@ -266,37 +280,9 @@ void BLDC_Spd_inc()
 }
 
 
+#ifdef BLDC_TIM1_TEST
 
-#if 0 // #ifdef BLDC_TIM1_TEST
-
-void BLDC_ramp_update(void)
-{
-    static const uint16_t RAMP_STEP_T1 = 0x0020; // step time at end of ramp
-
-    static uint16_t ramp_step_tmr = 0;
-
-    // on counter zero, decrement counter, start value divided by 2
-    if ( 0 == ramp_step_tmr-- )
-    {
-        ramp_step_tmr = Ramp_Step_Tm;
-
-        if (Ramp_Step_Tm > RAMP_STEP_T1)
-        {
-            Ramp_Step_Tm >>= 1;
-        }
-        //if (BLDC_OL_comm_tm > 0) // { // probably get by with an assert
-        BLDC_OL_comm_tm -= 1;
-        // }
-    }
-}
-
-#else
-
-// // should be 0.1 * 100 ... :(
-// #define SCALAR  10  //   100
-//#define K_PROP   1    //   0.1
-//#define K_PROP_X_SCALAR    ( SCALAR * K_PROP )    
-#define RAMP_SCALAR   32 
+ #define RAMP_SCALAR   32 
 
 void BLDC_ramp_update(void)
 {
@@ -318,7 +304,7 @@ void BLDC_ramp_update(void)
         }
     }
 }
-#endif
+#endif // BLDC_TIM1_TEST
 
 
 void timer_config_channel_time(uint16_t u16period); // tmp
@@ -340,11 +326,9 @@ void timer_config_channel_time(uint16_t u16period); // tmp
  */
 void BLDC_Update(void)
 {
-
 #if 1 // if ! MANUAL TEST
     timer_config_channel_time(BLDC_OL_comm_tm);
 #endif
-
 
     switch (BLDC_State)
     {
@@ -352,7 +336,6 @@ void BLDC_Update(void)
     case BLDC_OFF:
         // reset commutation timer and ramp-up counters ready for ramp-up
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
-        Ramp_Step_Tm = RAMP_STEP_TIME0;
         break;
 
     case BLDC_ON:
@@ -371,7 +354,12 @@ void BLDC_Update(void)
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
+#ifdef BLDC_TIM1_TEST
             BLDC_ramp_update();
+#else
+            BLDC_OL_comm_tm -= 1;  // TIM3 has been timed so that the ramp is realized by simple -=1 each timer period
+                                   // so the ramp rate is  16uS/TIM1_period w/ TIM1 @ 1.024 mS 
+#endif
         }
         else
         {
@@ -405,6 +393,9 @@ void BLDC_Step(void)
     }
 }
 
+/*
+ * TODO: schedule at 30degree intervals (see TIM3)
+ */
 void bldc_move(void)
 {
  const int8_t foo = 99; 
