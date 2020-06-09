@@ -222,14 +222,6 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 
    static uint16_t count = 0;
 
-#ifdef BLDC_TIM1_TEST
-    if ( ++count >= BLDC_OL_comm_tm )
-    {
-        // reset counter and step the BLDC state
-        count = 0;
-        BLDC_Step();
-    }
-#endif
     BLDC_Update();
 
     toggle ^= 1; // tmp test 
@@ -348,7 +340,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 {
     static uint8_t toggle = 0;
 #if 1
-toggle ^= 1;
+    toggle ^= 1;
     if ( toggle ){
         GPIOG->ODR &= ~(1<<0);
     }else {
@@ -356,11 +348,10 @@ toggle ^= 1;
     }
 #endif
 
-#ifndef BLDC_TIM1_TEST
-    BLDC_Step();
-#endif
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
+
+    BLDC_Step();
 }
 
 /**

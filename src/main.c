@@ -246,15 +246,6 @@ void ADC1_setup(void)
  *
  *       0.0012 sec
 */
-#ifdef BLDC_TIM1_TEST
-
- #ifdef CLOCK_16
-  #define TIM1_PRESCALER 4
- #else
-  #define TIM1_PRESCALER 2
- #endif
-
-#else
 // TIM1 rate establishes ramp aggressiveness
  #ifdef CLOCK_16
    #define TIM1_PRESCALER 64  //    (1/16Mhz) * 64 * 256 -> 0.001024 S
@@ -262,17 +253,15 @@ void ADC1_setup(void)
    #define TIM1_PRESCALER 32  //    (1/8Mhz) * 32 * 256 ->  0.001024 S     faster startup
  #endif
 
-#endif
 
 void TIM1_setup(void)
 {
-    const uint16_t T1_Period = 255; //     0.000064 S     16-bit counter 
+    const uint16_t T1_Period = 256;  // 16-bit counter 
     CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
     TIM1_DeInit();
 
 //fCK_CNT = fCK_PSC/(PSCR[15:0]+1) 
 
-// @8Mhz  the ISR overruns ... is taking ~50 uS because of BLDC_Step()	
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
@@ -289,11 +278,11 @@ void TIM1_setup(void)
  */
 void timer_config_task_rate(void)
 {
-    const uint8_t T4_Period = 255;     // @16Mhz  Period = 2.1ms 
+    const uint8_t T4_Period = 255;     // Period = 2ms 
 #ifdef CLOCK_16
-    TIM4->PSCR = 0x07; // Prescaler = 128
+    TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * 256 = 0.002048 S
 #else
-    TIM4->PSCR = 0x06; // Prescaler = 64
+    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * 256 = 0.002048 S
 #endif
 
     TIM4->ARR = T4_Period;
@@ -315,11 +304,7 @@ void timer_config_channel_time(uint16_t u_period)
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
     const uint16_t MIN_SWITCH_TIME = 1;
 
-#ifdef BLDC_TIM1_TEST
-    uint16_t period = 0; // not used
-#else
     uint16_t period = u_period * BLDC_COMM_TIME_SCALE;  // uses all 3-bits of TIM3 prescaler (move TIME_SCALE factor   upstream for additional precision ?)
-#endif
 
     if (period < MIN_SWITCH_TIME)
     {

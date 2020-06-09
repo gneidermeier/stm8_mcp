@@ -46,19 +46,6 @@
  * PS = 2 -> 128uS
  * PS = 4 -> 256uS   
  */
-#ifdef BLDC_TIM1_TEST
-
-// The commutation step time is  BLDC_OL_comm_tm * TIM1 period @ 64uS 
-// will be scaling into 8-bits  i.e. 64*4 
-#define BLDC_OL_TM_LO_SPD  64  // 64 * 64uS ... it doesn't need to be run at any slower speed ...  unless ramp start needs to be less aggressive?
-
-// ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
- #define BLDC_OL_TM_HI_SPD     10   //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
-
-// manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
- #define BLDC_OL_TM_MANUAL_HI_LIM   6 
-
-#else
 // Needs a scale factor to use TIM3 effectively (all 3 TIM3 PS bits have already used)
 // The commutation step time is:
 //   BLDC_OL_comm_tm * BLDC_TIME_SCALE * TIM3 period @ 16uS 
@@ -74,7 +61,6 @@
 // manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
  #define BLDC_OL_TM_MANUAL_HI_LIM   (7 * BLDC_TIME_SCALE)   // 23 is my limit ;)
 
-#endif
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -167,12 +153,11 @@ void PWM_Config(void)
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
 
-    /* Set TIM2 Frequency to 2Mhz ... and period to ?    ( @2Mhz, fMASTER period == @ 0.5uS) */
-    TIM2_TimeBaseInit(PWM_PRESCALER, ( TIM2_PWM_PD - 1 ) ); // PS==1, 499   ->  8khz (period == .000125)
+    TIM2_TimeBaseInit(PWM_PRESCALER, ( TIM2_PWM_PD - 1 ) );
 
-    /* Channel 1 PWM configuration */
     if (OC_1_pulse > 0 && OC_1_pulse < TIM2_Pulse_MAX)
     {
+        /* Channel 1 PWM configuration */
         TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, OC_1_pulse, TIM2_OCPOLARITY_LOW );
         TIM2_OC1PreloadConfig(ENABLE);
     }
@@ -280,33 +265,6 @@ void BLDC_Spd_inc()
 }
 
 
-#ifdef BLDC_TIM1_TEST
-
- #define RAMP_SCALAR   32 
-
-void BLDC_ramp_update(void)
-{
-    static uint16_t ramp_step_tmr = 0;
-
-    if ( ramp_step_tmr < RAMP_SCALAR )
-    {
-        ramp_step_tmr += 1;
-    }
-    else
-    {
-        ramp_step_tmr = 0;
-
-        if (BLDC_OL_comm_tm >  BLDC_OL_TM_HI_SPD  )
-        {
-            BLDC_OL_comm_tm -= 1;
-
-//	BLDC_OL_comm_tm =  ( (BLDC_OL_comm_tm * 32) -  1 ) / 32  ;
-        }
-    }
-}
-#endif // BLDC_TIM1_TEST
-
-
 void timer_config_channel_time(uint16_t u16period); // tmp
 
 /*
@@ -354,12 +312,8 @@ void BLDC_Update(void)
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
-#ifdef BLDC_TIM1_TEST
-            BLDC_ramp_update();
-#else
             BLDC_OL_comm_tm -= 1;  // TIM3 has been timed so that the ramp is realized by simple -=1 each timer period
                                    // so the ramp rate is  16uS/TIM1_period w/ TIM1 @ 1.024 mS 
-#endif
         }
         else
         {
