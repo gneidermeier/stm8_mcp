@@ -18,17 +18,21 @@
 
 #define BLDC_COMM_TIME_SCALE 2  // integer scale factor
 
-/* Public variables  ---------------------------------------------------------*/
-u8 Duty_cycle_pcnt_LED0;
-u8 TaskRdy;           // flag for timer interrupt for BG task timing
+#define ADC_N_CHANNELS 10       // [A0:A9]
 
-uint16_t A0 = 0x1234;//tmp
-uint16_t A1 = 0xabcd;//tmp
+/* Public variables  ---------------------------------------------------------*/
+uint8_t Duty_cycle_pcnt_LED0;
+uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
+
+uint16_t AnalogInputs[16]; // at least ADC NR CHANNELS
 
 
 /* Private variables ---------------------------------------------------------*/
-const u8 AINCH_COMMUATION_PD = 9;   // adjust pot to set "commutation" period
-const u8 AINCH_PWM_DC        = 8;   // adjust pot to PWM D.C. on FET outputs
+#define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
+#define AINCH_PWM_DC         8   // adjust pot to PWM D.C. on FET outputs
+
+#define A0  AnalogInputs[ AINCH_PWM_DC ]
+#define A1  AnalogInputs[ AINCH_COMMUATION_PD ]
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,6 +76,9 @@ char * itoa(uint16_t u16in, char *sbuf, int base)
     return sbuf;
 }
 
+/*
+ * some of this bulk could be reduced with macros
+*/
 void GPIO_Config(void)
 {
 // OUTPUTS
@@ -127,7 +134,7 @@ void GPIO_Config(void)
     GPIOA->DDR &= ~(1 << 4); // PA.6 as input
     GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
 
-// PA5/6 as button input 
+// PA6 as button input 
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
     GPIOA->DDR |= (1 << 5);  // PD.5 as output
@@ -160,10 +167,40 @@ void GPIO_Config(void)
     GPIOE->CR1 &= ~(1 << 7);  // floating input
     GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
+// AIN7
+    GPIOB->DDR &= ~(1 << 7);  // PB.7 as input
+    GPIOB->CR1 &= ~(1 << 7);  // floating input
+    GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
+
 // PB.6 AIN6
     GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
     GPIOB->CR1 &= ~(1 << 6);  // floating input
     GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
+
+// AIN5
+    GPIOB->DDR &= ~(1 << 5);  // PB.5 as input
+    GPIOB->CR1 &= ~(1 << 5);  // floating input
+    GPIOB->CR2 &= ~(1 << 5);  // 0: External interrupt disabled   ???
+
+// AIN4
+    GPIOB->DDR &= ~(1 << 4);  // PB.4 as input
+    GPIOB->CR1 &= ~(1 << 4);  // floating input
+    GPIOB->CR2 &= ~(1 << 4);  // 0: External interrupt disabled   ???
+
+// AIN3
+    GPIOB->DDR &= ~(1 << 3);  // PB.3 as input
+    GPIOB->CR1 &= ~(1 << 3);  // floating input
+    GPIOB->CR2 &= ~(1 << 3);  // 0: External interrupt disabled   ???
+
+// AIN2
+    GPIOB->DDR &= ~(1 << 2);  // PB.2 as input
+    GPIOB->CR1 &= ~(1 << 2);  // floating input
+    GPIOB->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
+
+// AIN1
+    GPIOB->DDR &= ~(1 << 1);  // PB.1 as input
+    GPIOB->CR1 &= ~(1 << 1);  // floating input
+    GPIOB->CR2 &= ~(1 << 1);  // 0: External interrupt disabled   ???
 
 // PB.0 AIN0
     GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
@@ -274,11 +311,12 @@ void TIM1_setup(void)
  *
  *   https://lujji.github.io/blog/bare-metal-programming-stm8/
  *
- * Default setup for STM8S Discovery is 2Mhz HSI ... leave period @ 5mS for now I guesss.....
+ * Setting periodic task for fast-ish rate of A/D acquisition.
+ * ISR must set 'TaskRdy' flag and not block on the task since A/D does a blocking wait.
  */
 void timer_config_task_rate(void)
 {
-    const uint8_t T4_Period = 255;     // Period = 2ms 
+    const uint8_t T4_Period = 16;     // Period =  128uS
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * 256 = 0.002048 S
 #else
@@ -361,17 +399,12 @@ void clock_setup(void)
 }
 
 /*
- * periodic task is timed to 5mS timer, but stack context is
- * 'main()' and not in the interrupt
+ * periodic task must be tied to a timer with something like 1 - 5 mS but stack 
+ * context is 'main()' so not to block ISR with ADC sampling. 
  */ 
 void periodic_task(void)
 {
-    const uint16_t PWM_DC_MIN = 20;   // (10/125)-> 8%
-
-    uint16_t period;
-    uint16_t pwm_dc_count;
-
-// todo, to synchronize A/D reading w/ the PWM  for proper coordintion w/  zero-cross events?
+    uint16_t ch = 0;
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
     ADC1_StartConversion();
@@ -380,41 +413,18 @@ void periodic_task(void)
     while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET );
 
 //    A1 = ADC1_GetConversionValue();
-    A0 = ADC1_GetBufferValue( AINCH_PWM_DC );
-    A1 = ADC1_GetBufferValue( AINCH_COMMUATION_PD );
+    for (ch = 0; ch < ADC_N_CHANNELS; ch++)
+    {
+        AnalogInputs[ ch ] = ADC1_GetBufferValue( ch );
+    }
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 
-
-// open-loop commutation switch period on TIMER 3 - passed period parameter uses ainput range [0:1023] 
-    period = A1 >> 1; // divide A/D range [0:1023] -> [0:511] to match planned scale-facgor of 2 for comm. time
-
-#if 0  // if MANUAL 
-    timer_config_channel_time( period * 2);
+#if 0 // MANUAL
+    Manual_uDC = A0 / 2;
 #endif
-
-
-// use LED0 for visual indication of period/A1 - ainput to ratio of arbitrary period
-    Duty_cycle_pcnt_LED0 = (TIM2_COUNT_LED0_PD / 2) * period / (1024/2); //  divide out factor of 2 so that (80/2 * 1024) fit in 16-bit 
-
-/// TODO: only use this for test ... needs to be on a +/- button
-    // divide out factor of 2 so that (126/2 * 1024) fit in 16-bit
-    pwm_dc_count = (TIM2_PWM_PD / 2) * A0 / (1024/2);
-
-#if 0 // ifdef MANUAL_LIMITS ?
-/* for the manual open-loop pwm adjustment, apply some limits */
-    if (pwm_dc_count < PWM_DC_MIN)
-    {
-        pwm_dc_count = PWM_DC_MIN;
-    }
-    else if (pwm_dc_count > (TIM2_PWM_PD - PWM_DC_MIN) )
-    {
-        pwm_dc_count = (TIM2_PWM_PD - PWM_DC_MIN);
-    }
-#endif
-
-    Manual_uDC = pwm_dc_count;
 }
+
 
 
 // hack, temp
