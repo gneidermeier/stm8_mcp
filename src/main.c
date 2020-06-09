@@ -16,8 +16,7 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-// minimum PWM DC duration (manual adjustment)
-
+#define BLDC_COMM_TIME_SCALE 2  // integer scale factor
 
 /* Public variables  ---------------------------------------------------------*/
 u8 Duty_cycle_pcnt_LED0;
@@ -247,10 +246,22 @@ void ADC1_setup(void)
  *
  *       0.0012 sec
 */
-#ifdef CLOCK_16
-#define TIM1_PRESCALER 4
+#ifdef BLDC_TIM1_TEST
+
+ #ifdef CLOCK_16
+  #define TIM1_PRESCALER 4
+ #else
+  #define TIM1_PRESCALER 2
+ #endif
+
 #else
-#define TIM1_PRESCALER 2
+// TIM1 rate establishes ramp aggressiveness
+ #ifdef CLOCK_16
+   #define TIM1_PRESCALER 64  //    (1/16Mhz) * 64 * 256 -> 0.001024 S
+ #else
+   #define TIM1_PRESCALER 32  //    (1/8Mhz) * 32 * 256 ->  0.001024 S     faster startup
+ #endif
+
 #endif
 
 void TIM1_setup(void)
@@ -291,31 +302,24 @@ void timer_config_task_rate(void)
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
 }
 
-// Timers 2 3 & 5 are 16-bit general purpose timers
 /*
- *  Sets the open-loop commutation switching period.
- *  Input: [0:1023]   (input may be set from analog trim-pot for test/dev)
+ * Timers 2 3 & 5 are 16-bit general purpose timers *  Sets the commutation switching period.
+ *  Input: [0:511]   (input may be set from analog trim-pot for test/dev)
 
- * @2Mhz, fMASTER period ==  0.5uS
+ * @8Mhz, fMASTER period ==  0.000000125 S
  *  Timer Step: 
- *    step = 1/2Mhz * prescaler = 0.0000005 * (2^5) = 0.000016 seconds 
-
- *  1/2Mhz = 0.0000005
- *  1 Count Time = 0.0000005 * (2^5) = 0.000016 Sec
- *    125 counts * 0.000016 -> 500Hz
- *   1014 counts * 0.000016 ->  60Hz
- *
- *  1016:    0.016256 measure 0.0165 sec. ( precision 0.5mS at this range)
- *    12:         210 uS
- *    11:   wth ???????????
+ *    step = 1 / 8Mhz * prescaler = 0.0000005 * (2^6) = 0.000008 S 
  */
 void timer_config_channel_time(uint16_t u_period)
 {
-// 0x02F0 experimental
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
     const uint16_t MIN_SWITCH_TIME = 1;
 
-    uint16_t period = u_period;
+#ifdef BLDC_TIM1_TEST
+    uint16_t period = 0; // not used
+#else
+    uint16_t period = u_period * BLDC_COMM_TIME_SCALE;  // uses all 3-bits of TIM3 prescaler (move TIME_SCALE factor   upstream for additional precision ?)
+#endif
 
     if (period < MIN_SWITCH_TIME)
     {

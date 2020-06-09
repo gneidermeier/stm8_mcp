@@ -21,7 +21,7 @@
  */
 
 //#define CLOCK_16
-#define BLDC_TIM1_TEST
+//#define BLDC_TIM1_TEST
 
 
 // With TIM2 prescale value of 1, period TIM2 == period fMaster
