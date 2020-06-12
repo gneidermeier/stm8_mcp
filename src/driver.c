@@ -42,24 +42,14 @@
 
 
 /*
- * presently using T1 pd = 64uS    
- * PS = 2 -> 128uS
- * PS = 4 -> 256uS   
+ * commutation step time is on TIM3
  */
-// Needs a scale factor to use TIM3 effectively (all 3 TIM3 PS bits have already used)
-// The commutation step time is:
-//   BLDC_OL_comm_tm * BLDC_TIME_SCALE * TIM3 period @ 16uS 
- #define BLDC_TIME_SCALE  4            // (256 / 4) = 64    -> range [0:63]
+ #define BLDC_OL_TM_LO_SPD   (256) // start of ramp
 
-// Allow the comm step time to have 6-bits range [0:63] and 2-bits precision
- #define BLDC_OL_TM_LO_SPD   (64 * BLDC_TIME_SCALE ) // start of ramp
+ #define BLDC_OL_TM_HI_SPD    (40)  // end of ramp
 
-// ten counts will speed up to about xxxx RPM (needs to be 2500 RPM or ~2.4mS
-//#define BLDC_OL_TM_HI_SPD    40  //  16uS * 40 * 6 -> 3.84mS 
- #define BLDC_OL_TM_HI_SPD    (10 * BLDC_TIME_SCALE)  //  64uS * 10 * 6 -> 3.84mS (~2600rpm) 
+ #define BLDC_OL_TM_MANUAL_HI_LIM   (26)   // stalls at 25 
 
-// manual adjustment of OL PWM DC ... limit (can get only to about 9 right now)
- #define BLDC_OL_TM_MANUAL_HI_LIM   (7 * BLDC_TIME_SCALE)   // 23 is my limit ;)
 
 
 
@@ -242,7 +232,7 @@ void BLDC_Spd_dec()
         BLDC_State = BLDC_RAMPUP;
     }
 
-    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < BLDC_OL_TM_LO_SPD)
+    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
     {
         BLDC_OL_comm_tm += 1; // slower
     }
@@ -258,7 +248,7 @@ void BLDC_Spd_inc()
         BLDC_State = BLDC_RAMPUP;
     }
 
-    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm >= BLDC_OL_TM_MANUAL_HI_LIM )
+    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
     {
         BLDC_OL_comm_tm -= 1; // faster
     }
@@ -348,53 +338,58 @@ void BLDC_Step(void)
 }
 
 /*
- * TODO: schedule at 30degree intervals (see TIM3)
+ * TODO: schedule at 30degree intervals? (see TIM3)
+ *
  */
 void bldc_move(void)
 {
  const int8_t foo = 99; 
 
 // /SD outputs on C5, C7, and G1
-// wait until switch time arrives (watching for voltage on the floating line to cross 0)
     switch(bldc_step)
     {
     default:
 
     case 0:
-        GPIOC->ODR |=   (1<<5);
-        GPIOC->ODR |=   (1<<7);      // LO
-        GPIOG->ODR &=  ~(1<<1);
-        PWM_set_outputs(foo, 0, 0);
-        break;
+        GPIOC->ODR |=   (1<<5);      // A+-+
+        GPIOC->ODR |=   (1<<7);      // B---
+        GPIOG->ODR &=  ~(1<<1);      // C.
+        PWM_set_outputs(foo, 0, 0);	 
+        break;                                    // C falling
+
     case 1:
-        GPIOC->ODR |=   (1<<5);
-        GPIOC->ODR &=  ~(1<<7);
-        GPIOG->ODR |=   (1<<1);      // LO
+        GPIOC->ODR |=   (1<<5);	     // A+-+
+        GPIOC->ODR &=  ~(1<<7);      // B.
+        GPIOG->ODR |=   (1<<1);      // C---
         PWM_set_outputs(foo, 0, 0);
-        break;
+        break;                                    //  B float 
+
     case 2:
-        GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR |=   (1<<7);
-        GPIOG->ODR |=   (1<<1);      // LO
+        GPIOC->ODR &=  ~(1<<5);      // A.
+        GPIOC->ODR |=   (1<<7);      // B+-+
+        GPIOG->ODR |=   (1<<1);      // C---
         PWM_set_outputs(0, foo, 0);
-        break;
+        break;                                    // A Falling
+
     case 3:
-        GPIOC->ODR |=   (1<<5);      // LO
-        GPIOC->ODR |=   (1<<7);
-        GPIOG->ODR &=  ~(1<<1);
+        GPIOC->ODR |=   (1<<5);      // A---
+        GPIOC->ODR |=   (1<<7);      // B+-+
+        GPIOG->ODR &=  ~(1<<1);      // C.
         PWM_set_outputs(0, foo, 0);
-        break;
+        break;                                    // C float
+
     case 4:
-        GPIOC->ODR |=   (1<<5);      // LO
-        GPIOC->ODR &=  ~(1<<7);
-        GPIOG->ODR |=   (1<<1);
+        GPIOC->ODR |=   (1<<5);      // A---
+        GPIOC->ODR &=  ~(1<<7);      // B.
+        GPIOG->ODR |=   (1<<1);      // C+-+
         PWM_set_outputs(0, 0, foo);
-        break;
+        break;                                    // B falling
+
     case 5:
-        GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR |=   (1<<7);      // LO
-        GPIOG->ODR |=   (1<<1);
+        GPIOC->ODR &=  ~(1<<5);      // A.
+        GPIOC->ODR |=   (1<<7);      // B---
+        GPIOG->ODR |=   (1<<1);      // C+-+
         PWM_set_outputs(0, 0, foo);
-        break;
+        break;                                    // A float
     }
 }

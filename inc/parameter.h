@@ -21,15 +21,11 @@
  */
 
 //#define CLOCK_16
-//#define BLDC_TIM1_TEST
 
 
 // With TIM2 prescale value of 1, period TIM2 == period fMaster
 // @8Mhz, fMASTER period ==  125 uS
-
-
-//set prescaler with "(period - 1)" (see datasheet)
-#define TIM2_PWM_PD    (250 - 0)   // 125uS (prescalar is set for 8 or 16 Mhz)
+#define TIM2_PWM_PD    250   // 125uS (prescalar is set for 8 or 16 Mhz)
 
 
 // Using the TIM2 counter as time base for open-loop commutation time  
@@ -59,6 +55,8 @@ extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 
 extern  uint16_t global_uDC;   // tmp
 extern  uint16_t Manual_uDC;
+
+extern uint16_t AnalogInputs[]; // at least ADC NR CHANNELS
 
 
 /*

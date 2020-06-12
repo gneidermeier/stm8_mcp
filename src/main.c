@@ -26,6 +26,9 @@ uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
 uint16_t AnalogInputs[16]; // at least ADC NR CHANNELS
 
+uint16_t testbuf[64]; // how to determine available STM8  "heap" for logging?  ... linker warns if limit exceeded.
+
+extern uint8_t bldc_step ; // tmp
 
 /* Private variables ---------------------------------------------------------*/
 #define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
@@ -316,11 +319,12 @@ void TIM1_setup(void)
  */
 void timer_config_task_rate(void)
 {
-    const uint8_t T4_Period = 16;     // Period =  128uS
+//    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
+    const uint8_t T4_Period = 255;    // Period = 2.048mS
 #ifdef CLOCK_16
-    TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * 256 = 0.002048 S
+    TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
 #else
-    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * 256 = 0.002048 S
+    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * p 
 #endif
 
     TIM4->ARR = T4_Period;
@@ -332,10 +336,6 @@ void timer_config_task_rate(void)
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers *  Sets the commutation switching period.
  *  Input: [0:511]   (input may be set from analog trim-pot for test/dev)
-
- * @8Mhz, fMASTER period ==  0.000000125 S
- *  Timer Step: 
- *    step = 1 / 8Mhz * prescaler = 0.0000005 * (2^6) = 0.000008 S 
  */
 void timer_config_channel_time(uint16_t u_period)
 {
@@ -354,6 +354,9 @@ void timer_config_channel_time(uint16_t u_period)
         period = MAX_SWITCH_TIME; // lower limit 
     }
 
+// @8Mhz, fMASTER period ==  0.000000125 S
+//  Timer Step: 
+//    step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S 
 #ifdef CLOCK_16
     TIM3->PSCR = 0x07; // 128 ......    @ 16Mhz -> 1 bit-time == 0.000008 S
 #else
@@ -399,8 +402,9 @@ void clock_setup(void)
 }
 
 /*
- * periodic task must be tied to a timer with something like 1 - 5 mS but stack 
- * context is 'main()' so not to block ISR with ADC sampling. 
+ * Initiate A/D sampling, period can be 1 - 5 mS ... only to read the manual POTs for now. 
+ * Execution context is 'main()' so not to block ISR with ADC sampling. 
+ * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling. 
  */ 
 void periodic_task(void)
 {
@@ -435,33 +439,60 @@ extern uint16_t BLDC_OL_comm_tm;
  */
 void testUART(void)
 {
+  int loop;
+
     static unsigned char cnt = 0x30;
-    char sbuf[64] ;                     // am i big enuff?
+    char sbuf[128] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
     cnt = cnt < 126 ? cnt + 1 : 0x30;
     sbuf[0] = 0;
 
-    strcat(sbuf, "hello");
+    strcat(sbuf, ":");
     cbuf[0] = cnt;
     cbuf[1] = 0;
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " A0= ");
-    itoa(A0, cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " A1= ");
-    itoa(A1, cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " _OL_comm_tm= ");
+    strcat(sbuf, " CT= ");
     itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " global_uDC= ");
-    itoa(global_uDC, cbuf, 16);
+#if 0
+    strcat(sbuf, " Axl=");
+    itoa(PhaseA_BEMF[0], cbuf, 16);
     strcat(sbuf, cbuf);
+
+    strcat(sbuf, " Bxl=");
+    itoa(PhaseB_BEMF[0], cbuf, 16);
+    strcat(sbuf, cbuf);
+
+strcat(sbuf, " Cxl=");
+    itoa(PhaseC_BEMF[0], cbuf, 16);
+    strcat(sbuf, cbuf);
+
+strcat(sbuf, " Axh=");
+    itoa(PhaseA_BEMF[1], cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " Bxh=");
+    itoa(PhaseB_BEMF[1], cbuf, 16);
+    strcat(sbuf, cbuf);
+
+strcat(sbuf, " Cxh=");
+    itoa(PhaseC_BEMF[1], cbuf, 16);
+    strcat(sbuf, cbuf);
+
+// A/D
+  for (loop = 0; loop < 3 /* ADC_N_CHANNELS */; loop++){
+    strcat(sbuf, " A");
+    cbuf[0] = 0x30 + loop;
+    cbuf[1] = 0;
+    strcat(sbuf, cbuf);
+    strcat(sbuf, "=");
+    itoa(AnalogInputs[loop], cbuf, 16);
+    strcat(sbuf, cbuf);
+  }
+#endif
 
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
