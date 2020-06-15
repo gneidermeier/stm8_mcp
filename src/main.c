@@ -134,8 +134,9 @@ void GPIO_Config(void)
 
 // INPUTS
 // PA4 as button input 
-    GPIOA->DDR &= ~(1 << 4); // PA.6 as input
+    GPIOA->DDR &= ~(1 << 4); // PA.4 as input
     GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
+// uses CN2.7 as GND
 
 // PA6 as button input 
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
@@ -147,9 +148,9 @@ void GPIO_Config(void)
 // PE5 as button input 
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
-    GPIOC->DDR |= (1 << 2);  // PC.2 as output
-    GPIOC->CR1 |= (1 << 2);  // push pull output
-    GPIOC->ODR &= ~(1 << 2); // set pin off to use as gnd of button
+    GPIOE->DDR |= (1 << 3);  // PE.3 as output
+    GPIOE->CR1 |= (1 << 3);  // push pull output
+    GPIOE->ODR &= ~(1 << 3); // set pin off to use as gnd of button
 
 
 // UART2 D5: Rx, D6: Tx 
