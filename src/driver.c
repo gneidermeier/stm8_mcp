@@ -274,10 +274,6 @@ void timer_config_channel_time(uint16_t u16period); // tmp
  */
 void BLDC_Update(void)
 {
-#if 1 // if ! MANUAL TEST
-    timer_config_channel_time(BLDC_OL_comm_tm);
-#endif
-
     switch (BLDC_State)
     {
     default:
@@ -314,6 +310,11 @@ void BLDC_Update(void)
         }
         break;
     }
+
+#if 1 //    ! MANUAL TEST
+//  set the OL commutation switch time
+    timer_config_channel_time(BLDC_OL_comm_tm);
+#endif
 }
 
 /*
