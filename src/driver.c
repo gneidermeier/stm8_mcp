@@ -42,13 +42,18 @@
 
 
 /*
+ * These constants are the number of 
  * commutation step time is on TIM3
+ * See TIM3 setup. 
+ * Base period of TIM3 is 0.000008 Seconds (8 uSecs)
  */
- #define BLDC_OL_TM_LO_SPD   (256) // start of ramp
-
- #define BLDC_OL_TM_HI_SPD    (40)  // end of ramp
-
- #define BLDC_OL_TM_MANUAL_HI_LIM   (26)   // stalls at 25 
+ // NOTE: off by factor of 2
+ // 8uS * 256 = 2.048mS
+#define BLDC_OL_TM_LO_SPD   (256) // start of ramp
+// 8uS * 40 * 6 * 2 = 0.00384 S
+#define BLDC_OL_TM_HI_SPD    (40)  // end of ramp
+// 8uS * 25 * 6 * 2 = 2.4mS
+#define BLDC_OL_TM_MANUAL_HI_LIM   (25)   // stalls at 25
 
 
 
@@ -114,6 +119,8 @@ uint16_t _set_output(int8_t state0)
     return pulse;
 }
 
+void PWM_Config_T1(void);
+
 void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
 {
     TIM2_pulse_0 = _set_output(state0);
@@ -121,6 +128,133 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
     TIM2_pulse_2 = _set_output(state2);
 
     PWM_Config();
+    PWM_Config_T1();
+}
+
+
+#ifdef CLOCK_16
+ #define TIM1_PRESCALER 2  //  (1/16Mhz) * 2 * 256 -> 0.000125  TIM2_PRESCALER_2
+#else
+ #define TIM1_PRESCALER 4  //  (1/8Mhz) * 4 * 256 ->  0.000125
+#endif
+
+/**
+  * @brief  .
+  * @par Parameters:
+  * None
+  * @retval void None
+  *   reference:
+  *    http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
+  *
+  * - pulse width modulation frequency determined by the value of the TIM1_ARR register 
+  * - duty cycle determined by the value of the TIM1_CCRi register
+  */
+void PWM_Config_T1(void)
+{
+    const uint16_t Pulse_MAX = (TIM2_PWM_PD - 1);
+    const uint16_t T1_Period = 250 /* TIMx_PWM_PD */ ;  // 16-bit counter
+
+// todo: re-config only if delta d.c. > threshold e.g. 1
+    u8 OC_1_pulse = TIM2_pulse_0;
+    u8 OC_2_pulse = TIM2_pulse_1;
+    u8 OC_3_pulse = TIM2_pulse_2;
+
+    TIM1_DeInit(); // don't know how to ensure the non-PWM phase is completely off??
+
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
+
+/* todo: look into this?:
+"For correct operation, preload registers must be enabled when the timer is in PWM mode. This
+is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
+*/
+
+    if (OC_1_pulse > 0 && OC_1_pulse < Pulse_MAX)
+    {
+        /* Channel 1 PWM configuration */
+        TIM1_OC2Init( TIM1_OCMODE_PWM2,
+                      TIM1_OUTPUTSTATE_ENABLE,
+                      TIM1_OUTPUTNSTATE_ENABLE,
+                      OC_1_pulse,
+                      TIM1_OCPOLARITY_LOW,
+                      TIM1_OCNPOLARITY_LOW,
+                      TIM1_OCIDLESTATE_RESET,
+                      TIM1_OCNIDLESTATE_RESET);
+        //GN: probbly  TIM2_OC2PreloadConfig(ENABLE);
+    }
+    else
+    {
+        if (OC_1_pulse >= Pulse_MAX)
+        {
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+            GPIOC->DDR |=  (1<<2);
+            GPIOC->CR1 |=  (1<<2);
+        }
+    }
+//        TIM1_SetCompare2(OC_1_pulse);
+
+    if (OC_2_pulse > 0 && OC_2_pulse < Pulse_MAX)
+    {
+        /* Channel 1 PWM configuration */
+        TIM1_OC3Init( TIM1_OCMODE_PWM2,
+                      TIM1_OUTPUTSTATE_ENABLE,
+                      TIM1_OUTPUTNSTATE_ENABLE,
+                      OC_2_pulse,
+                      TIM1_OCPOLARITY_LOW,
+                      TIM1_OCNPOLARITY_LOW,
+                      TIM1_OCIDLESTATE_RESET,
+                      TIM1_OCNIDLESTATE_RESET);
+        //GN: ?  TIM2_OC2PreloadConfig(ENABLE);
+    }
+    else
+    {
+        if (OC_2_pulse >= Pulse_MAX)
+        {
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+            GPIOC->DDR |=  (1<<3);
+            GPIOC->CR1 |=  (1<<3);
+        }
+    }
+//        TIM1_SetCompare3(OC_2_pulse);
+
+    if (OC_3_pulse > 0 && OC_3_pulse < Pulse_MAX)
+    {
+        /* Channel 4 PWM configuration */
+    TIM1_OC4Init(TIM1_OCMODE_PWM2, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  OC_3_pulse, 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET );
+
+//GN: ?  TIM2_OC4PreloadConfig(ENABLE);
+    }
+    else
+    {
+        if (OC_3_pulse >= Pulse_MAX)
+        {
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+            GPIOC->DDR |=  (1<<4);
+            GPIOC->CR1 |=  (1<<4);
+        }
+    }
+//        TIM1_SetCompare3(OC_2_pulse);
+
+
+    TIM1_CtrlPWMOutputs(ENABLE);
+
+    /* Enables TIM2 peripheral Preload register on ARR */
+//GN: probly     TIM1_ARRPreloadConfig(ENABLE);
+
+    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+    TIM1_Cmd(ENABLE);
 }
 
 /**
@@ -134,8 +268,7 @@ void PWM_Config(void)
 {
     const uint16_t TIM2_Pulse_MAX = (TIM2_PWM_PD - 1); // PWM_MAX_LIMIT 
 
-// dumb .. these should all be equal. 
-// todo: re-config only if delta d.c. > threshold e.g. 1 
+// todo: re-config only if delta d.c. > threshold e.g. 1
     u8 OC_1_pulse = TIM2_pulse_0;
     u8 OC_2_pulse = TIM2_pulse_1;
     u8 OC_3_pulse = TIM2_pulse_2;
@@ -287,14 +420,14 @@ void BLDC_Update(void)
 #ifdef PWM_IS_MANUAL
 // doesn't need to set global uDC every time as it would be set once in the FSM
 // transition ramp->on ... but it doesn't hurt to assert it
-         PWM_Set_DC( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
+        PWM_Set_DC( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
 #else
 //         PWM_Set_DC( PWM_NOT_MANUAL_DEF ) ;
 #endif
         break;
     case BLDC_RAMPUP:
 
-         PWM_Set_DC( PWM_DC_RAMPUP ) ;
+        PWM_Set_DC( PWM_DC_RAMPUP ) ;
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
