@@ -321,7 +321,10 @@ void TIM1_setup(void)
 void timer_config_task_rate(void)
 {
 //    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
-    const uint8_t T4_Period = 255;    // Period = 2.048mS
+//    const uint8_t T4_Period = 255;    // Period = 2.048mS
+// set this for ~1mS to use in place of TIM1 as ramp timer
+const uint8_t T4_Period = 128;    // Period = 1.02mS
+
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
 #else
