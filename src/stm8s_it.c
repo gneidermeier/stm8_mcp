@@ -219,11 +219,6 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
    static uint8_t toggle;
-
-   static uint16_t count = 0;
-
-    BLDC_Update();
-
     toggle ^= 1; // tmp test 
 #if 1 // tmp test
     if (toggle){ 

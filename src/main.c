@@ -131,6 +131,24 @@ void GPIO_Config(void)
     GPIOD->DDR |=  (1<<4);
     GPIOD->CR1 |=  (1<<4);
 #endif
+#if 0 // TIM1 CH1, CH2, CH3, CH4
+// T1.PWM.CH1 
+    GPIOC->ODR |=  (1<<1);  // PC1
+    GPIOC->DDR |=  (1<<1);
+    GPIOC->CR1 |=  (1<<1);
+// T1.PWM.CH2 
+    GPIOC->ODR |=  (1<<2);  // PC2
+    GPIOC->DDR |=  (1<<2);
+    GPIOC->CR1 |=  (1<<2);
+// T1.PWM.CH3 
+    GPIOC->ODR |=  (1<<3);  // PC3
+    GPIOC->DDR |=  (1<<3);
+    GPIOC->CR1 |=  (1<<3);
+// T1.PWM.CH4 
+    GPIOC->ODR |=  (1<<4);  // PC4
+    GPIOC->DDR |=  (1<<4);
+    GPIOC->CR1 |=  (1<<4);
+#endif
 
 // INPUTS
 // PA4 as button input 
@@ -287,26 +305,70 @@ void ADC1_setup(void)
  *
  *       0.0012 sec
 */
-// TIM1 rate establishes ramp aggressiveness
  #ifdef CLOCK_16
-   #define TIM1_PRESCALER 64  //    (1/16Mhz) * 64 * 256 -> 0.001024 S
+   #define TIM1_PRESCALER 2  //    (1/16Mhz) * 2 * 256 -> 0.000125
  #else
-   #define TIM1_PRESCALER 32  //    (1/8Mhz) * 32 * 256 ->  0.001024 S     faster startup
+   #define TIM1_PRESCALER 4  //    (1/8Mhz) * 4 * 256 ->  0.000125
  #endif
 
 
 void TIM1_setup(void)
 {
-    const uint16_t T1_Period = 256;  // 16-bit counter 
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);     
+    const uint16_t T1_Period = 250;  // 16-bit counter  
+
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE); 
     TIM1_DeInit();
 
 //fCK_CNT = fCK_PSC/(PSCR[15:0]+1) 
 
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
+    TIM1_OC1Init(TIM1_OCMODE_PWM2, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  TIM1_OUTPUTNSTATE_ENABLE, 
+                  T1_Period , 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCNPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET, 
+                  TIM1_OCNIDLESTATE_RESET);
+
+    TIM1_OC2Init(TIM1_OCMODE_PWM2, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  TIM1_OUTPUTNSTATE_ENABLE, 
+                  T1_Period , 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCNPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET, 
+                  TIM1_OCNIDLESTATE_RESET);
+
+    TIM1_OC3Init(TIM1_OCMODE_PWM2, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  TIM1_OUTPUTNSTATE_ENABLE, 
+                  T1_Period , 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCNPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET, 
+                  TIM1_OCNIDLESTATE_RESET);
+
+    TIM1_OC4Init(TIM1_OCMODE_PWM2, 
+                  TIM1_OUTPUTSTATE_ENABLE, 
+                  T1_Period , 
+                  TIM1_OCPOLARITY_LOW, 
+                  TIM1_OCIDLESTATE_RESET );
+
+    TIM1_CtrlPWMOutputs(ENABLE);
+
+
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
+
+#if 1
+///////////////////////// tmp test
+  TIM1_SetCompare1(T1_Period / 2);
+  TIM1_SetCompare2(T1_Period / 4);
+  TIM1_SetCompare3(T1_Period / 8);
+  TIM1_SetCompare4(T1_Period / 16);
+#endif
 }
 
 /*
@@ -413,6 +475,10 @@ void clock_setup(void)
 void periodic_task(void)
 {
     uint16_t ch = 0;
+
+    BLDC_Update(); //  Task rate establishes ramp aggressiveness 
+
+// A/D stuff needs to sync w/ PWM ISR ... 
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
     ADC1_StartConversion();
