@@ -16,7 +16,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define BLDC_COMM_TIME_SCALE 2  // integer scale factor
 
 #define ADC_N_CHANNELS 10       // [A0:A9]
 
@@ -363,7 +362,7 @@ void timer_config_channel_time(uint16_t u_period)
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
     const uint16_t MIN_SWITCH_TIME = 1;
 
-    uint16_t period = u_period * BLDC_COMM_TIME_SCALE;  // uses all 3-bits of TIM3 prescaler (move TIME_SCALE factor   upstream for additional precision ?)
+    uint16_t period = u_period;  // uses all 3-bits of TIM3 prescaler 
 
     if (period < MIN_SWITCH_TIME)
     {

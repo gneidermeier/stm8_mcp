@@ -42,20 +42,37 @@
 
 
 /*
- * These constants are the number of 
- * commutation step time is on TIM3
- * See TIM3 setup. 
- * Base period of TIM3 is 0.000008 Seconds (8 uSecs)
+ * These constants are the number of timer counts (TIM3) to achieve a given
+ *  commutation step period.
+ * See TIM3 setup - base period is 0.000008 Seconds (8 uSecs)
+ * For the theoretical 15000 RPM motor: 
+ *   15000 / 60 = 250 rps
+ *   cycles per sec = 250 * 6 = 1500
+ *   1 cycle = 1/1500 = .000667 S
+ *
+ * RPS = (1 / cycle_time * 6)
  */
- // NOTE: off by factor of 2
- // 8uS * 256 = 2.048mS
-#define BLDC_OL_TM_LO_SPD   (256) // start of ramp
-// 8uS * 40 * 6 * 2 = 0.00384 S
-#define BLDC_OL_TM_HI_SPD    (40)  // end of ramp
-// 8uS * 25 * 6 * 2 = 2.4mS
-#define BLDC_OL_TM_MANUAL_HI_LIM   (25)   // stalls at 25
 
+// the OL comm time is shortened by 1 rammp-unit (e.g. 2 counts @ 0.000008S per count where 8uS is the TIM3 bit-time)
+// the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
+#define BLDC_ONE_RAMP_UNIT          2
 
+ // 1 cycle = 6 * 8uS * 512 = 0.024576 S
+#define BLDC_OL_TM_LO_SPD         512  // start of ramp
+
+// 1 cycle = 6 * 8uS * 80 = 0.00384 S
+#define BLDC_OL_TM_HI_SPD          80  // end of ramp
+
+// 1 cycle = 6 * 8uS * 50 = 0.0024 S
+#define BLDC_OL_TM_MANUAL_HI_LIM   58  // stalls at 56
+
+// any "speed" setting higher than HI_LIM would be by closed-loop control of 
+// commutation period (manual speed-control input by adjusting PWM  duty-cycle) 
+// The control loop will only have precision of 0.000008 S adjustment though (externally triggered comparator would be ideal )
+
+// 1 cycle = 6 * 8uS * 13 = 0.000624 S
+// 1 cycle = 6 * 8uS * 14 = 0.000672 S
+#define LUDICROUS_SPEED (13) // 15kRPM would be ~13.8 counts
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -431,8 +448,7 @@ void BLDC_Update(void)
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
-            BLDC_OL_comm_tm -= 1;  // TIM3 has been timed so that the ramp is realized by simple -=1 each timer period
-                                   // so the ramp rate is  16uS/TIM1_period w/ TIM1 @ 1.024 mS 
+            BLDC_OL_comm_tm -= BLDC_ONE_RAMP_UNIT; 
         }
         else
         {
@@ -445,7 +461,7 @@ void BLDC_Update(void)
     }
 
 #if 1 //    ! MANUAL TEST
-//  set the OL commutation switch time
+//  update the timer for the OL commutation switch time
     timer_config_channel_time(BLDC_OL_comm_tm);
 #endif
 }
@@ -474,6 +490,8 @@ void BLDC_Step(void)
 /*
  * TODO: schedule at 30degree intervals? (see TIM3)
  *
+ * BUG? if PWM pulse is on at the step time to transition to floating, the PWM 
+ * pulse is not turned off with good timing as the voltage just bleeds off then
  */
 void bldc_move(void)
 {
