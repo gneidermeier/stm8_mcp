@@ -64,7 +64,7 @@
 #define BLDC_OL_TM_HI_SPD          80  // end of ramp
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
-#define BLDC_OL_TM_MANUAL_HI_LIM   58  // stalls at 56
+#define BLDC_OL_TM_MANUAL_HI_LIM   64 // 58   // stalls at 56 ... stop at 64? ( 0x40? ) (I want to push the button and see the data at this speed w/o actually chaniging the CT)
 
 // any "speed" setting higher than HI_LIM would be by closed-loop control of 
 // commutation period (manual speed-control input by adjusting PWM  duty-cycle) 
@@ -90,11 +90,10 @@ static uint16_t TIM2_pulse_2 ;
 
 static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 /* static */ uint16_t global_uDC;
-static uint8_t bldc_step = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 void PWM_Config(void);
-void bldc_move(void);
+void bldc_move( uint8_t );
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -176,14 +175,28 @@ void PWM_Config_T1(void)
     u8 OC_2_pulse = TIM2_pulse_1;
     u8 OC_3_pulse = TIM2_pulse_2;
 
-    TIM1_DeInit(); // don't know how to ensure the non-PWM phase is completely off??
-
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
-
 /* todo: look into this?:
 "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
 is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
 */
+
+ // not sure how to assert off, as the pwM reconfig occurs on commutation time intervals which is asynchronous to the PWM clock, so if turning off PWM while the pulse happens to be ON ... ????
+    TIM1_DeInit();
+
+            GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+            GPIOC->DDR |=  (1<<2);
+            GPIOC->CR1 |=  (1<<2);
+
+            GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+            GPIOC->DDR |=  (1<<3);
+            GPIOC->CR1 |=  (1<<3);
+
+            GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+            GPIOC->DDR |=  (1<<4);
+            GPIOC->CR1 |=  (1<<4);
+
+
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
     if (OC_1_pulse > 0 && OC_1_pulse < Pulse_MAX)
     {
@@ -202,12 +215,7 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_1_pulse >= Pulse_MAX)
         {
-        }
-        else
-        {
-            GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-            GPIOC->DDR |=  (1<<2);
-            GPIOC->CR1 |=  (1<<2);
+          // set HI
         }
     }
 //        TIM1_SetCompare2(OC_1_pulse);
@@ -229,12 +237,7 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_2_pulse >= Pulse_MAX)
         {
-        }
-        else
-        {
-            GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-            GPIOC->DDR |=  (1<<3);
-            GPIOC->CR1 |=  (1<<3);
+           // set HI
         }
     }
 //        TIM1_SetCompare3(OC_2_pulse);
@@ -254,12 +257,7 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_3_pulse >= Pulse_MAX)
         {
-        }
-        else
-        {
-            GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-            GPIOC->DDR |=  (1<<4);
-            GPIOC->CR1 |=  (1<<4);
+           // set HI
         }
     }
 //        TIM1_SetCompare3(OC_2_pulse);
@@ -380,6 +378,7 @@ void BLDC_Spd_dec()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
+				// BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
@@ -396,6 +395,7 @@ void BLDC_Spd_inc()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
+				// BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
@@ -471,12 +471,14 @@ void BLDC_Update(void)
  */
 void BLDC_Step(void)
 {
+    static uint8_t bldc_step = 0;
+
     bldc_step += 1;
     bldc_step %= N_CSTEPS;
 
     if (global_uDC > 0)
     {
-        bldc_move();
+        bldc_move( bldc_step );
     }
     else // motor drive output has been disabled
     {
@@ -487,22 +489,36 @@ void BLDC_Step(void)
     }
 }
 
+
+// temp test
+uint16_t ABC0[4];
+uint16_t ABC1[4];
+uint16_t ABC2[4];
+uint16_t ABC3[4];
+uint16_t ABC4[4];
+uint16_t ABC5[4];
+#define PHA 0
+#define PHB 1
+#define PHC 2
 /*
  * TODO: schedule at 30degree intervals? (see TIM3)
  *
  * BUG? if PWM pulse is on at the step time to transition to floating, the PWM 
  * pulse is not turned off with good timing as the voltage just bleeds off then
  */
-void bldc_move(void)
+void bldc_move( uint8_t step )
 {
  const int8_t foo = 99; 
 
 // /SD outputs on C5, C7, and G1
-    switch(bldc_step)
+    switch( step )
     {
     default:
 
     case 0:
+     ABC0[PHA] = AnalogInputs[PHA];
+     ABC0[PHB] = AnalogInputs[PHB];
+     ABC0[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A+-+
         GPIOC->ODR |=   (1<<7);      // B---
         GPIOG->ODR &=  ~(1<<1);      // C.
@@ -510,6 +526,9 @@ void bldc_move(void)
         break;                                    // C falling
 
     case 1:
+     ABC1[PHA] = AnalogInputs[PHA];
+     ABC1[PHB] = AnalogInputs[PHB];
+     ABC1[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);	     // A+-+
         GPIOC->ODR &=  ~(1<<7);      // B.
         GPIOG->ODR |=   (1<<1);      // C---
@@ -517,6 +536,9 @@ void bldc_move(void)
         break;                                    //  B float 
 
     case 2:
+     ABC2[PHA] = AnalogInputs[PHA];
+     ABC2[PHB] = AnalogInputs[PHB];
+     ABC2[PHC] = AnalogInputs[PHC];
         GPIOC->ODR &=  ~(1<<5);      // A.
         GPIOC->ODR |=   (1<<7);      // B+-+
         GPIOG->ODR |=   (1<<1);      // C---
@@ -524,6 +546,9 @@ void bldc_move(void)
         break;                                    // A Falling
 
     case 3:
+     ABC3[PHA] = AnalogInputs[PHA];
+     ABC3[PHB] = AnalogInputs[PHB];
+     ABC3[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A---
         GPIOC->ODR |=   (1<<7);      // B+-+
         GPIOG->ODR &=  ~(1<<1);      // C.
@@ -531,6 +556,9 @@ void bldc_move(void)
         break;                                    // C float
 
     case 4:
+     ABC4[PHA] = AnalogInputs[PHA];
+     ABC4[PHB] = AnalogInputs[PHB];
+     ABC4[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A---
         GPIOC->ODR &=  ~(1<<7);      // B.
         GPIOG->ODR |=   (1<<1);      // C+-+
@@ -538,6 +566,9 @@ void bldc_move(void)
         break;                                    // B falling
 
     case 5:
+     ABC5[PHA] = AnalogInputs[PHA];
+     ABC5[PHB] = AnalogInputs[PHB];
+     ABC5[PHC] = AnalogInputs[PHC];
         GPIOC->ODR &=  ~(1<<5);      // A.
         GPIOC->ODR |=   (1<<7);      // B---
         GPIOG->ODR |=   (1<<1);      // C+-+
