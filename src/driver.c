@@ -55,7 +55,7 @@
 
 // the OL comm time is shortened by 1 rammp-unit (e.g. 2 counts @ 0.000008S per count where 8uS is the TIM3 bit-time)
 // the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
-#define BLDC_ONE_RAMP_UNIT          2
+#define BLDC_ONE_RAMP_UNIT          1
 
  // 1 cycle = 6 * 8uS * 512 = 0.024576 S
 #define BLDC_OL_TM_LO_SPD         512  // start of ramp

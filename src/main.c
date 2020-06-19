@@ -33,8 +33,6 @@ extern uint8_t bldc_step ; // tmp
 #define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
 #define AINCH_PWM_DC         8   // adjust pot to PWM D.C. on FET outputs
 
-#define A0  AnalogInputs[ AINCH_PWM_DC ]
-#define A1  AnalogInputs[ AINCH_COMMUATION_PD ]
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -193,7 +191,7 @@ void GPIO_Config(void)
     GPIOB->CR1 &= ~(1 << 7);  // floating input
     GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
-// PB.6 AIN6
+// AIN6
     GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
     GPIOB->CR1 &= ~(1 << 6);  // floating input
     GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
@@ -223,7 +221,7 @@ void GPIO_Config(void)
     GPIOB->CR1 &= ~(1 << 1);  // floating input
     GPIOB->CR2 &= ~(1 << 1);  // 0: External interrupt disabled   ???
 
-// PB.0 AIN0
+// AIN0
     GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
     GPIOB->CR1 &= ~(1 << 0);  // floating input
     GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
@@ -272,22 +270,33 @@ void ADC1_setup(void)
 
     ADC1_DeInit();
 
-// this example, single channel polling :
+// configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
-              ADC1_CHANNEL_9,
-              ADC1_PRESSEL_FCPU_D18,
-              ADC1_EXTTRIG_TIM,   //  ADC1_EXTTRIG_GPIO
-              DISABLE,
+              ADC1_CHANNEL_9,        // tmp ... test pots on CH8, CH9
+              ADC1_PRESSEL_FCPU_D18, // setting for largest divider for lowest rate (don't want to consume too much CPU svcing ADC)   ??????? idk
+              ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO
+              DISABLE,               // ExtTriggerState
               ADC1_ALIGN_RIGHT,
               ADC1_SCHMITTTRIG_ALL,
-              DISABLE);
+              DISABLE);              // SchmittTriggerState
 
-//    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
+#ifdef ADC_EOCIE // interrupted ADC messes w/ motor
+    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
+#endif
 
+/*
+A single conversion is performed for each channel starting with AIN0 and the data is stored
+in the data buffer registers ADC_DBxR.
+*/
+//ADC1_ConversionConfig() ?
+//ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
 
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
     ADC1_Cmd(ENABLE);
+
+// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
+    ADC1_StartConversion();
 }
 
 /*
@@ -339,7 +348,8 @@ void timer_config_task_rate(void)
 //    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
 //    const uint8_t T4_Period = 255;    // Period = 2.048mS
 // set this for ~1mS to use in place of TIM1 as ramp timer
-const uint8_t T4_Period = 128;    // Period = 1.02mS
+//const uint8_t T4_Period = 128;    // Period = 1.02mS
+    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ... double up on ADC ?
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -430,12 +440,14 @@ void periodic_task(void)
 {
     uint16_t ch = 0;
 
-    BLDC_Update(); //  Task rate establishes ramp aggressiveness 
+        BLDC_Update(); //  Task rate establishes ramp aggressiveness 
 
 // A/D stuff needs to sync w/ PWM ISR ... 
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
     ADC1_StartConversion();
+
+#ifndef ADC_EOCIE // test ... bah interrupted ADC messes w/ motor
 
 // Wait until the conversion is done (no timeout => ... to be done)
     while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET );
@@ -447,13 +459,12 @@ void periodic_task(void)
     }
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
+#endif
 
 #if 0 // MANUAL
     Manual_uDC = A0 / 2;
 #endif
 }
-
-
 
 // hack, temp
 extern uint16_t BLDC_OL_comm_tm;
@@ -477,37 +488,38 @@ void testUART(void)
     cbuf[1] = 0;
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " CT= ");
+    strcat(sbuf, " CT=");
     itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
 #if 0
-    strcat(sbuf, " Axl=");
-    itoa(PhaseA_BEMF[0], cbuf, 16);
+    strcat(sbuf, " A0=");
+    itoa(ABC0[0], cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " Bxl=");
-    itoa(PhaseB_BEMF[0], cbuf, 16);
+    strcat(sbuf, " A1=");
+    itoa(ABC1[0], cbuf, 16);
     strcat(sbuf, cbuf);
 
-strcat(sbuf, " Cxl=");
-    itoa(PhaseC_BEMF[0], cbuf, 16);
+    strcat(sbuf, " A2=");
+    itoa(ABC2[0], cbuf, 16);
     strcat(sbuf, cbuf);
 
-strcat(sbuf, " Axh=");
-    itoa(PhaseA_BEMF[1], cbuf, 16);
+    strcat(sbuf, " A3=");
+    itoa(ABC3[0], cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " Bxh=");
-    itoa(PhaseB_BEMF[1], cbuf, 16);
+    strcat(sbuf, " A4=");
+    itoa(ABC4[0], cbuf, 16);
     strcat(sbuf, cbuf);
 
-strcat(sbuf, " Cxh=");
-    itoa(PhaseC_BEMF[1], cbuf, 16);
+    strcat(sbuf, " A5=");
+    itoa(ABC5[0], cbuf, 16);
     strcat(sbuf, cbuf);
-
+#endif
+#if 1
 // A/D
-  for (loop = 0; loop < 3 /* ADC_N_CHANNELS */; loop++){
+  for (loop = 0; loop <  ADC_N_CHANNELS ; loop++){
     strcat(sbuf, " A");
     cbuf[0] = 0x30 + loop;
     cbuf[1] = 0;
@@ -547,14 +559,18 @@ main()
         if (! (( GPIOA->IDR)&(1<<4)))
         {
 //            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
+                disableInterrupts();
                 BLDC_Stop();
+                enableInterrupts();
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-            BLDC_Spd_inc();
+                disableInterrupts();
+                BLDC_Spd_inc();
+                enableInterrupts();
             testUART();// tmp test
         }
 
@@ -562,7 +578,9 @@ main()
         {
             while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
 
-            BLDC_Spd_dec();	
+                disableInterrupts();
+                BLDC_Spd_dec();
+                enableInterrupts();
             testUART();// tmp test
         }
 
