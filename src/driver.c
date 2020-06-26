@@ -17,9 +17,16 @@
 
 //#define PWM_IS_MANUAL
 
+#define LOWER_ARM_CHOPPING
+#define PWM_DC_PLUS     1
+#define PWM_DC_MINUS   -1
+#define PWM_GP_HI    0x7F // 127 positive max signed 8 integer
+#define PWM_GP_LO    0 // 0x80
 
-#define PWM_50PCNT  ( TIM2_PWM_PD / 2 )
-#define PWM_25PCNT  ( TIM2_PWM_PD / 4 )
+#define PWM_100PCNT    TIM2_PWM_PD
+#define PWM_50PCNT     ( PWM_100PCNT / 2 )
+#define PWM_25PCNT     ( PWM_100PCNT / 4 )
+#define PWM_0PCNT      0
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 
 
@@ -32,13 +39,15 @@
 
 // see define of TIM2 PWM PD ... it set for 8kHz (125uS)
 #ifdef CLOCK_16
- #define PWM_PRESCALER  TIM2_PRESCALER_8 // @16Mhz
+//  (1/16Mhz) * 2 * 250 -> 0.000125 S
+ #define TIM1_PRESCALER  8
+ #define TIM2_PRESCALER  TIM2_PRESCALER_8
 #else
- #define PWM_PRESCALER  TIM2_PRESCALER_4 // @8Mhz
+//  (1/8Mhz) * 4 * 250 ->  0.000125 S
+ #define TIM1_PRESCALER  4
+ #define TIM2_PRESCALER  TIM2_PRESCALER_4
 #endif
 
-// nbr of steps required to commutate 3 phase
-#define N_CSTEPS   6
 
 
 /*
@@ -57,7 +66,7 @@
 // the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
 #define BLDC_ONE_RAMP_UNIT          1
 
- // 1 cycle = 6 * 8uS * 512 = 0.024576 S
+// 1 cycle = 6 * 8uS * 512 = 0.024576 S
 #define BLDC_OL_TM_LO_SPD         512  // start of ramp
 
 // 1 cycle = 6 * 8uS * 80 = 0.00384 S
@@ -92,6 +101,7 @@ static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 /* static */ uint16_t global_uDC;
 
 /* Private function prototypes -----------------------------------------------*/
+void PWM_Config_T1(void);
 void PWM_Config(void);
 void bldc_move( uint8_t );
 
@@ -115,27 +125,49 @@ void PWM_Set_DC(uint16_t pwm_dc)
 
 /*
  * intermediate function for setting PWM with positive or negative polarity
+ * Provides an "inverted" (complimentary) duty-cycle if [state0 < 0]
  */
-uint16_t _set_output(int8_t state0)
+uint16_t _set_output(int8_t s0)
 {
-    uint16_t pulse;
-    if (state0 > 0)
+    uint16_t pulse = PWM_0PCNT;
+
+    int8_t state0 = s0;
+
+#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ... 
+// Invert the logic of the transistor drive, so as to essentially PWM the 
+// lower arm. Drive the upper-arm transistor ON (setting PWM to 100% DC) and 
+// setting the complement of the duty-cycle (1-DC) on the lower transistor
+    if (PWM_DC_PLUS == s0)
+    {
+        state0 = PWM_DC_MINUS;
+    }
+    else if (PWM_GP_LO == s0)
+    {
+        state0 = PWM_GP_HI;
+    }
+#endif
+
+    if ( PWM_GP_HI == state0)
+    {
+        pulse = PWM_100PCNT;
+    }
+    else if ( PWM_GP_LO == state0)
+    {
+        pulse = PWM_0PCNT;
+    }
+    else if (state0 > 0)
     {
         pulse = global_uDC;
     }
     else if (state0 < 0)
     {
-        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse (for symetric PWM)
+        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse
     }
-    else
-    {
-        pulse = 0;
-    }
+    //  else ... == 0 
 
     return pulse;
 }
 
-void PWM_Config_T1(void);
 
 void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
 {
@@ -147,12 +179,6 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
     PWM_Config_T1();
 }
 
-
-#ifdef CLOCK_16
- #define TIM1_PRESCALER 2  //  (1/16Mhz) * 2 * 256 -> 0.000125  TIM2_PRESCALER_2
-#else
- #define TIM1_PRESCALER 4  //  (1/8Mhz) * 4 * 256 ->  0.000125
-#endif
 
 /**
   * @brief  .
@@ -183,20 +209,25 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
  // not sure how to assert off, as the pwM reconfig occurs on commutation time intervals which is asynchronous to the PWM clock, so if turning off PWM while the pulse happens to be ON ... ????
     TIM1_DeInit();
 
-            GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-            GPIOC->DDR |=  (1<<2);
-            GPIOC->CR1 |=  (1<<2);
+#if 0
+    GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+    GPIOC->DDR |=  (1<<2);
+    GPIOC->CR1 |=  (1<<2);
 
-            GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-            GPIOC->DDR |=  (1<<3);
-            GPIOC->CR1 |=  (1<<3);
+    GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+    GPIOC->DDR |=  (1<<3);
+    GPIOC->CR1 |=  (1<<3);
 
-            GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-            GPIOC->DDR |=  (1<<4);
-            GPIOC->CR1 |=  (1<<4);
-
+    GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+    GPIOC->DDR |=  (1<<4);
+    GPIOC->CR1 |=  (1<<4);
+#endif
+/*
+ todo: TIM1_SetCompare1() etc
+*/
 
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
+
 
     if (OC_1_pulse > 0 && OC_1_pulse < Pulse_MAX)
     {
@@ -215,7 +246,15 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_1_pulse >= Pulse_MAX)
         {
-          // set HI
+            GPIOC->ODR |=  (1<<2);  // PC2 set HI
+            GPIOC->DDR |=  (1<<2);
+            GPIOC->CR1 |=  (1<<2);
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+            GPIOC->DDR |=  (1<<2);
+            GPIOC->CR1 |=  (1<<2);
         }
     }
 //        TIM1_SetCompare2(OC_1_pulse);
@@ -237,7 +276,15 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_2_pulse >= Pulse_MAX)
         {
-           // set HI
+            GPIOC->ODR |=  (1<<3);  // PC3 set HI
+            GPIOC->DDR |=  (1<<3);
+            GPIOC->CR1 |=  (1<<3);
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+            GPIOC->DDR |=  (1<<3);
+            GPIOC->CR1 |=  (1<<3);
         }
     }
 //        TIM1_SetCompare3(OC_2_pulse);
@@ -249,7 +296,7 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
                   TIM1_OUTPUTSTATE_ENABLE, 
                   OC_3_pulse, 
                   TIM1_OCPOLARITY_LOW, 
-                  TIM1_OCIDLESTATE_RESET );
+                     TIM1_OCIDLESTATE_RESET );
 
 //GN: ?  TIM2_OC4PreloadConfig(ENABLE);
     }
@@ -257,7 +304,15 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     {
         if (OC_3_pulse >= Pulse_MAX)
         {
-           // set HI
+            GPIOC->ODR |=  (1<<4);  // PC4 set HI
+            GPIOC->DDR |=  (1<<4);
+            GPIOC->CR1 |=  (1<<4);
+        }
+        else
+        {
+            GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+            GPIOC->DDR |=  (1<<4);
+            GPIOC->CR1 |=  (1<<4);
         }
     }
 //        TIM1_SetCompare3(OC_2_pulse);
@@ -291,7 +346,7 @@ void PWM_Config(void)
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
 
-    TIM2_TimeBaseInit(PWM_PRESCALER, ( TIM2_PWM_PD - 1 ) );
+    TIM2_TimeBaseInit(TIM2_PRESCALER, ( TIM2_PWM_PD - 1 ) );
 
     if (OC_1_pulse > 0 && OC_1_pulse < TIM2_Pulse_MAX)
     {
@@ -378,7 +433,7 @@ void BLDC_Spd_dec()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
-				// BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
+        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
@@ -395,7 +450,7 @@ void BLDC_Spd_inc()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
-				// BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
+        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
@@ -405,7 +460,7 @@ void BLDC_Spd_inc()
 }
 
 
-void timer_config_channel_time(uint16_t u16period); // tmp
+void TIM3_setup(uint16_t u16period); // tmp
 
 /*
  * BLDC Update: handle the BLDC state 
@@ -462,7 +517,7 @@ void BLDC_Update(void)
 
 #if 1 //    ! MANUAL TEST
 //  update the timer for the OL commutation switch time
-    timer_config_channel_time(BLDC_OL_comm_tm);
+    TIM3_setup(BLDC_OL_comm_tm);
 #endif
 }
 
@@ -471,6 +526,8 @@ void BLDC_Update(void)
  */
 void BLDC_Step(void)
 {
+    const uint8_t N_CSTEPS = 6;
+
     static uint8_t bldc_step = 0;
 
     bldc_step += 1;
@@ -489,17 +546,6 @@ void BLDC_Step(void)
     }
 }
 
-
-// temp test
-uint16_t ABC0[4];
-uint16_t ABC1[4];
-uint16_t ABC2[4];
-uint16_t ABC3[4];
-uint16_t ABC4[4];
-uint16_t ABC5[4];
-#define PHA 0
-#define PHB 1
-#define PHC 2
 /*
  * TODO: schedule at 30degree intervals? (see TIM3)
  *
@@ -508,71 +554,51 @@ uint16_t ABC5[4];
  */
 void bldc_move( uint8_t step )
 {
- const int8_t foo = 99; 
-
 // /SD outputs on C5, C7, and G1
     switch( step )
     {
     default:
 
     case 0:
-     ABC0[PHA] = AnalogInputs[PHA];
-     ABC0[PHB] = AnalogInputs[PHB];
-     ABC0[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A+-+
         GPIOC->ODR |=   (1<<7);      // B---
         GPIOG->ODR &=  ~(1<<1);      // C.
-        PWM_set_outputs(foo, 0, 0);	 
-        break;                                    // C falling
+        PWM_set_outputs(PWM_DC_PLUS, PWM_GP_LO, 0);
+        break;
 
     case 1:
-     ABC1[PHA] = AnalogInputs[PHA];
-     ABC1[PHB] = AnalogInputs[PHB];
-     ABC1[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);	     // A+-+
         GPIOC->ODR &=  ~(1<<7);      // B.
         GPIOG->ODR |=   (1<<1);      // C---
-        PWM_set_outputs(foo, 0, 0);
-        break;                                    //  B float 
+        PWM_set_outputs(PWM_DC_PLUS, 0, PWM_GP_LO);
+        break;
 
     case 2:
-     ABC2[PHA] = AnalogInputs[PHA];
-     ABC2[PHB] = AnalogInputs[PHB];
-     ABC2[PHC] = AnalogInputs[PHC];
         GPIOC->ODR &=  ~(1<<5);      // A.
         GPIOC->ODR |=   (1<<7);      // B+-+
         GPIOG->ODR |=   (1<<1);      // C---
-        PWM_set_outputs(0, foo, 0);
-        break;                                    // A Falling
+        PWM_set_outputs(0, PWM_DC_PLUS, PWM_GP_LO);
+        break;
 
     case 3:
-     ABC3[PHA] = AnalogInputs[PHA];
-     ABC3[PHB] = AnalogInputs[PHB];
-     ABC3[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A---
         GPIOC->ODR |=   (1<<7);      // B+-+
         GPIOG->ODR &=  ~(1<<1);      // C.
-        PWM_set_outputs(0, foo, 0);
-        break;                                    // C float
+        PWM_set_outputs(PWM_GP_LO, PWM_DC_PLUS, 0);
+        break;
 
     case 4:
-     ABC4[PHA] = AnalogInputs[PHA];
-     ABC4[PHB] = AnalogInputs[PHB];
-     ABC4[PHC] = AnalogInputs[PHC];
         GPIOC->ODR |=   (1<<5);      // A---
         GPIOC->ODR &=  ~(1<<7);      // B.
         GPIOG->ODR |=   (1<<1);      // C+-+
-        PWM_set_outputs(0, 0, foo);
-        break;                                    // B falling
+        PWM_set_outputs(PWM_GP_LO, 0, PWM_DC_PLUS);
+        break;
 
     case 5:
-     ABC5[PHA] = AnalogInputs[PHA];
-     ABC5[PHB] = AnalogInputs[PHB];
-     ABC5[PHC] = AnalogInputs[PHC];
         GPIOC->ODR &=  ~(1<<5);      // A.
         GPIOC->ODR |=   (1<<7);      // B---
         GPIOG->ODR |=   (1<<1);      // C+-+
-        PWM_set_outputs(0, 0, foo);
-        break;                                    // A float
+        PWM_set_outputs(0, PWM_GP_LO, PWM_DC_PLUS);
+        break;
     }
 }

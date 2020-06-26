@@ -325,10 +325,10 @@ void TIM1_setup(void)
     const uint16_t T1_Period = 250 /* TIMx_PWM_PD */ ;  // 16-bit counter  
 
     CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE); // put this with clocks setup 
+
     TIM1_DeInit();
 
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
-
 
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
@@ -343,7 +343,7 @@ void TIM1_setup(void)
  * Setting periodic task for fast-ish rate of A/D acquisition.
  * ISR must set 'TaskRdy' flag and not block on the task since A/D does a blocking wait.
  */
-void timer_config_task_rate(void)
+void TIM4_setup(void)
 {
 //    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
 //    const uint8_t T4_Period = 255;    // Period = 2.048mS
@@ -367,7 +367,7 @@ void timer_config_task_rate(void)
  * Timers 2 3 & 5 are 16-bit general purpose timers *  Sets the commutation switching period.
  *  Input: [0:511]   (input may be set from analog trim-pot for test/dev)
  */
-void timer_config_channel_time(uint16_t u_period)
+void TIM3_setup(uint16_t u_period)
 {
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
     const uint16_t MIN_SWITCH_TIME = 1;
@@ -442,6 +442,9 @@ void periodic_task(void)
 
         BLDC_Update(); //  Task rate establishes ramp aggressiveness 
 
+
+#if 1 // tmp test turn off A/D to check for motor glitching
+
 // A/D stuff needs to sync w/ PWM ISR ... 
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
@@ -460,6 +463,9 @@ void periodic_task(void)
 
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 #endif
+
+#endif
+
 
 #if 0 // MANUAL
     Manual_uDC = A0 / 2;
@@ -544,7 +550,7 @@ main()
     UART_setup();
     ADC1_setup();
     TIM1_setup();
-    timer_config_task_rate(); // fixed at 5mS
+    TIM4_setup();
 
     BLDC_Stop();
 
