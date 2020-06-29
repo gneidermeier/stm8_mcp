@@ -314,9 +314,9 @@ in the data buffer registers ADC_DBxR.
  *       0.0012 sec
 */
  #ifdef CLOCK_16
-   #define TIM1_PRESCALER 2  //    (1/16Mhz) * 2 * 256 -> 0.000125
+   #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
  #else
-   #define TIM1_PRESCALER 4  //    (1/8Mhz) * 4 * 256 ->  0.000125
+   #define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
  #endif
 
 
