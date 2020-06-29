@@ -3,7 +3,7 @@
   * @file driver.c
   * @brief support functions for the BLDC motor control
   * @author Neidermeier
-  * @version 
+  * @version
   * @date March-2020
   ******************************************************************************
   */
@@ -46,7 +46,7 @@
  * These constants are the number of timer counts (TIM3) to achieve a given
  *  commutation step period.
  * See TIM3 setup - base period is 0.000008 Seconds (8 uSecs)
- * For the theoretical 15000 RPM motor: 
+ * For the theoretical 15000 RPM motor:
  *   15000 / 60 = 250 rps
  *   cycles per sec = 250 * 6 = 1500
  *   1 cycle = 1/1500 = .000667 S
@@ -67,14 +67,16 @@
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
 #define BLDC_OL_TM_MANUAL_HI_LIM   64 // 58   // stalls at 56 ... stop at 64? ( 0x40? ) (I want to push the button and see the data at this speed w/o actually chaniging the CT)
 
-// any "speed" setting higher than HI_LIM would be by closed-loop control of 
-// commutation period (manual speed-control input by adjusting PWM  duty-cycle) 
+// any "speed" setting higher than HI_LIM would be by closed-loop control of
+// commutation period (manual speed-control input by adjusting PWM  duty-cycle)
 // The control loop will only have precision of 0.000008 S adjustment though (externally triggered comparator would be ideal )
 
 // 1 cycle = 6 * 8uS * 13 = 0.000624 S
 // 1 cycle = 6 * 8uS * 14 = 0.000672 S
 #define LUDICROUS_SPEED (13) // 15kRPM would be ~13.8 counts
 
+
+#define THREE_PHASES 3
 
 /* Private types -----------------------------------------------------------*/
 
@@ -98,16 +100,13 @@ BLDC_STATE_T BLDC_State;
 
 
 /* Private variables ---------------------------------------------------------*/
-static uint16_t TIM2_pulse_0 ;
-static uint16_t TIM2_pulse_1 ;
-static uint16_t TIM2_pulse_2 ;
 
 static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 /* static */ uint16_t global_uDC;
 
 /* Private function prototypes -----------------------------------------------*/
-void PWM_Config_T1(void);
-void PWM_Config(void);
+void PWM_Config_T1( uint16_t channels[] );
+void PWM_Config( uint16_t channels[] );
 void bldc_move( uint8_t );
 
 /* Private functions ---------------------------------------------------------*/
@@ -138,9 +137,9 @@ uint16_t _set_output(uint8_t chan, DC_PWM_STATE_enum s0)
 
     DC_PWM_STATE_enum state0 = s0;
 
-#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ... 
-// Invert the logic of the transistor drive, so as to essentially PWM the 
-// lower arm. Drive the upper-arm transistor ON (setting PWM to 100% DC) and 
+#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ...
+// Invert the logic of the transistor drive, so as to essentially PWM the
+// lower arm. Drive the upper-arm transistor ON (setting PWM to 100% DC) and
 // setting the complement of the duty-cycle (1-DC) on the lower transistor
     if (DC_PWM_PLUS == s0)
     {
@@ -178,12 +177,15 @@ uint16_t _set_output(uint8_t chan, DC_PWM_STATE_enum s0)
 
 void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
 {
+    uint16_t t_channels[ THREE_PHASES ];
+
     // need to kknow which phase if floating (/SD -> OFF), and the other two /SD outputs are ON
     // this is klunky .. todo; _set_outputs(int8_t states[3]){
     if (DC_OUTP_FLOAT == state0)
     {
 // assert PWM channel to 0
         TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
+
         GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
         GPIOC->DDR |=  (1<<2);
         GPIOC->CR1 |=  (1<<2);
@@ -195,6 +197,7 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
     else if (DC_OUTP_FLOAT == state1)
     {
         TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
+
         GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
         GPIOC->DDR |=  (1<<3);
         GPIOC->CR1 |=  (1<<3);
@@ -206,6 +209,7 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
     else if (DC_OUTP_FLOAT == state2)
     {
         TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
+
         GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
         GPIOC->DDR |=  (1<<4);
         GPIOC->CR1 |=  (1<<4);
@@ -215,12 +219,19 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
         GPIOG->ODR &=  ~(1<<1);
     }
 
-    TIM2_pulse_0 = _set_output(0, state0);
-    TIM2_pulse_1 = _set_output(1, state1);
-    TIM2_pulse_2 = _set_output(2, state2);
+    t_channels[0] = _set_output(0, state0);
+    t_channels[1] = _set_output(1, state1);
+    t_channels[2] = _set_output(2, state2);
 
-    PWM_Config();
-    PWM_Config_T1();
+#if 1
+    PWM_Config_T1( t_channels );
+#else
+#endif
+
+
+
+
+    PWM_Config( t_channels );
 }
 
 
@@ -232,26 +243,24 @@ void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
   *   reference:
   *    http://embedded-lab.com/blog/starting-stm8-microcontrollers/21/
   *
-  * - pulse width modulation frequency determined by the value of the TIM1_ARR register 
+  * - pulse width modulation frequency determined by the value of the TIM1_ARR register
   * - duty cycle determined by the value of the TIM1_CCRi register
   */
-void PWM_Config_T1(void)
+void PWM_Config_T1( uint16_t timer_channels[] )
 {
     const uint16_t Pulse_MAX = (TIM2_PWM_PD - 1);
-    const uint16_t T1_Period = 250 /* TIMx_PWM_PD */ ;  // 16-bit counter
+    const uint16_t T1_Period = 250 /* TIM2_PWM_PD */ ;  // 16-bit counter
 
-// todo: re-config only if delta d.c. > threshold e.g. 1
-    u8 OC_1_pulse = TIM2_pulse_0;
-    u8 OC_2_pulse = TIM2_pulse_1;
-    u8 OC_3_pulse = TIM2_pulse_2;
+    u8 OC_1_pulse = timer_channels[0];
+    u8 OC_2_pulse = timer_channels[1];
+    u8 OC_3_pulse = timer_channels[2];
 
 /* todo: look into this?:
 "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
 is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
-*/
-//    TIM1_CtrlPWMOutputs(DISABLE);
-// tbd: issue #6?  make sure the floating phase gets asserts off - 1) make sure ir2104 on (/SD=1) and HIN==0
 
+ TIM1_ARRPreloadConfig(ENABLE); ??
+*/
 
     if (OC_1_pulse > 0 && OC_1_pulse < Pulse_MAX)
     {
@@ -326,12 +335,8 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
 
 
 //    TIM1_CtrlPWMOutputs(ENABLE);
-
-    /* Enables TIM2 peripheral Preload register on ARR */
-//GN: probly     TIM1_ARRPreloadConfig(ENABLE);
-
-    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
-    TIM1_Cmd(ENABLE);
+//    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+//    TIM1_Cmd(ENABLE);
 }
 
 /**
@@ -341,14 +346,14 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
   * @retval void None
   *   GN: from UM0834 PWM example
   */
-void PWM_Config(void)
+void PWM_Config( uint16_t timer_channels[] )
 {
-    const uint16_t TIM2_Pulse_MAX = (TIM2_PWM_PD - 1); // PWM_MAX_LIMIT 
+    const uint16_t TIM2_Pulse_MAX = (TIM2_PWM_PD - 1); // PWM_MAX_LIMIT
 
 // todo: re-config only if delta d.c. > threshold e.g. 1
-    u8 OC_1_pulse = TIM2_pulse_0;
-    u8 OC_2_pulse = TIM2_pulse_1;
-    u8 OC_3_pulse = TIM2_pulse_2;
+    u8 OC_1_pulse = timer_channels[0];
+    u8 OC_2_pulse = timer_channels[1];
+    u8 OC_3_pulse = timer_channels[2];
 
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
@@ -470,18 +475,18 @@ void BLDC_Spd_inc()
 void TIM3_setup(uint16_t u16period); // tmp
 
 /*
- * BLDC Update: handle the BLDC state 
+ * BLDC Update: handle the BLDC state
  *      Off: nothing
  *      Rampup: get BLDC up to sync speed to est. comm. sync.
- *              Once the HI OL speed (frequency) is reached, then the idle speed 
+ *              Once the HI OL speed (frequency) is reached, then the idle speed
  *              must be established, i.e. controlling PWM DC to ? to achieve 2500RPM
  *              To do this closed loop, will need to internally time between the
  *              A/D or comparator input interrupts and adjust DC using e.g. Proportional
  *              control. When idle speed is reached, can transition to user control i.e. ON State
- *      On:  definition of ON state - user control (button inputs) has been enabled 
+ *      On:  definition of ON state - user control (button inputs) has been enabled
  *              1) ideally, does nothing - BLDC_Step triggered by A/D comparator event
- *              2) less ideal, has to check A/D or comp. result and do the comm. 
- *                 step ... but the resolution will be these discrete steps 
+ *              2) less ideal, has to check A/D or comp. result and do the comm.
+ *                 step ... but the resolution will be these discrete steps
  *                 (of TIM1 reference)
  */
 void BLDC_Update(void)
@@ -556,7 +561,7 @@ void BLDC_Step(void)
 /*
  * TODO: schedule at 30degree intervals? (see TIM3)
  *
- * BUG? if PWM pulse is on at the step time to transition to floating, the PWM 
+ * BUG? if PWM pulse is on at the step time to transition to floating, the PWM
  * pulse is not turned off with good timing as the voltage just bleeds off then
  */
 void bldc_move( uint8_t step )
@@ -566,7 +571,7 @@ void bldc_move( uint8_t step )
 */
 //        PWM_set_outputs(0, 0, 0);
 
-// Start a short timer on which ISR will then  trigger the A/D with proper 
+// Start a short timer on which ISR will then  trigger the A/D with proper
 //  timing  .... at 1/4 of the comm. cycle ?
 // So this TIM3 would not stepp 6 times but 6x4 times? (4 times precision?)
 // .......
