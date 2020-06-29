@@ -90,6 +90,12 @@ typedef enum DC_PWM_STATE
   DC_OUTP_FLOAT
 } DC_PWM_STATE_enum;
 
+typedef enum THREE_PHASE_CHANNELS
+{
+  PHASE_A,
+  PHASE_B,
+  PHASE_C
+} THREE_PHASE_CHANNELS_enum;
 
 /* Public variables  ---------------------------------------------------------*/
 uint16_t BLDC_OL_comm_tm;   // could be private
@@ -174,54 +180,95 @@ uint16_t _set_output(uint8_t chan, DC_PWM_STATE_enum s0)
     return pulse;
 }
 
-
-void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
+/*
+ * when the motor runs, the output voltage during the sector will float between
+ * the two driving phases. 
+ * PWM pin is first asserted to the top or bottom rail depending on 
+ * "XX_ARM_CHOPPING". The assertion is to avoid what will appear as a noise
+ * spike on the transition -> floating. 
+*/
+void PWM_set_phase_float(int8_t channel)
 {
-    uint16_t t_channels[ THREE_PHASES ];
-
-    // need to kknow which phase if floating (/SD -> OFF), and the other two /SD outputs are ON
-    // this is klunky .. todo; _set_outputs(int8_t states[3]){
-    if (DC_OUTP_FLOAT == state0)
+    if (PHASE_A == channel)
     {
-// assert PWM channel to 0
+        // assert PWM channel to 0
         TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
-
+#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ...
+        GPIOC->ODR |=  (1<<2);  // PC2 set HI
+        GPIOC->DDR |=  (1<<2);
+        GPIOC->CR1 |=  (1<<2);
+#else
         GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
         GPIOC->DDR |=  (1<<2);
         GPIOC->CR1 |=  (1<<2);
+#endif
 // set /SD A OFF
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR |=   (1<<1);
+
     }
-    else if (DC_OUTP_FLOAT == state1)
+    else if (PHASE_B == channel)
     {
         TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
-
+#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ...
+        GPIOC->ODR |=  (1<<3);  // PC3 set HI
+        GPIOC->DDR |=  (1<<3);
+        GPIOC->CR1 |=  (1<<3);
+#else
         GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
         GPIOC->DDR |=  (1<<3);
         GPIOC->CR1 |=  (1<<3);
+#endif
 // set /SD B OFF
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR |=   (1<<1);
+
     }
-    else if (DC_OUTP_FLOAT == state2)
+    else if (PHASE_C == channel)
     {
         TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
-
+#ifdef LOWER_ARM_CHOPPING // lower chopping hackro ...
+        GPIOC->ODR |=  (1<<4);  // PC4 set HI
+        GPIOC->DDR |=  (1<<4);
+        GPIOC->CR1 |=  (1<<4);
+#else
         GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
         GPIOC->DDR |=  (1<<4);
         GPIOC->CR1 |=  (1<<4);
+#endif
 // set /SD C OFF
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR &=  ~(1<<1);
     }
+}
 
-    t_channels[0] = _set_output(0, state0);
-    t_channels[1] = _set_output(1, state1);
-    t_channels[2] = _set_output(2, state2);
+void PWM_set_outputs(int8_t state0, int8_t state1, int8_t state2)
+{
+    uint16_t t_channels[ THREE_PHASES ];
+    const uint16_t Pulse_MAX = (TIM2_PWM_PD - 1);
+
+    // need to kknow which phase if floating (/SD -> OFF), and the other two /SD outputs are ON
+    // this is klunky .. todo; _set_outputs(int8_t states[3]){
+
+    if (DC_OUTP_FLOAT == state0)
+    {
+        PWM_set_phase_float(PHASE_A);
+    }
+    else if (DC_OUTP_FLOAT == state1)
+    {
+        PWM_set_phase_float(PHASE_B);
+    }
+    else if (DC_OUTP_FLOAT == state2)
+    {
+        PWM_set_phase_float(PHASE_C);
+    }
+
+    t_channels[0]= _set_output(0, state0);
+    t_channels[1]= _set_output(1, state1);
+    t_channels[2]= _set_output(2, state2);
 
 #if 1
     PWM_Config_T1( t_channels );
