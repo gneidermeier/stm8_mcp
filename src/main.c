@@ -330,6 +330,37 @@ void TIM1_setup(void)
 
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
+        /* Channel 2 PWM configuration */
+    TIM1_OC2Init( TIM1_OCMODE_PWM2,
+                      TIM1_OUTPUTSTATE_ENABLE,
+                      TIM1_OUTPUTNSTATE_ENABLE,
+                      0,
+                      TIM1_OCPOLARITY_LOW,
+                      TIM1_OCNPOLARITY_LOW,
+                      TIM1_OCIDLESTATE_RESET,
+                      TIM1_OCNIDLESTATE_RESET);
+        //   TIM2_OC2PreloadConfig(ENABLE); ??
+
+    TIM1_OC3Init( TIM1_OCMODE_PWM2,
+                      TIM1_OUTPUTSTATE_ENABLE,
+                      TIM1_OUTPUTNSTATE_ENABLE,
+                      0,
+                      TIM1_OCPOLARITY_LOW,
+                      TIM1_OCNPOLARITY_LOW,
+                      TIM1_OCIDLESTATE_RESET,
+                      TIM1_OCNIDLESTATE_RESET);	
+ // ?  TIM2_OC3PreloadConfig(ENABLE);
+
+        /* Channel 4 PWM configuration */
+    TIM1_OC4Init(TIM1_OCMODE_PWM2, 
+                      TIM1_OUTPUTSTATE_ENABLE, 
+                      0, 
+                      TIM1_OCPOLARITY_LOW, 
+                      TIM1_OCIDLESTATE_RESET);
+// TIM2_OC4PreloadConfig(ENABLE); // ???
+
+    TIM1_CtrlPWMOutputs(ENABLE);
+
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
     TIM1_Cmd(ENABLE);
 }

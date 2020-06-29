@@ -30,9 +30,6 @@
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 
 
-//#ifdef SYMETRIC_PWM
-//  #define PWM_NOT_MANUAL_DEF  (PWM_50PCNT +  15  )
-
 #ifndef PWM_IS_MANUAL
 #define PWM_NOT_MANUAL_DEF  PWM_25PCNT //30 //0x20 // experimentally determined value (using manual adjustment)
 #endif
@@ -205,45 +202,20 @@ void PWM_Config_T1(void)
 "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
 is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
 */
-
- // not sure how to assert off, as the pwM reconfig occurs on commutation time intervals which is asynchronous to the PWM clock, so if turning off PWM while the pulse happens to be ON ... ????
-    TIM1_DeInit();
-
-#if 0
-    GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-    GPIOC->DDR |=  (1<<2);
-    GPIOC->CR1 |=  (1<<2);
-
-    GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-    GPIOC->DDR |=  (1<<3);
-    GPIOC->CR1 |=  (1<<3);
-
-    GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-    GPIOC->DDR |=  (1<<4);
-    GPIOC->CR1 |=  (1<<4);
-#endif
-/*
- todo: TIM1_SetCompare1() etc
-*/
-
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
+//    TIM1_CtrlPWMOutputs(DISABLE);
+// tbd: issue #6?  make sure the floating phase gets asserts off - 1) make sure ir2104 on (/SD=1) and HIN==0
 
 
     if (OC_1_pulse > 0 && OC_1_pulse < Pulse_MAX)
     {
         /* Channel 1 PWM configuration */
-        TIM1_OC2Init( TIM1_OCMODE_PWM2,
-                      TIM1_OUTPUTSTATE_ENABLE,
-                      TIM1_OUTPUTNSTATE_ENABLE,
-                      OC_1_pulse,
-                      TIM1_OCPOLARITY_LOW,
-                      TIM1_OCNPOLARITY_LOW,
-                      TIM1_OCIDLESTATE_RESET,
-                      TIM1_OCNIDLESTATE_RESET);
-        //GN: probbly  TIM2_OC2PreloadConfig(ENABLE);
+        TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
+        TIM1_SetCompare2(OC_1_pulse);
     }
     else
     {
+        TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
+
         if (OC_1_pulse >= Pulse_MAX)
         {
             GPIOC->ODR |=  (1<<2);  // PC2 set HI
@@ -257,23 +229,16 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
             GPIOC->CR1 |=  (1<<2);
         }
     }
-//        TIM1_SetCompare2(OC_1_pulse);
 
     if (OC_2_pulse > 0 && OC_2_pulse < Pulse_MAX)
     {
-        /* Channel 1 PWM configuration */
-        TIM1_OC3Init( TIM1_OCMODE_PWM2,
-                      TIM1_OUTPUTSTATE_ENABLE,
-                      TIM1_OUTPUTNSTATE_ENABLE,
-                      OC_2_pulse,
-                      TIM1_OCPOLARITY_LOW,
-                      TIM1_OCNPOLARITY_LOW,
-                      TIM1_OCIDLESTATE_RESET,
-                      TIM1_OCNIDLESTATE_RESET);
-        //GN: ?  TIM2_OC2PreloadConfig(ENABLE);
+        TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
+        TIM1_SetCompare3(OC_2_pulse);
     }
     else
     {
+        TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
+
         if (OC_2_pulse >= Pulse_MAX)
         {
             GPIOC->ODR |=  (1<<3);  // PC3 set HI
@@ -287,21 +252,17 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
             GPIOC->CR1 |=  (1<<3);
         }
     }
-//        TIM1_SetCompare3(OC_2_pulse);
 
     if (OC_3_pulse > 0 && OC_3_pulse < Pulse_MAX)
     {
         /* Channel 4 PWM configuration */
-    TIM1_OC4Init(TIM1_OCMODE_PWM2, 
-                  TIM1_OUTPUTSTATE_ENABLE, 
-                  OC_3_pulse, 
-                  TIM1_OCPOLARITY_LOW, 
-                     TIM1_OCIDLESTATE_RESET );
-
-//GN: ?  TIM2_OC4PreloadConfig(ENABLE);
+        TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
+        TIM1_SetCompare4(OC_3_pulse);
     }
     else
     {
+        TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
+
         if (OC_3_pulse >= Pulse_MAX)
         {
             GPIOC->ODR |=  (1<<4);  // PC4 set HI
@@ -315,10 +276,9 @@ is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
             GPIOC->CR1 |=  (1<<4);
         }
     }
-//        TIM1_SetCompare3(OC_2_pulse);
 
 
-    TIM1_CtrlPWMOutputs(ENABLE);
+//    TIM1_CtrlPWMOutputs(ENABLE);
 
     /* Enables TIM2 peripheral Preload register on ARR */
 //GN: probly     TIM1_ARRPreloadConfig(ENABLE);
@@ -554,6 +514,17 @@ void BLDC_Step(void)
  */
 void bldc_move( uint8_t step )
 {
+/*
+    each comm. step, need to shutdown all PWM for the "hold off" period (flyback settling)
+*/
+//        PWM_set_outputs(0, 0, 0);
+
+// Start a short timer on which ISR will then  trigger the A/D with proper 
+//  timing  .... at 1/4 of the comm. cycle ?
+// So this TIM3 would not stepp 6 times but 6x4 times? (4 times precision?)
+// .......
+
+
 // /SD outputs on C5, C7, and G1
     switch( step )
     {
