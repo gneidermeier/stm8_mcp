@@ -15,13 +15,13 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-/* 
- * a 30-50 uS delay is required for flyback diode action 
+/*
+ * a 30-50 uS delay is required for flyback diode action
  */
 #ifdef CLOCK_16
- #define FLYBACK_DELAY  40
+#define FLYBACK_DELAY  40
 #else
- #define FLYBACK_DELAY  20
+#define FLYBACK_DELAY  20
 #endif
 
 #define PWM_100PCNT    TIM2_PWM_PD
@@ -60,7 +60,8 @@
 #define BLDC_OL_TM_HI_SPD          80  // end of ramp
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
-#define BLDC_OL_TM_MANUAL_HI_LIM   64 // 58   // stalls at 56 ... stop at 64? ( 0x40? ) (I want to push the button and see the data at this speed w/o actually chaniging the CT)
+#define BLDC_OL_TM_MANUAL_HI_LIM   64 // stalls at ... 56 ? hi-enuff to manually 
+                                      // advance to (and slightly past) "ideal" timing point
 
 // any "speed" setting higher than HI_LIM would be by closed-loop control of
 // commutation period (manual speed-control input by adjusting PWM  duty-cycle)
@@ -215,106 +216,183 @@ void delay(int time)
   *
   *    "120° Square-Wave Commutation for Brushless DC Motors" (Toshiba Electronic)
   *
-  * PWM is carefully disabled and then to assert the state of the output pins. 
-  * This can mess with back-EMF component of phase voltage. 
+  * PWM is carefully disabled and then to assert the state of the output pins.
+  * This can mess with back-EMF component of phase voltage.
 
-  * First: shutoff PWM (before setting any of the new FET states) to ensure PWM 
+  * First: shutoff PWM (before setting any of the new FET states) to ensure PWM
   *  leg is turned off and flyback-diode of non-PWM conducts flyback current("demagnization time".)
   *
-  *  The way it's described in Toshiba AN, as if the PWMd leg turns off, 
+  *  The way it's described in Toshiba AN, as if the PWMd leg turns off,
   *  the (non-PWM) also remains off, and flyback-diode becomes active.
   *  Does IR2104 dead-time account for this ?:
   *
-  * Second: assert /SD ==OFF  of (only!) the PWMd FET - to ensure that flyback 
-  *  diode is complete (de-energizing the coil that is now being transitioned 
+  * Second: assert /SD ==OFF  of (only!) the PWMd FET - to ensure that flyback
+  *  diode is complete (de-energizing the coil that is now being transitioned
   *  to float). This seems to be the only way to ensure IR2104 set both switch non-conducting.
+  *
+  * Ideally, when a phase is a 60degress (half of its time) there should be
+  * no change/disruption to  its PWM signal.
+
   */
 void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_t state2)
 {
+    int8_t cntr; // make it signed so I get the counter "underflow"
+    int8_t pre_cntr ;// test counter delta
+
     /* todo: look into this?:
     "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
     is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     */
 
     /*
-     * disable PWM channels in order to assert the PWM timer channels and set 
-     * the GPIO pin config to non-PWM state (OFF, for upper-arm chopping). 
+     * disable PWM channels in order to assert the PWM timer channels and set
+     * the GPIO pin config to non-PWM state (OFF, for upper-arm chopping).
      * Complete de-Init and re-initialization of Timer 1 doesn't seem necessary,
-     * and ideally, to not to disrupt the PWM signal on the 
+     * and ideally, to not to disrupt the PWM signal on the
      * driven phase (which continues for 2 "sectors" (120 electrical degrees).
      *
      * A coneivable improvement might be to better sync commutation switching with PWM period:
-     * Ideally, when a phase is a 60degress (half of its time) there should be 
-     * no change/disruption to  its PWM signal. 		 
-     * Maybe TIM1 ocunter could better be used for this and also to avoid the hard delay?		 
+     * Ideally, when a phase is a 60degress (half of its time) there should be
+     * no change/disruption to  its PWM signal.
+     * Maybe TIM1 ocunter could better be used for this and also to avoid the hard delay?
      * 1) set a flag that commuatation time has arrived
      * 2) wait for the next TIM1 period to expire (up to 125uS)
      * 3) perform the commutation (call "PWM_set_outputs()", but from within the TIM1 ISR context.
-     * 4) update PWM duty-cycle in TIM1 config . 
+     * 4) update PWM duty-cycle in TIM1 config .
+     *
+     * If PWM is ON, and turns off, then the output goes low when the Channel
+     * and the PWM Outputs is Disabled.
+     * However, when the peripheral module sets the output low, the back-EMF is 
+     *    also biased negatively, and a delay must be allowed for flyback diode action
+     *to allow back-EMF to "recover".
      */
+
+		 // stop PWM channels (but don't disable TIM1 yet so we can use the freerunning timer for de-mag delay
     TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
     TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
     TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
-
-    TIM1_Cmd(DISABLE); // maybe? (TIM1->CR1)  ........ YES
-    TIM1_SetCounter(0); // maybe? YES (can TIM1 counter be used to countdown the flyback delay?)
-    TIM1_CtrlPWMOutputs(DISABLE); // maybe?  (TIM1->BKR) ...... definately
-
-// mark the start of commutation trigger
-#if 1 //
-    GPIOG->ODR |=  (1<<0); // tmp test
-#endif
+    TIM1_CtrlPWMOutputs(DISABLE);
 
     /*
-     * needs to individually set the driven phase to float  (otherwise it could 
-     * be integrated into the state logic block below ... )
-     */
-    if (DC_OUTP_FLOAT == state0)
+     * When a phase is transitioned to Floating, then the other 2 IR2104s are enabled.
+     *    This is where the "stepdown" of back-EMF occurs.
+     * DEFINATELY LAST THING TO DO before turning on the driving channel. ... .. no change of plan ... 
+		                ... the channel that is floating (about to be PWM) will "echo" 
+										   the comm. switch pulse, so FIRST (after stop PWM) set the driving channels to GND
+if a phase is floating up from low-drive, when the lower-switch turn off it flyback clamp to HV
+ When the PWM on the upper-arm turn-off, the flyback is to clamp to GND so this is ideal discharge of flaoting coil.
+ 
+ If a phase is floating down from high-pwm, when the upper-switch turn off the flyback is to GND by the lower body diode.
+ Ideally the lower-arm is then PWMd and when the low-side switch off the flback of upper body diode is to HV. 
+ This does not keep the previous state, so the direction of the float transition is not known.
+ The flyback discharge of this 1100kv motor seems to need ~50uS holdoff before
+ restarting the PWM, otherwise the back-EMF may get squashed until the higher speed is reached.
+ THere would not seem to be enough energy in the small motor to worrry about trying 
+ to coordinate the flyback discharge with the oncoming (next-leg) PWM.
+*/
+
+   if (DC_OUTP_FLOAT == state0)
     {
-        // set /SD A OFF (other two legs set /SD enabled)
-        GPIOC->ODR &=  ~(1<<5);      // A.
+            GPIOC->ODR &=  ~(1<<5);      // /SD A OFF 			
+        // other two legs have /SD enabled
+// /SD A OFF 
+        GPIOC->ODR |=   (1<<7);
+        GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT == state1)
     {
-        // set /SD B OFF (other two legs set /SD enabled)
-        GPIOC->ODR &=   ~(1<<7);     // B
+            GPIOC->ODR &=   ~(1<<7);     // /SD B OFF 			
+        // other two legs have /SD enabled
+        GPIOC->ODR |=   (1<<5);
+// /SD B OFF 
+        GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT == state2)
     {
-        // set /SD C OFF (other two legs set /SD enabled)
-        GPIOG->ODR &=   ~(1<<1);     // C
+            GPIOG->ODR &=   ~(1<<1);     // /SD C OFF 			
+        // other two legs have /SD enabled
+        GPIOC->ODR |=   (1<<5);
+        GPIOC->ODR |=   (1<<7);
+// /SD C OFF 
     }
 
-// short delay, seems to benefit from delay BEFORE asserting the drivers to LOW
-    delay( FLYBACK_DELAY );
 
+// mark the start of commutation trigger
+#if 0 //
+    GPIOG->ODR |=  (1<<0); // tmp test
+#endif
+
+
+#if 1 // can I put here ?????????????????????????? yes apparently so, with neither good or ill effect.
+
+// The "OFF" (non-PWMd) phase is asserted output pins to GPIO, driven Off
+    if (DC_OUTP_LO == state0)
+    {
+// let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
+        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+        GPIOC->DDR |=  (1<<2);
+        GPIOC->CR1 |=  (1<<2);
+    }
+    else if (DC_OUTP_LO == state1)
+    {
+// let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
+        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+        GPIOC->DDR |=  (1<<3);
+        GPIOC->CR1 |=  (1<<3);
+    }
+    else if (DC_OUTP_LO == state2)
+    {
+// let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
+        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+        GPIOC->DDR |=  (1<<4);
+        GPIOC->CR1 |=  (1<<4);
+    }
+#endif
+
+#if 1 // start of dead-time
+    GPIOG->ODR |=  (1<<0); // tmp test
+#endif
 #if 1
-    GPIOG->ODR &= ~(1<<0); // tmp test
+
+    /*
+     * allow TIM1 freerunning counter to provide small delay to wait for back-emf voltage to settle, before setting
+     * the other 2 phases /SD in the section below. See note above, the 
+     * action of the PWM module (as Channel and TIM1 PWM module is disabled) 
+     * snaps the phase voltage to either   + or -  1/2 Vsys.
+     */
+//    delay( FLYBACK_DELAY );
+//    cntr = 60; // 42 uS ... good @45
+
+//    cntr = 70; // 46 uS scope triggers better @ 20uS ct@45
+
+ cntr = 50; // 46 uS scope triggers better @ 20uS ct@45
+
+
+    TIM1_SetCounter(cntr);
+    while( cntr > 0 ) //  @ 8Mhz, 0.0000005 (1/2 uS)
+    {
+        pre_cntr = cntr; // seems to be counting off about 10 counts (or 5uS?) per pass
+        cntr = TIM1_GetCounter();
+    }
+#endif
+
+// Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
+    TIM1_Cmd(DISABLE);
+    TIM1_SetCounter(0);
+
+#if 1 // end of dead-time
+    GPIOG->ODR &=  ~(1<<0); // tmp test
 #endif
 
 /*
- * assert output channel pins to off doesn't seem to care if is here or after 
- * the /SD->off transition ... here it useful part of the demag-delay before re-config PWM
+ * reconfig and re-enable PWM of the driving channels. One driving channel is 
+ * PWMd, the other is continuously Off. Both driving IR2104s must be enabeld 
+ * by setting its /SD input line.
  */
-    GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-    GPIOC->DDR |=  (1<<2);
-    GPIOC->CR1 |=  (1<<2);
-
-    GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-    GPIOC->DDR |=  (1<<3);
-    GPIOC->CR1 |=  (1<<3);
-
-    GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-    GPIOC->DDR |=  (1<<4);
-    GPIOC->CR1 |=  (1<<4);
-
-
     if (DC_OUTP_OFF != state0)
     {
         if (DC_OUTP_FLOAT != state0)
         {
-            GPIOC->ODR |=  (1<<5);      // set /SD A On
-
             if (DC_PWM_PLUS == state0 /* MINUS? */)
             {
                 TIM1_SetCompare2(_set_output(0, state0));
@@ -326,22 +404,16 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
             {
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
             }
+
+//            GPIOC->ODR |=  (1<<5);      // set /SD A On  ... assert On below ... 
         }
-        else
-        {
-            // floating phase, assert /SD A OFF and other two phase-legs enabled
-//            GPIOC->ODR &=  ~(1<<5);      // A.
-            GPIOC->ODR |=   (1<<7);
-            GPIOG->ODR |=   (1<<1);
-        }
+//        else // floating phase, assert /SD A OFF and other two phase-legs enabled
     }
 
     if (DC_OUTP_OFF != state1)
     {
         if (DC_OUTP_FLOAT != state1)
         {
-            GPIOG->ODR |=   (1<<7);     // set /SD B  On
-
             if (DC_PWM_PLUS == state1 /* MINUS? */)
             {
                 TIM1_SetCompare3(_set_output(1, state1));
@@ -353,22 +425,16 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
             {
 // let the Timer PWM channel remain disabled, PC3 set LO, set /SD B  On
             }
+
+//            GPIOG->ODR |=   (1<<7);     // set /SD B  On  ... assert On below ... 
         }
-        else
-        {
-            // floating phase, assert /SD B OFF and other two phase-legs enabled
-            GPIOC->ODR |=   (1<<5);
-//            GPIOC->ODR &=   ~(1<<7);     // B
-            GPIOG->ODR |=   (1<<1);
-        }
+//        else // floating phase, assert /SD B OFF and other two phase-legs enabled
     }
 
     if (DC_OUTP_OFF != state2)
     {
         if (DC_OUTP_FLOAT != state2)
         {
-            GPIOG->ODR |=   (1<<1);     // set /SD C  On
-
             if (DC_PWM_PLUS == state2 /* MINUS? */)
             {
                 TIM1_SetCompare4(_set_output(2, state2));
@@ -380,21 +446,30 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
             {
 // let the Timer PWM channel remain disabled, PC4 set LO, set /SD C  On
             }
+//            GPIOG->ODR |=   (1<<1);     // set /SD C  On ... assert On below ... 
         }
-        else
-        {
-            // floating phase, assert /SD C OFF and other two phase-legs enabled
-            GPIOC->ODR |=   (1<<5);
-            GPIOC->ODR |=   (1<<7);
-//            GPIOG->ODR &=   ~(1<<1);     // C
-        }
+//        else // floating phase, assert /SD C OFF and other two phase-legs enabled
     }
 
+#if 0
+    /*
+     * When a phase is transitioned to Floating, then the other 2 IR2104s are enabled.
+     *    This is where the "stepdown" of back-EMF occurs.
+     * DEFINATELY LAST THING TO DO before turning on the driving channel.
+     */
+   if (DC_OUTP_FLOAT == state0)
+    {
+			
+#endif
+
+    /*
+    When TIM1 PWM is re-enabled, then see the "big spike" as the next phase
+     Channel output ON momentarily as the counter is reset.
+     */
 // counterparts to Disable commands above
     TIM1_CtrlPWMOutputs(ENABLE);
     TIM1_Cmd(ENABLE);
 }
-
 
 
 /*
@@ -503,7 +578,7 @@ void BLDC_Update(void)
 }
 
 /*
- * TODO: schedule at 30degree intervals? (see TIM3)	????
+ * TODO: schedule at 15degree intervals? (see TIM3)	????
  Start a short timer on which ISR will then  trigger the A/D with proper timing  .... at 1/4 of the comm. cycle ?
  So TIM3 would not stepp 6 times but 6x4 times? (4 times precision?)
  */
@@ -518,15 +593,9 @@ void BLDC_Step(void)
 
     if (global_uDC > 0)
     {
-        /*
-            each comm. step, need to shutdown all PWM for the "hold off" period (flyback settling) ???
-               PWM_set_outputs(0, 0, 0);
-        */
-// TODO: set the PWM states (hi, lo plus minus) from look-up tables	???
-
         bldc_move( bldc_step );
     }
-    else // motor drive output has been disabled
+    else // motor drive output is not active
     {
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR &=  ~(1<<7);
@@ -536,7 +605,7 @@ void BLDC_Step(void)
 }
 
 /*
- * TODO: schedule at 30degree intervals? (see TIM3)
+ * TODO: set output states (hi, lo, float, plus, minus) from look-up tables	?
  */
 void bldc_move(COMMUTATION_SECTOR_t step )
 {

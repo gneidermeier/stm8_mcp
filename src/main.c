@@ -3,7 +3,7 @@
   * @file main.c
   * @brief This file contains the main function for the BLDC motor control
   * @author Neidermeier
-  * @version 
+  * @version
   * @date March-2020
   ******************************************************************************
   */
@@ -89,7 +89,7 @@ void GPIO_Config(void)
 
 
 // HB driver "ENABLES" (/SD input pin of IR2104) on PC5, PC7, PG1
-///////////  // tried E2, E0, D1 but E2 not work as output ... ??? 
+///////////  // tried E2, E0, D1 but E2 not work as output ... ???
 // C5, C7, and G1 are CN2 pin 6,8 ,12 so 3 leads can go in one connector shell ;)
 // also this is to expose PC2 which is TIM1 CH2 output.
     GPIOC->ODR &=  ~(1<<5);
@@ -104,63 +104,63 @@ void GPIO_Config(void)
     GPIOG->DDR |=  (1<<1);
     GPIOG->CR1 |=  (1<<1);
 ////////////
-// test LED  
+// test LED
     GPIOG->ODR &= ~(1<<0);
     GPIOG->DDR |=  (1<<0);
     GPIOG->CR1 |=  (1<<0);
 
-    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6 
+    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
 
 #if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
-// 3 PWM Channels 
-// T2.PWM.CH3 
+// 3 PWM Channels
+// T2.PWM.CH3
     GPIOA->ODR |=  (1<<3);  // PA3
     GPIOA->DDR |=  (1<<3);
     GPIOA->CR1 |=  (1<<3);
-// T2.PWM.CH2 
+// T2.PWM.CH2
     GPIOD->ODR |=  (1<<3);  // PD3
     GPIOD->DDR |=  (1<<3);
     GPIOD->CR1 |=  (1<<3);
-// T2.PWM.CH1 
+// T2.PWM.CH1
     GPIOD->ODR |=  (1<<4);  // PD4
     GPIOD->DDR |=  (1<<4);
     GPIOD->CR1 |=  (1<<4);
 #endif
 #if 0 // TIM1 CH1, CH2, CH3, CH4
-// T1.PWM.CH1 
+// T1.PWM.CH1
     GPIOC->ODR |=  (1<<1);  // PC1
     GPIOC->DDR |=  (1<<1);
     GPIOC->CR1 |=  (1<<1);
-// T1.PWM.CH2 
+// T1.PWM.CH2
     GPIOC->ODR |=  (1<<2);  // PC2
     GPIOC->DDR |=  (1<<2);
     GPIOC->CR1 |=  (1<<2);
-// T1.PWM.CH3 
+// T1.PWM.CH3
     GPIOC->ODR |=  (1<<3);  // PC3
     GPIOC->DDR |=  (1<<3);
     GPIOC->CR1 |=  (1<<3);
-// T1.PWM.CH4 
+// T1.PWM.CH4
     GPIOC->ODR |=  (1<<4);  // PC4
     GPIOC->DDR |=  (1<<4);
     GPIOC->CR1 |=  (1<<4);
 #endif
 
 // INPUTS
-// PA4 as button input 
+// PA4 as button input
     GPIOA->DDR &= ~(1 << 4); // PA.4 as input
     GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
 // uses CN2.7 as GND
 
-// PA6 as button input 
+// PA6 as button input
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
     GPIOA->DDR |= (1 << 5);  // PD.5 as output
     GPIOA->CR1 |= (1 << 5);  // push pull output
     GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
 
-// PE5 as button input 
+// PE5 as button input
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
     GPIOE->DDR |= (1 << 3);  // PE.3 as output
@@ -168,7 +168,7 @@ void GPIO_Config(void)
     GPIOE->ODR &= ~(1 << 3); // set pin off to use as gnd of button
 
 
-// UART2 D5: Rx, D6: Tx 
+// UART2 D5: Rx, D6: Tx
     GPIOD->DDR &= ~(1 << 5); // PD.5 as input
     GPIOD->CR1 |= (1 << 5);  // pull up w/o interrupts
     GPIOD->DDR |= (1 << 6);  // PD.6 as output
@@ -284,10 +284,10 @@ void ADC1_setup(void)
     ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
 #endif
 
-/*
-A single conversion is performed for each channel starting with AIN0 and the data is stored
-in the data buffer registers ADC_DBxR.
-*/
+    /*
+    A single conversion is performed for each channel starting with AIN0 and the data is stored
+    in the data buffer registers ADC_DBxR.
+    */
 //ADC1_ConversionConfig() ?
 //ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
@@ -305,7 +305,7 @@ in the data buffer registers ADC_DBxR.
  *   http://www.emcu.it/STM8/STM8-Discovery/Tim1eTim4/TIM1eTIM4.html
  *
  * manual mode (ramp-up) commutation timing?
- * based on OTS ESC analysic, rampup start at 
+ * based on OTS ESC analysic, rampup start at
  *  pd = 0.008  sec
  *       0.003  sec  rampup to 3000 RPM
  *       0.004  sec  settle to 2500 RPM
@@ -313,50 +313,50 @@ in the data buffer registers ADC_DBxR.
  *
  *       0.0012 sec
 */
- #ifdef CLOCK_16
-   #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
- #else
-   #define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
- #endif
+#ifdef CLOCK_16
+#define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#else
+#define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+#endif
 
 
 void TIM1_setup(void)
 {
-    const uint16_t T1_Period = 250 /* TIMx_PWM_PD */ ;  // 16-bit counter  
+    const uint16_t T1_Period = TIM2_PWM_PD /* TIMx_PWM_PD */ ;  // 16-bit counter  ... 260 test
 
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE); // put this with clocks setup 
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);  // put this with clocks setup
 
     TIM1_DeInit();
 
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
 
-        /* Channel 2 PWM configuration */
+    /* Channel 2 PWM configuration */
     TIM1_OC2Init( TIM1_OCMODE_PWM2,
-                      TIM1_OUTPUTSTATE_ENABLE,
-                      TIM1_OUTPUTNSTATE_ENABLE,
-                      0,
-                      TIM1_OCPOLARITY_LOW,
-                      TIM1_OCNPOLARITY_LOW,
-                      TIM1_OCIDLESTATE_RESET,
-                      TIM1_OCNIDLESTATE_RESET);
-        //   TIM2_OC2PreloadConfig(ENABLE); ??
+                  TIM1_OUTPUTSTATE_ENABLE,
+                  TIM1_OUTPUTNSTATE_ENABLE,
+                  0,
+                  TIM1_OCPOLARITY_LOW,
+                  TIM1_OCNPOLARITY_LOW,
+                  TIM1_OCIDLESTATE_RESET,
+                  TIM1_OCNIDLESTATE_RESET);
+    //   TIM2_OC2PreloadConfig(ENABLE); ??
 
     TIM1_OC3Init( TIM1_OCMODE_PWM2,
-                      TIM1_OUTPUTSTATE_ENABLE,
-                      TIM1_OUTPUTNSTATE_ENABLE,
-                      0,
-                      TIM1_OCPOLARITY_LOW,
-                      TIM1_OCNPOLARITY_LOW,
-                      TIM1_OCIDLESTATE_RESET,
-                      TIM1_OCNIDLESTATE_RESET);	
- // ?  TIM2_OC3PreloadConfig(ENABLE);
+                  TIM1_OUTPUTSTATE_ENABLE,
+                  TIM1_OUTPUTNSTATE_ENABLE,
+                  0,
+                  TIM1_OCPOLARITY_LOW,
+                  TIM1_OCNPOLARITY_LOW,
+                  TIM1_OCIDLESTATE_RESET,
+                  TIM1_OCNIDLESTATE_RESET);
+// ?  TIM2_OC3PreloadConfig(ENABLE);
 
-        /* Channel 4 PWM configuration */
-    TIM1_OC4Init(TIM1_OCMODE_PWM2, 
-                      TIM1_OUTPUTSTATE_ENABLE, 
-                      0, 
-                      TIM1_OCPOLARITY_LOW, 
-                      TIM1_OCIDLESTATE_RESET);
+    /* Channel 4 PWM configuration */
+    TIM1_OC4Init(TIM1_OCMODE_PWM2,
+                 TIM1_OUTPUTSTATE_ENABLE,
+                 0,
+                 TIM1_OCPOLARITY_LOW,
+                 TIM1_OCIDLESTATE_RESET);
 // TIM2_OC4PreloadConfig(ENABLE); // ???
 
     TIM1_CtrlPWMOutputs(ENABLE);
@@ -385,7 +385,7 @@ void TIM4_setup(void)
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
 #else
-    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * p 
+    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * p
 #endif
 
     TIM4->ARR = T4_Period;
@@ -403,28 +403,28 @@ void TIM3_setup(uint16_t u_period)
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
     const uint16_t MIN_SWITCH_TIME = 1;
 
-    uint16_t period = u_period;  // uses all 3-bits of TIM3 prescaler 
+    uint16_t period = u_period;  // uses all 3-bits of TIM3 prescaler
 
     if (period < MIN_SWITCH_TIME)
     {
         period = MIN_SWITCH_TIME;  // protect against setting a 0 period
     }
 
-    if (period > MAX_SWITCH_TIME) 
+    if (period > MAX_SWITCH_TIME)
     {
-        period = MAX_SWITCH_TIME; // lower limit 
+        period = MAX_SWITCH_TIME; // lower limit
     }
 
 // @8Mhz, fMASTER period ==  0.000000125 S
-//  Timer Step: 
-//    step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S 
+//  Timer Step:
+//    step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
 #ifdef CLOCK_16
     TIM3->PSCR = 0x07; // 128 ......    @ 16Mhz -> 1 bit-time == 0.000008 S
 #else
     TIM3->PSCR = 0x06; //  64 ......    @  8Mhz ->               0.000008
 #endif
 
-    TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet  
+    TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet
     TIM3->ARRL = period & 0xff;
 
     TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
@@ -434,7 +434,7 @@ void TIM3_setup(uint16_t u_period)
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
- * GN:  by default  microcontroller uses   internal 16MHz RC oscillator 
+ * GN:  by default  microcontroller uses   internal 16MHz RC oscillator
  * ("HSI", or high-speed internal) divided by eight  as a clock source. This results in a base timer frequency of 2MHz.
  * Using this function just to show the library way to explicit clock setup.
  */
@@ -457,26 +457,26 @@ void clock_setup(void)
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1 , ENABLE);
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
 /*
- * Initiate A/D sampling, period can be 1 - 5 mS ... only to read the manual POTs for now. 
- * Execution context is 'main()' so not to block ISR with ADC sampling. 
- * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling. 
- */ 
-void periodic_task(void)
+ * Initiate A/D sampling, period can be 1 - 5 mS ... only to read the manual POTs for now.
+ * Execution context is 'main()' so not to block ISR with ADC sampling.
+ * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
+ */
+void Periodic_task(void)
 {
     uint16_t ch = 0;
 
-        BLDC_Update(); //  Task rate establishes ramp aggressiveness 
+    BLDC_Update(); //  Task rate establishes ramp aggressiveness
 
 
 #if 1 // tmp test turn off A/D to check for motor glitching
 
-// A/D stuff needs to sync w/ PWM ISR ... 
+// A/D stuff needs to sync w/ PWM ISR ...
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
     ADC1_StartConversion();
@@ -511,7 +511,7 @@ extern uint16_t BLDC_OL_comm_tm;
  */
 void testUART(void)
 {
-  int loop;
+    int loop;
 
     static unsigned char cnt = 0x30;
     char sbuf[128] ;                     // am i big enuff?
@@ -556,15 +556,16 @@ void testUART(void)
 #endif
 #if 1
 // A/D
-  for (loop = 0; loop <  ADC_N_CHANNELS ; loop++){
-    strcat(sbuf, " A");
-    cbuf[0] = 0x30 + loop;
-    cbuf[1] = 0;
-    strcat(sbuf, cbuf);
-    strcat(sbuf, "=");
-    itoa(AnalogInputs[loop], cbuf, 16);
-    strcat(sbuf, cbuf);
-  }
+    for (loop = 0; loop <  ADC_N_CHANNELS ; loop++)
+    {
+        strcat(sbuf, " A");
+        cbuf[0] = 0x30 + loop;
+        cbuf[1] = 0;
+        strcat(sbuf, cbuf);
+        strcat(sbuf, "=");
+        itoa(AnalogInputs[loop], cbuf, 16);
+        strcat(sbuf, cbuf);
+    }
 #endif
 
     strcat(sbuf, "\r\n");
@@ -596,28 +597,28 @@ main()
         if (! (( GPIOA->IDR)&(1<<4)))
         {
 //            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
-                disableInterrupts();
-                BLDC_Stop();
-                enableInterrupts();
+            disableInterrupts();
+            BLDC_Stop();
+            enableInterrupts();
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
 
-                disableInterrupts();
-                BLDC_Spd_inc();
-                enableInterrupts();
+            disableInterrupts();
+            BLDC_Spd_inc();
+            enableInterrupts();
             testUART();// tmp test
         }
 
         if ( ! (( GPIOE->IDR)&(1<<5)))
         {
-            while( ! (( GPIOE->IDR)&(1<<5)) ){;} // wait for debounce (sorta works)
+            while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
 
-                disableInterrupts();
-                BLDC_Spd_dec();
-                enableInterrupts();
+            disableInterrupts();
+            BLDC_Spd_dec();
+            enableInterrupts();
             testUART();// tmp test
         }
 
@@ -629,7 +630,7 @@ main()
         else
         {
             TaskRdy = FALSE;
-            periodic_task();
+            Periodic_task();
         }
     } // while 1
 }
