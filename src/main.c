@@ -88,10 +88,9 @@ void GPIO_Config(void)
     GPIOD->CR1 |= (1 << LED); //push pull output
 
 
-// HB driver "ENABLES" (/SD input pin of IR2104) on PC5, PC7, PG1
+// Controls the /SD pins of IR2104s on PC5, PC7, PG1
 ///////////  // tried E2, E0, D1 but E2 not work as output ... ???
-// C5, C7, and G1 are CN2 pin 6,8 ,12 so 3 leads can go in one connector shell ;)
-// also this is to expose PC2 which is TIM1 CH2 output.
+// C5, C7, and G1 are CN2 pin 6, 8, 12 so 3 leads can go in one connector shell ;)
     GPIOC->ODR &=  ~(1<<5);
     GPIOC->DDR |=  (1<<5);
     GPIOC->CR1 |=  (1<<5);
@@ -103,8 +102,9 @@ void GPIO_Config(void)
     GPIOG->ODR &=  ~(1<<1);
     GPIOG->DDR |=  (1<<1);
     GPIOG->CR1 |=  (1<<1);
+
 ////////////
-// test LED
+// use PC6 (CN2-9) and PG0 (CN2-11) as test pins 
     GPIOG->ODR &= ~(1<<0);
     GPIOG->DDR |=  (1<<0);
     GPIOG->CR1 |=  (1<<0);
@@ -148,19 +148,19 @@ void GPIO_Config(void)
 #endif
 
 // INPUTS
-// PA4 as button input
+// PA4 as button input (Stop)
     GPIOA->DDR &= ~(1 << 4); // PA.4 as input
     GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
 // uses CN2.7 as GND
 
-// PA6 as button input
+// PA6 as button input (B+)
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
     GPIOA->DDR |= (1 << 5);  // PD.5 as output
     GPIOA->CR1 |= (1 << 5);  // push pull output
     GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
 
-// PE5 as button input
+// PE5 as button input (B-)
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
     GPIOE->DDR |= (1 << 3);  // PE.3 as output
@@ -266,7 +266,7 @@ void ADC1_setup(void)
 {
 // Port B[0..7]=floating input no interr
 // STM8 Discovery, all PortB pins are on CN3
-    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT);
+//    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT); // all AIN pins setup explicityly with the GPIO init
 
     ADC1_DeInit();
 
@@ -288,7 +288,9 @@ void ADC1_setup(void)
     A single conversion is performed for each channel starting with AIN0 and the data is stored
     in the data buffer registers ADC_DBxR.
     */
-//ADC1_ConversionConfig() ?
+ //ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1)), ADC1_ALIGN_RIGHT);
+ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
+
 //ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
 
@@ -320,6 +322,9 @@ void ADC1_setup(void)
 #endif
 
 
+
+ #define PWM_MODE  TIM1_OCMODE_PWM1
+
 void TIM1_setup(void)
 {
     const uint16_t T1_Period = TIM2_PWM_PD /* TIMx_PWM_PD */ ;  // 16-bit counter  ... 260 test
@@ -328,34 +333,35 @@ void TIM1_setup(void)
 
     TIM1_DeInit();
 
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_DOWN, T1_Period, 0);
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0); // ISR at and of "idle" time
 
     /* Channel 2 PWM configuration */
-    TIM1_OC2Init( TIM1_OCMODE_PWM2,
+    TIM1_OC2Init( PWM_MODE,
                   TIM1_OUTPUTSTATE_ENABLE,
                   TIM1_OUTPUTNSTATE_ENABLE,
                   0,
-                  TIM1_OCPOLARITY_LOW,
-                  TIM1_OCNPOLARITY_LOW,
+                  TIM1_OCPOLARITY_HIGH,
+                  TIM1_OCNPOLARITY_HIGH,
                   TIM1_OCIDLESTATE_RESET,
                   TIM1_OCNIDLESTATE_RESET);
     //   TIM2_OC2PreloadConfig(ENABLE); ??
 
-    TIM1_OC3Init( TIM1_OCMODE_PWM2,
+    /* Channel 3 PWM configuration */
+    TIM1_OC3Init( PWM_MODE,
                   TIM1_OUTPUTSTATE_ENABLE,
                   TIM1_OUTPUTNSTATE_ENABLE,
                   0,
-                  TIM1_OCPOLARITY_LOW,
-                  TIM1_OCNPOLARITY_LOW,
+                  TIM1_OCPOLARITY_HIGH,
+                  TIM1_OCNPOLARITY_HIGH,
                   TIM1_OCIDLESTATE_RESET,
                   TIM1_OCNIDLESTATE_RESET);
 // ?  TIM2_OC3PreloadConfig(ENABLE);
 
     /* Channel 4 PWM configuration */
-    TIM1_OC4Init(TIM1_OCMODE_PWM2,
+    TIM1_OC4Init(PWM_MODE,
                  TIM1_OUTPUTSTATE_ENABLE,
                  0,
-                 TIM1_OCPOLARITY_LOW,
+                 TIM1_OCPOLARITY_HIGH,
                  TIM1_OCIDLESTATE_RESET);
 // TIM2_OC4PreloadConfig(ENABLE); // ???
 
@@ -469,38 +475,7 @@ void clock_setup(void)
  */
 void Periodic_task(void)
 {
-    uint16_t ch = 0;
-
-    BLDC_Update(); //  Task rate establishes ramp aggressiveness
-
-
-#if 1 // tmp test turn off A/D to check for motor glitching
-
-// A/D stuff needs to sync w/ PWM ISR ...
-
-// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
-    ADC1_StartConversion();
-
-#ifndef ADC_EOCIE // test ... bah interrupted ADC messes w/ motor
-
-// Wait until the conversion is done (no timeout => ... to be done)
-    while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET );
-
-//    A1 = ADC1_GetConversionValue();
-    for (ch = 0; ch < ADC_N_CHANNELS; ch++)
-    {
-        AnalogInputs[ ch ] = ADC1_GetBufferValue( ch );
-    }
-
-    ADC1_ClearFlag(ADC1_FLAG_EOC);
-#endif
-
-#endif
-
-
-#if 0 // MANUAL
-    Manual_uDC = A0 / 2;
-#endif
+    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context 
 }
 
 // hack, temp
@@ -563,7 +538,9 @@ void testUART(void)
         cbuf[1] = 0;
         strcat(sbuf, cbuf);
         strcat(sbuf, "=");
-        itoa(AnalogInputs[loop], cbuf, 16);
+
+//itoa(AnalogInputs[loop], cbuf, 16);
+itoa( ADC1_GetBufferValue( loop ), cbuf, 16);
         strcat(sbuf, cbuf);
     }
 #endif
