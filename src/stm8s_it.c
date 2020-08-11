@@ -362,7 +362,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
  * PWM .. sort of ;)
 */
 #if 1 // using G0 to check duration of this kludgey crap
-    GPIOG->ODR |=  (1<<0); //
+//    GPIOG->ODR |=  (1<<0); //
 
     /*
      * allow TIM1 freerunning counter to let the present PWM cycle expire. Seems to
@@ -371,11 +371,13 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
      * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
      */
     cntr  = TIM1_GetCounter();
-
     while( cntr < global_uDC ) // COUNTER MODE UP !!
     {
         pre_cntr = cntr;// test
         cntr = TIM1_GetCounter();
+         if (cntr > 0){ // confirms that the counter is at 0 until end of idle-time, then (begins up-count and pulse turns on)
+            GPIOG->ODR |=  (1<<0); //
+}
     }
 
     GPIOG->ODR &=  ~(1<<0); //

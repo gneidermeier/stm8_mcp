@@ -22,10 +22,28 @@
 
 //#define CLOCK_16
 
+#define PWM_8K
+
+
+// 1/8000  = 0.000125 = 12.5 * 10^(-5)
+// 1/12000 = 0.000083 = 8.3 * 10^(-5) 
 
 // With TIM2 prescale value of 1, period TIM2 == period fMaster
-// @8Mhz, fMASTER period ==  125 uS
-#define TIM2_PWM_PD    250   // 125uS (prescalar is set for 8 or 16 Mhz)
+// @8Mhz, fMASTER period == 0.000000125 S
+// fMASTER * TIM1_PS = 0.125us * 4 = 0.5us
+
+// @8k:
+//  0.000125 / 0.5 us = 250 counts
+
+// @12k:
+//  0.000083 / 0.5 us  = 166.67 counts
+
+
+#ifdef PWM_8K
+  #define TIM2_PWM_PD    250   // 125uS 
+#else
+  #define TIM2_PWM_PD    166   //  83uS 
+#endif
 
 
 // Using the TIM2 counter as time base for open-loop commutation time  

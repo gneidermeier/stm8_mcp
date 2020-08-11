@@ -297,8 +297,8 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
     }
 
 
-#if 1
-    GPIOG->ODR |=  (1<<0); //
+
+    GPIOG->ODR |=  (1<<0); // TEST PIN ON
 
 // kludges the timing to get "widest" presence of  b-EMF across as many as 3 comm timing steps
 // with the PWM mode 1 and up count. timing is delayed of first of the next PWM pulse chain ... see below, it is enough time to get the first A/D reading
@@ -308,11 +308,17 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 //delay(  80 ); //   42 41 40 ... stall 3f?
 
 //delay(  70 ); //   41 40 ... stall 3f?
-    delay(  75 ); //   42 41 40 ... stall 3f?
 
+#ifdef PWM_8K // 8k PWM
 
-    GPIOG->ODR &=  ~(1<<0); //
+  delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
+
+#else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
+  delay(  40 ); //   41 40 ... stall ?
 #endif
+
+    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
+
 
 //  back-EMF could be read the first time about right here ... ;)
 // ...
