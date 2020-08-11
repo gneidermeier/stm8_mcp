@@ -236,6 +236,11 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
     }
 #endif
 
+/*
+ used PWM MODE 1 and UP count so the ISR would occur at end of PWM idle-time.
+ Doesn't need to use an A/D ISR so far, can just read the A/D input buffer (continuous scanning)
+ How to know what channel to read?
+*/
     // must reset the tmer interrupt flag
     TIM1->SR1 &= ~TIM1_SR1_UIF;
 //TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
@@ -333,8 +338,11 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
+    int8_t cntr; // make it signed so I get the counter "underflow"
+    int8_t pre_cntr ;// test counter delta
+
     static uint8_t toggle = 0;
-#if 1
+#if 0
     toggle ^= 1;
     if ( toggle ){
         GPIOG->ODR &= ~(1<<0);
@@ -346,7 +354,36 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 
-    BLDC_Step();
+
+    TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
+
+/*
+ * experimentation has shown that things are running smoother if syncronizd w/ 
+ * PWM .. sort of ;)
+*/
+#if 1 // using G0 to check duration of this kludgey crap
+    GPIOG->ODR |=  (1<<0); //
+
+    /*
+     * allow TIM1 freerunning counter to let the present PWM cycle expire. Seems to
+     *  help with maintaining/not-interfering-with stability of the back-EMF signal.
+     * (On this CPU - no nested interrupt? )
+     * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
+     */
+    cntr  = TIM1_GetCounter();
+
+    while( cntr < global_uDC ) // COUNTER MODE UP !!
+    {
+        pre_cntr = cntr;// test
+        cntr = TIM1_GetCounter();
+    }
+
+    GPIOG->ODR &=  ~(1<<0); //
+#endif
+
+
+    BLDC_Step();                         // can it be called from non-ISR (main()) context?
+
 }
 
 /**
@@ -515,7 +552,8 @@ toggle ^= 1;
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
 
-    TaskRdy = TRUE;     // notify background process
+    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context 
+
 }
 #endif /*STM8S903*/
 

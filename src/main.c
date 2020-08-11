@@ -475,7 +475,12 @@ void clock_setup(void)
  */
 void Periodic_task(void)
 {
-    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context 
+// if the Step() could be invoked from lowest-priority/back-ground task, then it 
+// could spin and wait for current PWM cycle to complete and next/last PWM ISR to trigger.
+// but the buttons debouncing is dumb and ties up the background task, so it is 
+// not possile to "schedule" anything from the BG with any regularity as it is :(
+//    BLDC_Step();                         // can it be called from non-ISR (main()) context?
+
 }
 
 // hack, temp

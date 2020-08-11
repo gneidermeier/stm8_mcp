@@ -61,7 +61,7 @@
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
 #define BLDC_OL_TM_MANUAL_HI_LIM   63 // 64 // stalls in the range of 62-64 dependng on delays 
-                                      // advance to (and slightly past) "ideal" timing point
+// advance to (and slightly past) "ideal" timing point
 
 // any "speed" setting higher than HI_LIM would be by closed-loop control of
 // commutation period (manual speed-control input by adjusting PWM  duty-cycle)
@@ -232,38 +232,10 @@ void delay(int time)
   */
 void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_t state2)
 {
-    int8_t cntr; // make it signed so I get the counter "underflow"
-    int8_t pre_cntr ;// test counter delta
-
     /* todo: look into this?:
     "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
     is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
     */
-
-
-#if 1
-
-GPIOG->ODR |=  (1<<0); // 
-
-/*
-     * allow TIM1 freerunning counter to let the present running PWM time expire. Seems to
-     *  help with maintaining/not-interfering-with stability of the back-EMF signal.
-     * (On this CPU - no nested interrupt? )
-     * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
-     */
- cntr  = TIM1_GetCounter();
-
-while( cntr < global_uDC ) // COUNTER MODE UP !!
-    {
-        pre_cntr = cntr;// test
-        cntr = TIM1_GetCounter();
-    }
-
-GPIOG->ODR &=  ~(1<<0); // 
-
-#endif
-
-
     TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // dsable interrupts ???? .. (there is an ISR triggered as soon as the channel/PWM disabled
 
     TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
@@ -275,29 +247,29 @@ GPIOG->ODR &=  ~(1<<0); //
     TIM1_Cmd(DISABLE);
 
 
-   if (DC_OUTP_FLOAT == state0)
+    if (DC_OUTP_FLOAT == state0)
     {
-            GPIOC->ODR &=  ~(1<<5);      // /SD A OFF 			
+        GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
         // other two legs have /SD enabled
-// /SD A OFF 
+// /SD A OFF
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT == state1)
     {
-            GPIOC->ODR &=   ~(1<<7);     // /SD B OFF 			
+        GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
         // other two legs have /SD enabled
         GPIOC->ODR |=   (1<<5);
-// /SD B OFF 
+// /SD B OFF
         GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT == state2)
     {
-            GPIOG->ODR &=   ~(1<<1);     // /SD C OFF 			
+        GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
         // other two legs have /SD enabled
         GPIOC->ODR |=   (1<<5);
         GPIOC->ODR |=   (1<<7);
-// /SD C OFF 
+// /SD C OFF
     }
 
 
@@ -326,7 +298,7 @@ GPIOG->ODR &=  ~(1<<0); //
 
 
 #if 1
-    GPIOG->ODR |=  (1<<0); // 
+    GPIOG->ODR |=  (1<<0); //
 
 // kludges the timing to get "widest" presence of  b-EMF across as many as 3 comm timing steps
 // with the PWM mode 1 and up count. timing is delayed of first of the next PWM pulse chain ... see below, it is enough time to get the first A/D reading
@@ -336,19 +308,22 @@ GPIOG->ODR &=  ~(1<<0); //
 //delay(  80 ); //   42 41 40 ... stall 3f?
 
 //delay(  70 ); //   41 40 ... stall 3f?
-delay(  75 ); //   42 41 40 ... stall 3f?
+    delay(  75 ); //   42 41 40 ... stall 3f?
 
 
-GPIOG->ODR &=  ~(1<<0); // 
+    GPIOG->ODR &=  ~(1<<0); //
 #endif
 
-// seems that the back-EMF could be read here ... ;)
+//  back-EMF could be read the first time about right here ... ;)
+// ...
+// Beyond that, end of  TIM1 ISR  is where the next couple b-EMF readings would be
+// taken (at  end of  PWM idle/off time) - will need to know which phase/channel 
 
-/*
- * reconfig and re-enable PWM of the driving channels. One driving channel is 
- * PWMd, the other is continuously Off. Both driving IR2104s must be enabeld 
- * by setting its /SD input line.
- */
+    /*
+     * reconfig and re-enable PWM of the driving channels. One driving channel is
+     * PWMd, the other is continuously Off. Both driving IR2104s must be enabeld
+     * by setting its /SD input line.
+     */
     if (DC_OUTP_OFF != state0)
     {
         if (DC_OUTP_FLOAT != state0)
@@ -365,7 +340,7 @@ GPIOG->ODR &=  ~(1<<0); //
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
             }
 
-//            GPIOC->ODR |=  (1<<5);      // set /SD A On  ... assert On below ... 
+//            GPIOC->ODR |=  (1<<5);      // set /SD A On  ... assert On below ...
         }
 //        else // floating phase, assert /SD A OFF and other two phase-legs enabled
     }
@@ -386,7 +361,7 @@ GPIOG->ODR &=  ~(1<<0); //
 // let the Timer PWM channel remain disabled, PC3 set LO, set /SD B  On
             }
 
-//            GPIOG->ODR |=   (1<<7);     // set /SD B  On  ... assert On below ... 
+//            GPIOG->ODR |=   (1<<7);     // set /SD B  On  ... assert On below ...
         }
 //        else // floating phase, assert /SD B OFF and other two phase-legs enabled
     }
@@ -406,7 +381,7 @@ GPIOG->ODR &=  ~(1<<0); //
             {
 // let the Timer PWM channel remain disabled, PC4 set LO, set /SD C  On
             }
-//            GPIOG->ODR |=   (1<<1);     // set /SD C  On ... assert On below ... 
+//            GPIOG->ODR |=   (1<<1);     // set /SD C  On ... assert On below ...
         }
 //        else // floating phase, assert /SD C OFF and other two phase-legs enabled
     }
@@ -539,61 +514,46 @@ void BLDC_Step(void)
     bldc_step += 1;
     bldc_step %= N_CSTEPS;
 
-    if (global_uDC > 0)
-    {
-        bldc_move( bldc_step );
-    }
-    else // motor drive output is not active
-    {
+    if ( 0 == global_uDC )
+    {    // motor drive output is not active
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR &=  ~(1<<1);
         PWM_set_outputs(DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF);
     }
-}
+    else
+    { /*
+        needs to be a table so that the state of e.g. float rising vs float falling can be know.n.
+        */
+        switch( bldc_step )
+        {
+        default:
+            PWM_set_outputs(DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF);
+            break;
 
-/*
- * TODO: set output states (hi, lo, float, plus, minus) from look-up tables	?
- */
-void bldc_move(COMMUTATION_SECTOR_t step )
-{
-// Start a short timer on which ISR will then  trigger the A/D with proper
-//  timing  .... at 1/4 of the comm. cycle ?
-// So this TIM3 would not stepp 6 times but 6x4 times? (4 times precision?)
-// ....... (yes seems necessary (refer to SiLabs appnote)
+        case 0: // SECTOR_1 etc.
+            PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_LO, DC_OUTP_FLOAT);
+            break;
 
+        case 1:
+            PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_FLOAT, DC_OUTP_LO);
+            break;
 
-/*
-needs to be a table so that the state of e.g. float rising vs float falling can be know.n.
-*/
-    switch( step )
-    {
-    default:
-        PWM_set_outputs(DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF);
-        break;
+        case 2:
+            PWM_set_outputs(DC_OUTP_FLOAT, DC_PWM_PLUS, DC_OUTP_LO);
+            break;
 
-    case 0: // SECTOR_1 etc.
-        PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_LO, DC_OUTP_FLOAT);
-        break;
+        case 3:
+            PWM_set_outputs(DC_OUTP_LO, DC_PWM_PLUS, DC_OUTP_FLOAT);
+            break;
 
-    case 1:
-        PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_FLOAT, DC_OUTP_LO);
-        break;
+        case 4:
+            PWM_set_outputs(DC_OUTP_LO, DC_OUTP_FLOAT, DC_PWM_PLUS);
+            break;
 
-    case 2:
-        PWM_set_outputs(DC_OUTP_FLOAT, DC_PWM_PLUS, DC_OUTP_LO);
-        break;
-
-    case 3:
-        PWM_set_outputs(DC_OUTP_LO, DC_PWM_PLUS, DC_OUTP_FLOAT);
-        break;
-
-    case 4:
-        PWM_set_outputs(DC_OUTP_LO, DC_OUTP_FLOAT, DC_PWM_PLUS);
-        break;
-
-    case 5:
-        PWM_set_outputs(DC_OUTP_FLOAT, DC_OUTP_LO, DC_PWM_PLUS);
-        break;
+        case 5:
+            PWM_set_outputs(DC_OUTP_FLOAT, DC_OUTP_LO, DC_PWM_PLUS);
+            break;
+        }
     }
 }
