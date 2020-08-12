@@ -70,9 +70,9 @@ typedef  enum {
  */
 extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
 
+extern  uint16_t global_uDC;
 
-extern  uint16_t global_uDC;   // tmp
-extern  uint16_t Manual_uDC;
+//extern  uint16_t Manual_uDC; // user speed input should be controlling PWM duty-cycle eventually ... 
 
 extern uint16_t AnalogInputs[]; // at least ADC NR CHANNELS
 
@@ -80,12 +80,17 @@ extern uint16_t AnalogInputs[]; // at least ADC NR CHANNELS
 /*
  * prototypes
  */
+// these are in driver.c .. header?
 void BLDC_Spd_inc(void);
 void BLDC_Spd_dec(void);
 void BLDC_Stop(void);
 void BLDC_Step(void);
 void BLDC_Update(void);
-void PWM_Set_DC(uint16_t uDC);
+
+// presently is in main.c .. header?
+void TIM3_setup(uint16_t u16period);
+
+//void PWM_Set_DC(uint16_t uDC);
 
 
 #endif // PARAMETER_H

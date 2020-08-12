@@ -60,7 +60,7 @@
 #define BLDC_OL_TM_HI_SPD          80  // end of ramp
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
-#define BLDC_OL_TM_MANUAL_HI_LIM   63 // 64 // stalls in the range of 62-64 dependng on delays 
+#define BLDC_OL_TM_MANUAL_HI_LIM   63 // 64 // stalls in the range of 62-64 dependng on delays
 // advance to (and slightly past) "ideal" timing point
 
 // any "speed" setting higher than HI_LIM would be by closed-loop control of
@@ -84,13 +84,38 @@ typedef enum DC_PWM_STATE
     DC_PWM_MINUS, // complimented i.e. (100% - DC)
     DC_OUTP_HI,
     DC_OUTP_LO,
-    DC_OUTP_FLOAT,
+    DC_OUTP_FLOAT_R,
+    DC_OUTP_FLOAT_F,
     DC_NONE
 } DC_PWM_STATE_t;
+
+/*
+ * aggregate 3 phases into a struct for easy param passing and putting in table
+ */
+typedef struct
+{
+    DC_PWM_STATE_t phaseA;
+    DC_PWM_STATE_t phaseB;
+    DC_PWM_STATE_t phaseC;
+}
+DC_PWM_PH_STATES_t;
+
+/*
+ * define an integer "triplet" type for storing accumulated back-EMF values
+ */
+typedef struct
+{
+    uint16_t phaseA;
+    uint16_t phaseB;
+    uint16_t phaseC;
+}
+BACK_EMF_AD_t;
+
 
 // enumerate 3 phases
 typedef enum THREE_PHASE_CHANNELS
 {
+    PHASE_NONE,
     PHASE_A,
     PHASE_B,
     PHASE_C
@@ -115,21 +140,55 @@ typedef enum COMMUTATION_SECTOR
     SECTOR_6
 } COMMUTATION_SECTOR_t;
 
+
 /* Public variables  ---------------------------------------------------------*/
 uint16_t BLDC_OL_comm_tm;   // could be private
 
-uint16_t Manual_uDC;
+uint16_t global_uDC;
+
+uint16_t Manual_uDC; // user speed input should be controlling PWM duty-cycle eventually ...
 
 BLDC_STATE_T BLDC_State;
 
 
 /* Private variables ---------------------------------------------------------*/
 
+
+// max nr of back-EMF readings (3? 4? how many PWMs will be readale during each 60 degree float (of which only 30degree is seen w/ upp-erarm driving anyay!!)
+#define NR_BEMF_MSR 4
+
+static BACK_EMF_AD_t Rising_BEMF[NR_BEMF_MSR];
+static BACK_EMF_AD_t Falling_BEMF[NR_BEMF_MSR];
+
+/*
+ * table of commutation states: confirmed that the elements of type
+ * DC_PWM_PH_STATES t are occurpying 3-bytes each and packed (odd-aligned bytes should generally not be a problem for the CPU or the comp/linker)
+ */
+static const DC_PWM_PH_STATES_t Commutation_States[] =
+{
+//        case 0:
+    { DC_PWM_PLUS,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
+//        case 1:
+    { DC_PWM_PLUS,      DC_OUTP_FLOAT_R, DC_OUTP_LO },
+//        case 2:
+    { DC_OUTP_FLOAT_F,  DC_PWM_PLUS,     DC_OUTP_LO },
+//        case 3:
+    { DC_OUTP_LO,       DC_PWM_PLUS,     DC_OUTP_FLOAT_R },
+//        case 4:
+    { DC_OUTP_LO,       DC_OUTP_FLOAT_F, DC_PWM_PLUS },
+//        case 5:
+    { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_PWM_PLUS }
+};
+
+
 static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
-/* static */ uint16_t global_uDC;
+
+/*
+ * RUNNING OUT OF RAM!!!!!!!!!!!!!!!
+ */
+
 
 /* Private function prototypes -----------------------------------------------*/
-void bldc_move( COMMUTATION_SECTOR_t );
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -139,9 +198,9 @@ void bldc_move( COMMUTATION_SECTOR_t );
   * None
   * @retval void None
   */
-void PWM_Set_DC(uint16_t pwm_dc)
+void set_dutycycle(uint16_t global_dutycycle)
 {
-    global_uDC = pwm_dc;
+    global_uDC = global_dutycycle;
 
     if ( BLDC_OFF == BLDC_State )
     {
@@ -149,18 +208,61 @@ void PWM_Set_DC(uint16_t pwm_dc)
     }
 }
 
+
+/*
+ * back EMF readings are acquired on each phase
+ */
+void read_BackEMF_ph( BACK_EMF_AD_t * p_BackEMF, THREE_PHASE_CHANNELS_t phase)
+{
+    switch(phase)
+    {
+    case PHASE_A:
+        p_BackEMF->phaseA = ADC1_GetBufferValue( 0 );
+        break;
+    case PHASE_B:
+        p_BackEMF->phaseB = ADC1_GetBufferValue( 1 );
+        break;
+    case PHASE_C:
+        p_BackEMF->phaseC = ADC1_GetBufferValue( 2 );
+        break;
+    default:
+        break;
+    }
+}
+
+/*
+ * back EMF readings are being differentiated as to which slope they are acquired on
+ */
+void read_BackEMF_ss(
+    THREE_PHASE_CHANNELS_t phase, DC_PWM_STATE_t state)
+{
+    int nnn = 0; // index of BEMF store array ... (0 for now)
+
+    if (DC_OUTP_FLOAT_R == state )
+    {
+        read_BackEMF_ph( &Rising_BEMF[nnn], phase);
+    }
+    else if (DC_OUTP_FLOAT_F == state )
+    {
+        read_BackEMF_ph( &Falling_BEMF[nnn], phase);
+    }
+}
+
 /*
  * intermediate function for setting PWM with positive or negative polarity
  * Provides an "inverted" (complimentary) duty-cycle if [state0 < 0]
+ *
+ * This could probably be done better given a more coherent read of the PWM/timer confugration in the MCU reference manual!!
  */
-uint16_t _set_output(uint8_t chan, DC_PWM_STATE_t state0)
+uint16_t get_pwm_dc(uint8_t chan /* unused */, DC_PWM_STATE_t state)
 {
     uint16_t pulse = PWM_0PCNT;
 
-    switch(state0)
+    switch(state)
     {
     default:
-    case DC_OUTP_FLOAT:
+    case DC_OUTP_FLOAT_R:
+    case DC_OUTP_FLOAT_F:
     case DC_OUTP_LO:
         pulse = PWM_0PCNT;
         break;
@@ -230,12 +332,19 @@ void delay(int time)
   * no change/disruption to  its PWM signal.
 
   */
-void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_t state2)
+void comm_switch ( DC_PWM_PH_STATES_t  states )
 {
+    THREE_PHASE_CHANNELS_t float_phase = PHASE_NONE;
+    DC_PWM_STATE_t float_value= DC_NONE;
+
+    DC_PWM_STATE_t state0 = states.phaseA;
+    DC_PWM_STATE_t state1 = states.phaseB;
+    DC_PWM_STATE_t state2 = states.phaseC;
+
     /* todo: look into this?:
-    "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
-    is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
-    */
+        "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
+        is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
+        */
     TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // dsable interrupts ???? .. (there is an ISR triggered as soon as the channel/PWM disabled
 
     TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
@@ -247,24 +356,33 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
     TIM1_Cmd(DISABLE);
 
 
-    if (DC_OUTP_FLOAT == state0)
+    if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
+        float_phase = PHASE_A;
+        float_value= state0;
+
         GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
         // other two legs have /SD enabled
 // /SD A OFF
         GPIOC->ODR |=   (1<<7);
         GPIOG->ODR |=   (1<<1);
     }
-    else if (DC_OUTP_FLOAT == state1)
+    else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
+        float_phase = PHASE_B;
+        float_value= state1;
+
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
         // other two legs have /SD enabled
         GPIOC->ODR |=   (1<<5);
 // /SD B OFF
         GPIOG->ODR |=   (1<<1);
     }
-    else if (DC_OUTP_FLOAT == state2)
+    else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
+        float_phase = PHASE_C;
+        float_value= state2;
+
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
         // other two legs have /SD enabled
         GPIOC->ODR |=   (1<<5);
@@ -311,10 +429,10 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 
 #ifdef PWM_8K // 8k PWM
 
-  delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
+    delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
 
 #else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
-  delay(  40 ); //   41 40 ... stall ?
+    delay(  40 ); //   41 40 ... stall ?
 #endif
 
     GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
@@ -323,7 +441,10 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 //  back-EMF could be read the first time about right here ... ;)
 // ...
 // Beyond that, end of  TIM1 ISR  is where the next couple b-EMF readings would be
-// taken (at  end of  PWM idle/off time) - will need to know which phase/channel 
+// taken (at  end of  PWM idle/off time) - will need to know which phase/channel
+/*
+  read_BackEMF_ss(float_phase, float_value);
+*/
 
     /*
      * reconfig and re-enable PWM of the driving channels. One driving channel is
@@ -332,11 +453,11 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
      */
     if (DC_OUTP_OFF != state0)
     {
-        if (DC_OUTP_FLOAT != state0)
+        if (DC_OUTP_FLOAT_R != state0 && DC_OUTP_FLOAT_F != state0)
         {
             if (DC_PWM_PLUS == state0 /* MINUS? */)
             {
-                TIM1_SetCompare2(_set_output(0, state0));
+                TIM1_SetCompare2( get_pwm_dc(0, state0) );
                 TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
                 // set /SD A ON
 //        GPIOC->ODR |=  (1<<5);      // A.
@@ -353,11 +474,11 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 
     if (DC_OUTP_OFF != state1)
     {
-        if (DC_OUTP_FLOAT != state1)
+        if (DC_OUTP_FLOAT_R != state1 && DC_OUTP_FLOAT_F != state1)
         {
             if (DC_PWM_PLUS == state1 /* MINUS? */)
             {
-                TIM1_SetCompare3(_set_output(1, state1));
+                TIM1_SetCompare3( get_pwm_dc(1, state1) );
                 TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
                 // set /SD B ON
 //        GPIOG->ODR |=   (1<<7);
@@ -374,11 +495,11 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 
     if (DC_OUTP_OFF != state2)
     {
-        if (DC_OUTP_FLOAT != state2)
+        if (DC_OUTP_FLOAT_R != state2 && DC_OUTP_FLOAT_F != state2)
         {
             if (DC_PWM_PLUS == state2 /* MINUS? */)
             {
-                TIM1_SetCompare4(_set_output(2, state2));
+                TIM1_SetCompare4( get_pwm_dc(2, state2) );
                 TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
                 // set /SD C ON
 //        GPIOG->ODR |=   (1<<1);     // C
@@ -407,7 +528,7 @@ void PWM_set_outputs(DC_PWM_STATE_t state0, DC_PWM_STATE_t state1, DC_PWM_STATE_
 void BLDC_Stop()
 {
     BLDC_State = BLDC_OFF;
-    PWM_Set_DC( 0 );
+    set_dutycycle( 0 );
 }
 
 /*
@@ -445,8 +566,6 @@ void BLDC_Spd_inc()
 }
 
 
-void TIM3_setup(uint16_t u16period); // tmp
-
 /*
  * BLDC Update: handle the BLDC state
  *      Off: nothing
@@ -477,14 +596,14 @@ void BLDC_Update(void)
 #ifdef PWM_IS_MANUAL
 // doesn't need to set global uDC every time as it would be set once in the FSM
 // transition ramp->on ... but it doesn't hurt to assert it
-        PWM_Set_DC( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
+        set_dutycycle( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
 #else
 //         PWM_Set_DC( PWM_NOT_MANUAL_DEF ) ;
 #endif
         break;
     case BLDC_RAMPUP:
 
-        PWM_Set_DC( PWM_DC_RAMPUP ) ;
+        set_dutycycle( PWM_DC_RAMPUP ) ;
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
@@ -495,7 +614,7 @@ void BLDC_Update(void)
             // TODO: the actual transition to ON state would be seeing the ramp-to speed
 // achieved in closed-loop operation
             BLDC_State = BLDC_ON;
-            PWM_Set_DC( PWM_NOT_MANUAL_DEF );
+            set_dutycycle( PWM_NOT_MANUAL_DEF );
         }
         break;
     }
@@ -513,6 +632,7 @@ void BLDC_Update(void)
  */
 void BLDC_Step(void)
 {
+    const DC_PWM_PH_STATES_t OFF_State = { DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF };
     const uint8_t N_CSTEPS = 6;
 
     static COMMUTATION_SECTOR_t bldc_step = 0;
@@ -521,45 +641,15 @@ void BLDC_Step(void)
     bldc_step %= N_CSTEPS;
 
     if ( 0 == global_uDC )
-    {    // motor drive output is not active
+    {
+        // motor drive output is not active
         GPIOC->ODR &=  ~(1<<5);
         GPIOC->ODR &=  ~(1<<7);
         GPIOG->ODR &=  ~(1<<1);
-        PWM_set_outputs(DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF);
+        comm_switch( OFF_State );
     }
     else
-    { /*
-        needs to be a table so that the state of e.g. float rising vs float falling can be know.n.
-        */
-        switch( bldc_step )
-        {
-        default:
-            PWM_set_outputs(DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF);
-            break;
-
-        case 0: // SECTOR_1 etc.
-            PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_LO, DC_OUTP_FLOAT);
-            break;
-
-        case 1:
-            PWM_set_outputs(DC_PWM_PLUS, DC_OUTP_FLOAT, DC_OUTP_LO);
-            break;
-
-        case 2:
-            PWM_set_outputs(DC_OUTP_FLOAT, DC_PWM_PLUS, DC_OUTP_LO);
-            break;
-
-        case 3:
-            PWM_set_outputs(DC_OUTP_LO, DC_PWM_PLUS, DC_OUTP_FLOAT);
-            break;
-
-        case 4:
-            PWM_set_outputs(DC_OUTP_LO, DC_OUTP_FLOAT, DC_PWM_PLUS);
-            break;
-
-        case 5:
-            PWM_set_outputs(DC_OUTP_FLOAT, DC_OUTP_LO, DC_PWM_PLUS);
-            break;
-        }
+    {
+        comm_switch( Commutation_States[ bldc_step ] );
     }
 }
