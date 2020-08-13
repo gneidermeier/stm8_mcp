@@ -25,6 +25,12 @@
 #define PWM_8K
 
 
+#define COMM_TIME_KLUDGE_DELAYS 
+
+
+#define BLDC_CT_SCALE  2
+
+
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
 // 1/12000 = 0.000083 = 8.3 * 10^(-5) 
 
@@ -41,15 +47,9 @@
 
 #ifdef PWM_8K
   #define TIM2_PWM_PD    250   // 125uS 
-#else
+#else // 12kHz
   #define TIM2_PWM_PD    166   //  83uS 
 #endif
-
-
-// Using the TIM2 counter as time base for open-loop commutation time  
-// arbitrary period (n * 125uS ^H^H^H 62.5uS) to PWM the user LED0
-#define TIM2_COUNT_LED0_PD   80
-
 
 
 #define LED  0
@@ -68,13 +68,10 @@ typedef  enum {
 /*
  * variables
  */
-extern u8 TaskRdy;     // flag for background task to sync w/ timer refrence
+extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
 
 extern  uint16_t global_uDC;
 
-//extern  uint16_t Manual_uDC; // user speed input should be controlling PWM duty-cycle eventually ... 
-
-extern uint16_t AnalogInputs[]; // at least ADC NR CHANNELS
 
 
 /*
@@ -89,8 +86,6 @@ void BLDC_Update(void);
 
 // presently is in main.c .. header?
 void TIM3_setup(uint16_t u16period);
-
-//void PWM_Set_DC(uint16_t uDC);
 
 
 #endif // PARAMETER_H

@@ -15,15 +15,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-/*
- * a 30-50 uS delay is required for flyback diode action
- */
-#ifdef CLOCK_16
-#define FLYBACK_DELAY  40
-#else
-#define FLYBACK_DELAY  20
-#endif
-
 #define PWM_100PCNT    TIM2_PWM_PD
 #define PWM_50PCNT     ( PWM_100PCNT / 2 )
 #define PWM_25PCNT     ( PWM_100PCNT / 4 )
@@ -49,18 +40,24 @@
  * RPS = (1 / cycle_time * 6)
  */
 
+
+//   BLDC_CT_SCALE  ... needs to be linked to TIM3 Presacalar! (changing this is not working right now ... )
+// BLDC_CT_SCALE must be > 2 (and must be power of 2)
+#define RAMP_SCALAR   ( BLDC_CT_SCALE / 2 ) // this is doing better job to ramp to higher initial speed
+
 // the OL comm time is shortened by 1 rammp-unit (e.g. 2 counts @ 0.000008S per count where 8uS is the TIM3 bit-time)
 // the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
-#define BLDC_ONE_RAMP_UNIT          1
+#define BLDC_ONE_RAMP_UNIT          (1 * BLDC_CT_SCALE)
 
 // 1 cycle = 6 * 8uS * 512 = 0.024576 S
-#define BLDC_OL_TM_LO_SPD         512  // start of ramp
+#define BLDC_OL_TM_LO_SPD         (512 * BLDC_CT_SCALE)  // start of ramp
 
 // 1 cycle = 6 * 8uS * 80 = 0.00384 S
-#define BLDC_OL_TM_HI_SPD          80  // end of ramp
+//#define BLDC_OL_TM_HI_SPD          (80 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
+#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
-#define BLDC_OL_TM_MANUAL_HI_LIM   63 // 64 // stalls in the range of 62-64 dependng on delays
+#define BLDC_OL_TM_MANUAL_HI_LIM   (63 * BLDC_CT_SCALE) // 64 // stalls in the range of 62-64 dependng on delays
 // advance to (and slightly past) "ideal" timing point
 
 // any "speed" setting higher than HI_LIM would be by closed-loop control of
@@ -69,10 +66,8 @@
 
 // 1 cycle = 6 * 8uS * 13 = 0.000624 S
 // 1 cycle = 6 * 8uS * 14 = 0.000672 S
-#define LUDICROUS_SPEED (13) // 15kRPM would be ~13.8 counts
+#define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
 
-
-#define THREE_PHASES 3
 
 /* Private types -----------------------------------------------------------*/
 
@@ -414,7 +409,7 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
         GPIOC->CR1 |=  (1<<4);
     }
 
-
+#ifdef COMM_TIME_KLUDGE_DELAYS 
 
     GPIOG->ODR |=  (1<<0); // TEST PIN ON
 
@@ -437,6 +432,7 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
 
     GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
 
+#endif // COMM_TIME_KLUDGE_DELAYS 
 
 //  back-EMF could be read the first time about right here ... ;)
 // ...
@@ -539,7 +535,6 @@ void BLDC_Spd_dec()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
-        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)

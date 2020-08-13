@@ -322,8 +322,6 @@ void ADC1_setup(void)
 #define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
 #endif
 
-
-
 #define PWM_MODE  TIM1_OCMODE_PWM1
 
 void TIM1_setup(void)
@@ -402,9 +400,20 @@ void TIM4_setup(void)
 }
 
 /*
- * Timers 2 3 & 5 are 16-bit general purpose timers *  Sets the commutation switching period.
- *  Input: [0:511]   (input may be set from analog trim-pot for test/dev)
+ * Timers 2 3 & 5 are 16-bit general purpose timers
+ *  Sets the commutation switching period.
+ * 
+ *  @8Mhz, fMASTER period ==  0.000000125 S
+ *   Timer Step:
+ *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
  */
+// ideally, TIM3 prescaler would be tied to  BLDC_CT_SCALE  
+#ifdef CLOCK_16
+ #define TIM3_PSCR  0x06  // 2^6 == 64
+#else
+ #define TIM3_PSCR  0x05  // 2^5 == 32
+#endif
+
 void TIM3_setup(uint16_t u_period)
 {
     const uint16_t MAX_SWITCH_TIME = 0xfffe;
@@ -425,11 +434,7 @@ void TIM3_setup(uint16_t u_period)
 // @8Mhz, fMASTER period ==  0.000000125 S
 //  Timer Step:
 //    step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
-#ifdef CLOCK_16
-    TIM3->PSCR = 0x07; // 128 ......    @ 16Mhz -> 1 bit-time == 0.000008 S
-#else
-    TIM3->PSCR = 0x06; //  64 ......    @  8Mhz ->               0.000008
-#endif
+    TIM3->PSCR = TIM3_PSCR;
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet
     TIM3->ARRL = period & 0xff;

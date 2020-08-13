@@ -17,7 +17,7 @@
   *
   * <h2><center>&copy; COPYRIGHT 2011 STMicroelectronics</center></h2>
   ******************************************************************************
-  */ 
+  */
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
@@ -219,9 +219,9 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
    static uint8_t toggle;
-    toggle ^= 1; // tmp test 
+    toggle ^= 1; // tmp test
 #if 1 // tmp test
-    if (toggle){ 
+    if (toggle){
         GPIOD->ODR |= (1 << LED);
     } else {
         GPIOD->ODR &= ~(1 << LED);
@@ -229,7 +229,7 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 #endif
 #if  0
 // tmp test
-    if (toggle){ 
+    if (toggle){
         GPIOA->ODR |= (1 << 3);
     } else {
         GPIOA->ODR &= ~(1 << 3);
@@ -299,9 +299,9 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     count20ms += 1;
 
 /*
- * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing) 
+ * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing)
  */
-#if 0 
+#if 0
     if (count20ms > TIM2_COUNT_LED0_PD)
     {
         count20ms = 0;
@@ -338,48 +338,47 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-    int8_t cntr; // make it signed so I get the counter "underflow"
-    int8_t pre_cntr ;// test counter delta
+    static uint8_t bldc_step_modul; // internal counter for sub-tasking the TIM3 period
 
     static uint8_t toggle = 0;
-#if 0
-    toggle ^= 1;
-    if ( toggle ){
-        GPIOG->ODR &= ~(1<<0);
-    }else {
-        GPIOG->ODR |=  (1<<0);
-    }
-#endif
 
-/*
- * experimentation has shown that things are running smoother if syncronizd w/ 
- * PWM .. sort of ;)
-*/
-#if 1 // using G0 to check duration of this kludgey crap
-//    GPIOG->ODR |=  (1<<0); //
+    uint16_t cntr; 
 
-    /*
-     * allow TIM1 freerunning counter to let the present PWM cycle expire. Seems to
-     *  help with maintaining/not-interfering-with stability of the back-EMF signal.
-     * (On this CPU - no nested interrupt? )
-     * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
+    /* only do commutation step on the timer modulus!
      */
-    cntr  = TIM1_GetCounter();
-    while( cntr < global_uDC ) // COUNTER MODE UP !!
+    bldc_step_modul += 1;
+if (1)//    if (  0 == ( bldc_step_modul % BLDC_CT_SCALE ) )
     {
-        pre_cntr = cntr;// test
-        cntr = TIM1_GetCounter();
-         if (cntr > 0){ // confirms that the counter is at 0 until end of idle-time, then (begins up-count and pulse turns on)
-            GPIOG->ODR |=  (1<<0); //
-}
-    }
+        /*
+         * experimentation has shown that things are running smoother if syncronizd w/
+         * PWM .. sort of ;)
+        */
+#ifdef COMM_TIME_KLUDGE_DELAYS
+        GPIOG->ODR |=  (1<<0); // test pin
 
-    GPIOG->ODR &=  ~(1<<0); //
+        /*
+         * allow TIM1 freerunning counter to let the present PWM cycle expire. Seems to
+         *  help with maintaining/not-interfering-with stability of the back-EMF signal.
+         * (On this CPU - no nested interrupt? )
+         * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
+         */
+        cntr  = TIM1_GetCounter();
+        while( cntr < global_uDC ) // COUNTER MODE UP !!
+        {
+//        pre_cntr = cntr;// test
+            cntr = TIM1_GetCounter();
+            if (cntr > 0)  // confirms that the counter is at 0 until end of idle-time, then (begins up-count and pulse turns on)
+            {
+                GPIOG->ODR |=  (1<<0); //
+            }
+        }
+
+        GPIOG->ODR &=  ~(1<<0); //
 #endif
 
 
-    BLDC_Step();
-
+        BLDC_Step();
+    }
 
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
@@ -549,7 +548,7 @@ toggle ^= 1;
 #endif
 
 
-    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context 
+    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context
 
     TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
 
