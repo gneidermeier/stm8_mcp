@@ -351,12 +351,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 #endif
 
-    // must reset the tmer interrupt flag
-    TIM3->SR1 &= ~TIM3_SR1_UIF;
-
-
-    TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
-
 /*
  * experimentation has shown that things are running smoother if syncronizd w/ 
  * PWM .. sort of ;)
@@ -384,8 +378,11 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 #endif
 
 
-    BLDC_Step();                         // can it be called from non-ISR (main()) context?
+    BLDC_Step();
 
+
+    // must reset the tmer interrupt flag
+    TIM3->SR1 &= ~TIM3_SR1_UIF;
 }
 
 /**
@@ -551,11 +548,13 @@ toggle ^= 1;
     }
 #endif
 
-// must reset the tmer interrupt flag
-    TIM4->SR1 &= ~TIM4_SR1_UIF;
 
     BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context 
 
+    TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
+
+// must reset the tmer interrupt flag
+    TIM4->SR1 &= ~TIM4_SR1_UIF;
 }
 #endif /*STM8S903*/
 

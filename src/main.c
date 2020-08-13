@@ -16,23 +16,24 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-
 #define ADC_N_CHANNELS 10       // [A0:A9]
 
+//#define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
+//#define AINCH_PWM_DC         8   // adjust pot to PWM D.C. on FET outputs
+
+
 /* Public variables  ---------------------------------------------------------*/
-uint8_t Duty_cycle_pcnt_LED0;
+
+uint16_t AnalogInputs[16]; // at least ADC NR CHANNELS .. tmp?
+
+
 uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
-uint16_t AnalogInputs[16]; // at least ADC NR CHANNELS
 
-uint16_t testbuf[64]; // how to determine available STM8  "heap" for logging?  ... linker warns if limit exceeded.
-
-extern uint8_t bldc_step ; // tmp
 
 /* Private variables ---------------------------------------------------------*/
-#define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
-#define AINCH_PWM_DC         8   // adjust pot to PWM D.C. on FET outputs
 
+static uint8_t Log_Level;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,7 +105,7 @@ void GPIO_Config(void)
     GPIOG->CR1 |=  (1<<1);
 
 ////////////
-// use PC6 (CN2-9) and PG0 (CN2-11) as test pins 
+// use PC6 (CN2-9) and PG0 (CN2-11) as test pins
     GPIOG->ODR &= ~(1<<0);
     GPIOG->DDR |=  (1<<0);
     GPIOG->CR1 |=  (1<<0);
@@ -288,8 +289,8 @@ void ADC1_setup(void)
     A single conversion is performed for each channel starting with AIN0 and the data is stored
     in the data buffer registers ADC_DBxR.
     */
- //ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1)), ADC1_ALIGN_RIGHT);
-ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
+//ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1)), ADC1_ALIGN_RIGHT);
+    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
 
 //ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
@@ -323,7 +324,7 @@ ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(AD
 
 
 
- #define PWM_MODE  TIM1_OCMODE_PWM1
+#define PWM_MODE  TIM1_OCMODE_PWM1
 
 void TIM1_setup(void)
 {
@@ -391,7 +392,7 @@ void TIM4_setup(void)
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
 #else
-    TIM4->PSCR = 0x06; // PS = 64   -> 0.000000125  * 64 * p
+    TIM4->PSCR = 0x06; // PS =  64  -> 0.000000125  *  64 * p
 #endif
 
     TIM4->ARR = T4_Period;
@@ -468,20 +469,6 @@ void clock_setup(void)
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
-/*
- * Initiate A/D sampling, period can be 1 - 5 mS ... only to read the manual POTs for now.
- * Execution context is 'main()' so not to block ISR with ADC sampling.
- * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
- */
-void Periodic_task(void)
-{
-// if the Step() could be invoked from lowest-priority/back-ground task, then it 
-// could spin and wait for current PWM cycle to complete and next/last PWM ISR to trigger.
-// but the buttons debouncing is dumb and ties up the background task, so it is 
-// not possile to "schedule" anything from the BG with any regularity as it is :(
-//    BLDC_Step();                         // can it be called from non-ISR (main()) context?
-
-}
 
 // hack, temp
 extern uint16_t BLDC_OL_comm_tm;
@@ -545,7 +532,7 @@ void testUART(void)
         strcat(sbuf, "=");
 
 //itoa(AnalogInputs[loop], cbuf, 16);
-itoa( ADC1_GetBufferValue( loop ), cbuf, 16);
+        itoa( ADC1_GetBufferValue( loop ), cbuf, 16);
         strcat(sbuf, cbuf);
     }
 #endif
@@ -553,6 +540,31 @@ itoa( ADC1_GetBufferValue( loop ), cbuf, 16);
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
 }
+
+/*
+ * Execution context is 'main()' so not to block ISR with ADC sampling.
+ * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
+ * Servicing the UART (presently just a simply one-way logging stream)
+ */
+void Periodic_task(void)
+{
+    /*
+     * debug logging information can be "scheduled" by setting the level, which for now
+     * simply designates number of reps ... spacing TBD? this task is now tied to
+     * BLDC Update cycle ( about 1/2sec?)
+     */
+    if (Log_Level > 0)
+    {
+// allow log to sticky-on
+        if (Log_Level < 255)
+        {
+            Log_Level -= 1;
+        }
+
+        testUART();// tmp test
+    }
+}
+
 
 /*
  * mainly looping
@@ -567,6 +579,7 @@ main()
     TIM4_setup();
 
     BLDC_Stop();
+    Log_Level = 0;
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
@@ -582,6 +595,8 @@ main()
             disableInterrupts();
             BLDC_Stop();
             enableInterrupts();
+
+            Log_Level = 2;
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -591,7 +606,8 @@ main()
             disableInterrupts();
             BLDC_Spd_inc();
             enableInterrupts();
-            testUART();// tmp test
+
+            Log_Level = 1;
         }
 
         if ( ! (( GPIOE->IDR)&(1<<5)))
@@ -601,7 +617,8 @@ main()
             disableInterrupts();
             BLDC_Spd_dec();
             enableInterrupts();
-            testUART();// tmp test
+
+            Log_Level = 255;
         }
 
 // while( FALSE == TaskRdy )
@@ -611,6 +628,7 @@ main()
         }
         else
         {
+    // theoretically no time-limit for the periodic task? ... periodic task should be interruptible
             TaskRdy = FALSE;
             Periodic_task();
         }
