@@ -13,6 +13,9 @@
 #include "parameter.h" // app defines
 
 
+extern uint8_t Log_Level; // tmp
+
+
 /* Private defines -----------------------------------------------------------*/
 
 #define PWM_100PCNT    TIM2_PWM_PD
@@ -409,7 +412,7 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
         GPIOC->CR1 |=  (1<<4);
     }
 
-#ifdef COMM_TIME_KLUDGE_DELAYS 
+#ifdef COMM_TIME_KLUDGE_DELAYS
 
     GPIOG->ODR |=  (1<<0); // TEST PIN ON
 
@@ -432,15 +435,15 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
 
     GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
 
-#endif // COMM_TIME_KLUDGE_DELAYS 
+#endif // COMM_TIME_KLUDGE_DELAYS
 
 //  back-EMF could be read the first time about right here ... ;)
 // ...
 // Beyond that, end of  TIM1 ISR  is where the next couple b-EMF readings would be
 // taken (at  end of  PWM idle/off time) - will need to know which phase/channel
-/*
-  read_BackEMF_ss(float_phase, float_value);
-*/
+    /*
+      read_BackEMF_ss(float_phase, float_value);
+    */
 
     /*
      * reconfig and re-enable PWM of the driving channels. One driving channel is
@@ -523,6 +526,11 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
  */
 void BLDC_Stop()
 {
+    if (BLDC_OFF != BLDC_State)
+    {
+        Log_Level = 1;
+    }
+
     BLDC_State = BLDC_OFF;
     set_dutycycle( 0 );
 }
@@ -610,6 +618,8 @@ void BLDC_Update(void)
 // achieved in closed-loop operation
             BLDC_State = BLDC_ON;
             set_dutycycle( PWM_NOT_MANUAL_DEF );
+
+            Log_Level = 1; // tmp debug
         }
         break;
     }

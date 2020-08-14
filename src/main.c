@@ -33,7 +33,8 @@ uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint8_t Log_Level;
+//static
+uint8_t Log_Level;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -402,17 +403,31 @@ void TIM4_setup(void)
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
  *  Sets the commutation switching period.
- * 
+ *
  *  @8Mhz, fMASTER period ==  0.000000125 S
  *   Timer Step:
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
  */
-// ideally, TIM3 prescaler would be tied to  BLDC_CT_SCALE  
+// ideally, TIM3 prescaler would be tied to  BLDC_CT_SCALE
+
+// now reduce the pre-scaler, while sub-tasking the TIM3 ISR
+
+#if 0  // define BLDC_CT_SCALE  2
 #ifdef CLOCK_16
- #define TIM3_PSCR  0x06  // 2^6 == 64
+#define TIM3_PSCR  0x06  // 2^6 == 64
 #else
- #define TIM3_PSCR  0x05  // 2^5 == 32
+#define TIM3_PSCR  0x05  // 2^5 == 32
 #endif
+#endif // 0
+
+#if 1  // define BLDC_CT_SCALE  8
+#ifdef CLOCK_16
+#define TIM3_PSCR  0x04  // 2^4 == 16
+#else
+#define TIM3_PSCR  0x03  // 2^3 == 8
+#endif
+#endif // 0
+
 
 void TIM3_setup(uint16_t u_period)
 {
@@ -601,7 +616,7 @@ main()
             BLDC_Stop();
             enableInterrupts();
 
-            Log_Level = 2;
+//            Log_Level = 2; // key is bouncy ... 
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -633,7 +648,7 @@ main()
         }
         else
         {
-    // theoretically no time-limit for the periodic task? ... periodic task should be interruptible
+            // theoretically no time-limit for the periodic task? ... periodic task should be interruptible
             TaskRdy = FALSE;
             Periodic_task();
         }

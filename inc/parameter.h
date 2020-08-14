@@ -28,8 +28,19 @@
 #define COMM_TIME_KLUDGE_DELAYS 
 
 
-#define BLDC_CT_SCALE  2
+//#define BLDC_CT_SCALE  2
+//#define BLDC_CT_SCALE  4
+#define BLDC_CT_SCALE  8
+//#define BLDC_CT_SCALE  16
+//#define BLDC_CT_SCALE  32
 
+
+
+#ifdef SADFASDF
+// #define TIM3_RATE_MODULUS   4
+#else
+ #define TIM3_RATE_MODULUS   1
+#endif
 
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
 // 1/12000 = 0.000083 = 8.3 * 10^(-5) 
