@@ -336,33 +336,41 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   * @param  None
   * @retval None
   */
- INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
+INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
     static uint8_t bldc_step_modul; // internal counter for sub-tasking the TIM3 period
 
     static uint8_t toggle = 0;
 
-    uint16_t cntr; 
+    uint8_t Step_Enabled = 0;
 
-    /* only do commutation step on the timer modulus!
-     */
+
+    GPIOG->ODR |=  (1<<0); // test pin
+
     bldc_step_modul += 1;
-if (1)//    if (  0 == ( bldc_step_modul % BLDC_CT_SCALE ) )
+
+
+// falling bEMF (2) here at 30 degree
+// rising bEMF (2)  here at end of 60 degreee
+
+
+// commutation obviously done only once on the base-period
+    if (  0 == ( bldc_step_modul % TIM3_RATE_MODULUS ) )
     {
         /*
-         * experimentation has shown that things are running smoother if syncronizd w/
-         * PWM .. sort of ;)
-        */
-#ifdef COMM_TIME_KLUDGE_DELAYS
-        GPIOG->ODR |=  (1<<0); // test pin
-
-        /*
-         * allow TIM1 freerunning counter to let the present PWM cycle expire. Seems to
-         *  help with maintaining/not-interfering-with stability of the back-EMF signal.
+         * allow TIM1 freerunning counter to let the present PWM cycle expire.
+         * Seems to help with maintaining/not-interfering-with stability of the back-EMF signal.
          * (On this CPU - no nested interrupt? )
          * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
+         * experimentation has shown that things are running smoother if syncronizd w/
+         * PWM .. sort of ;)
          */
-        cntr  = TIM1_GetCounter();
+        uint16_t cntr  = TIM1_GetCounter();
+
+        Step_Enabled = 1;
+
+#ifdef COMM_TIME_KLUDGE_DELAYS
+
         while( cntr < global_uDC ) // COUNTER MODE UP !!
         {
 //        pre_cntr = cntr;// test
@@ -377,8 +385,22 @@ if (1)//    if (  0 == ( bldc_step_modul % BLDC_CT_SCALE ) )
 #endif
 
 
+// BLDC Step ..restarts the counter!
+//        bldc_step_modul = 0;
+
         BLDC_Step();
     }
+
+    // if (0 != Step_Enabled)
+    //    BLDC_Step();
+
+
+    GPIOG->ODR &=  ~(1<<0); // test pin
+
+
+// Falling bEMF (1) here at 0 degree
+// Rising bEMF (1) here at end of 30 degreee.
+
 
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;

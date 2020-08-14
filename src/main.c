@@ -412,21 +412,12 @@ void TIM4_setup(void)
 
 // now reduce the pre-scaler, while sub-tasking the TIM3 ISR
 
-#if 0  // define BLDC_CT_SCALE  2
-#ifdef CLOCK_16
-#define TIM3_PSCR  0x06  // 2^6 == 64
-#else
-#define TIM3_PSCR  0x05  // 2^5 == 32
-#endif
-#endif // 0
+ #ifdef CLOCK_16
+  #define TIM3_PSCR  0x03  // 2^3 == 8
+ #else
+  #define TIM3_PSCR  0x02  // 2^2 == 4
+ #endif
 
-#if 1  // define BLDC_CT_SCALE  8
-#ifdef CLOCK_16
-#define TIM3_PSCR  0x04  // 2^4 == 16
-#else
-#define TIM3_PSCR  0x03  // 2^3 == 8
-#endif
-#endif // 0
 
 
 void TIM3_setup(uint16_t u_period)
