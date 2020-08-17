@@ -46,7 +46,9 @@ extern uint8_t Log_Level; // tmp
 
 //   BLDC_CT_SCALE  ... needs to be linked to TIM3 Presacalar! (changing this is not working right now ... )
 // BLDC_CT_SCALE must be > 2 (and must be power of 2)
-#define RAMP_SCALAR   ( BLDC_CT_SCALE / 2 ) // this is doing better job to ramp to higher initial speed
+//#define RAMP_SCALAR   ( BLDC_CT_SCALE / 2 )   // ... 2/5 stalls   :(
+//#define RAMP_SCALAR   ( 2 ) // somehow this relates to the BLDC Commutation Timer scaling?
+#define RAMP_SCALAR   ( 1 ) // not sure how much this matters .. stalls 40-50% of the time ?? L:J:???
 
 // the OL comm time is shortened by 1 rammp-unit (e.g. 2 counts @ 0.000008S per count where 8uS is the TIM3 bit-time)
 // the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
@@ -57,7 +59,7 @@ extern uint8_t Log_Level; // tmp
 
 // 1 cycle = 6 * 8uS * 80 = 0.00384 S
 //#define BLDC_OL_TM_HI_SPD          (80 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
-#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
+#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 3.2ms
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
 #define BLDC_OL_TM_MANUAL_HI_LIM   (63 * BLDC_CT_SCALE) // 64 // stalls in the range of 62-64 dependng on delays
@@ -140,6 +142,12 @@ typedef enum COMMUTATION_SECTOR
 
 
 /* Public variables  ---------------------------------------------------------*/
+
+ // 2 elements (sample 1 and sample 2)
+uint16_t Back_EMF_R[2];
+uint16_t Back_EMF_F[2];
+uint16_t Back_EMF_F0_MA;
+
 uint16_t BLDC_OL_comm_tm;   // could be private
 
 uint16_t global_uDC;
@@ -339,6 +347,8 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
     DC_PWM_STATE_t state1 = states.phaseB;
     DC_PWM_STATE_t state2 = states.phaseC;
 
+    uint16_t u16tmp;
+
     /* todo: look into this?:
         "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
         is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
@@ -437,13 +447,18 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
 
 #endif // COMM_TIME_KLUDGE_DELAYS
 
-//  back-EMF could be read the first time about right here ... ;)
-// ...
-// Beyond that, end of  TIM1 ISR  is where the next couple b-EMF readings would be
-// taken (at  end of  PWM idle/off time) - will need to know which phase/channel
-    /*
-      read_BackEMF_ss(float_phase, float_value);
-    */
+
+ /* exp. back-EMF reading hardcoded to phase "A" (ADC_0) */
+// Falling bEMF (t0) here at 0 degree
+// Rising bEMF (t0) here at end of 30 degreee.
+
+if (  DC_OUTP_FLOAT_F == state0 ){
+
+ u16tmp = Back_EMF_F[0];
+ Back_EMF_F[0] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
+ Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
+}
+
 
     /*
      * reconfig and re-enable PWM of the driving channels. One driving channel is
@@ -521,6 +536,7 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
 }
 
 
+extern uart_print( char * sbuf ); // tmp
 /*
  *
  */
@@ -528,7 +544,8 @@ void BLDC_Stop()
 {
     if (BLDC_OFF != BLDC_State)
     {
-        Log_Level = 1;
+        Log_Level = 0;
+        uart_print( "STOP\r\n");
     }
 
     BLDC_State = BLDC_OFF;
@@ -543,12 +560,15 @@ void BLDC_Spd_dec()
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
+        uart_print( "OFF->RAMP-\r\n");
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
     {
         BLDC_OL_comm_tm += 1; // slower
     }
+
+    Log_Level = 255;// enable continous/verbous log
 }
 
 /*
@@ -556,10 +576,15 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
+    Log_Level = 1; // default on INC button is just print one line
+
     if (BLDC_OFF == BLDC_State)
     {
         BLDC_State = BLDC_RAMPUP;
         // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
+
+            uart_print( "OFF->RAMP+\r\n");
+            Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
@@ -619,7 +644,7 @@ void BLDC_Update(void)
             BLDC_State = BLDC_ON;
             set_dutycycle( PWM_NOT_MANUAL_DEF );
 
-            Log_Level = 1; // tmp debug
+            Log_Level = 16; // tmp debug
         }
         break;
     }
