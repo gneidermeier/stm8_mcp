@@ -482,57 +482,56 @@ void clock_setup(void)
 
 
 // hack, temp
+
+static uint16_t Line_Count = 0;
+
 extern uint16_t BLDC_OL_comm_tm;
+extern uint16_t Back_EMF_R[2];
+extern uint16_t Back_EMF_F[2];
+
 
 /*
  * temp, todo better function
  */
 void testUART(void)
 {
-    int loop;
-
-    static unsigned char cnt = 0x30;
     char sbuf[128] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
-    cnt = cnt < 126 ? cnt + 1 : 0x30;
     sbuf[0] = 0;
 
-    strcat(sbuf, ":");
-    cbuf[0] = cnt;
-    cbuf[1] = 0;
+    Line_Count  += 1;;
+
+    strcat(sbuf, "(");
+    itoa(Line_Count, cbuf, 16);
     strcat(sbuf, cbuf);
+    strcat(sbuf, ")");
 
     strcat(sbuf, " CT=");
     itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
-#if 0
     strcat(sbuf, " A0=");
-    itoa(ABC0[0], cbuf, 16);
+    itoa(ADC1_GetBufferValue(0), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " A1=");
-    itoa(ABC1[0], cbuf, 16);
+    itoa(ADC1_GetBufferValue(1), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " A2=");
-    itoa(ABC2[0], cbuf, 16);
+    itoa(ADC1_GetBufferValue(2), cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " A3=");
-    itoa(ABC3[0], cbuf, 16);
+    strcat(sbuf, " A8=");
+    itoa(ADC1_GetBufferValue(8), cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " A4=");
-    itoa(ABC4[0], cbuf, 16);
+    strcat(sbuf, " A9=");
+    itoa(ADC1_GetBufferValue(9), cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " A5=");
-    itoa(ABC5[0], cbuf, 16);
-    strcat(sbuf, cbuf);
-#endif
-#if 1
+#if 0 
 // A/D
     for (loop = 0; loop <  ADC_N_CHANNELS ; loop++)
     {
@@ -576,6 +575,13 @@ void Periodic_task(void)
     }
 }
 
+/*
+ * 
+ */
+uart_print( char * sbuf ){
+
+    UARTputs(sbuf);
+}
 
 /*
  * mainly looping
@@ -594,6 +600,8 @@ main()
 
     enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
 
+    uart_print("\033c"); // sends ANSI code to  clear the serial terminal 
+    uart_print("Program Startup....... \r\n");
 
     while(1)
     {
@@ -607,7 +615,7 @@ main()
             BLDC_Stop();
             enableInterrupts();
 
-//            Log_Level = 2; // key is bouncy ... 
+            Line_Count = -1;
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -617,8 +625,6 @@ main()
             disableInterrupts();
             BLDC_Spd_inc();
             enableInterrupts();
-
-            Log_Level = 1;
         }
 
         if ( ! (( GPIOE->IDR)&(1<<5)))
@@ -628,8 +634,6 @@ main()
             disableInterrupts();
             BLDC_Spd_dec();
             enableInterrupts();
-
-            Log_Level = 255;
         }
 
 // while( FALSE == TaskRdy )
