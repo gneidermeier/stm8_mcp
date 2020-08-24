@@ -155,8 +155,6 @@ uint16_t BLDC_OL_comm_tm;   // could be private
 
 uint16_t global_uDC;
 
-uint16_t Manual_uDC; // user speed input should be controlling PWM duty-cycle eventually ...
-
 BLDC_STATE_T BLDC_State;
 
 
@@ -207,11 +205,6 @@ static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 void set_dutycycle(uint16_t global_dutycycle)
 {
     global_uDC = global_dutycycle;
-
-    if ( BLDC_OFF == BLDC_State )
-    {
-//        global_uDC = 0;
-    }
 }
 
 
@@ -524,7 +517,7 @@ void BLDC_Stop()
 }
 
 /*
- *
+ * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_dec()
 {
@@ -543,7 +536,7 @@ void BLDC_Spd_dec()
 }
 
 /*
- *
+ * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_inc()
 {
@@ -634,7 +627,7 @@ void BLDC_Step(void)
     bldc_step += 1;
     bldc_step %= N_CSTEPS;
 
-    if ( 0 == global_uDC )
+    if (BLDC_OFF == BLDC_State )
     {
         // motor drive output is not active
         GPIOC->ODR &=  ~(1<<5); //  /SD A
@@ -643,7 +636,7 @@ void BLDC_Step(void)
 
         TIM1_CtrlPWMOutputs(DISABLE);
     }
-    else
+    else // if (BLDC_ON == BLDC_State || BLDC_RAMP == BLDC_State)
     {
         comm_switch( Commutation_States[ bldc_step ] );
     }
