@@ -25,12 +25,14 @@ extern uint8_t Log_Level; // tmp
 #define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
 
 
-#ifndef PWM_IS_MANUAL
-#define PWM_NOT_MANUAL_DEF  PWM_25PCNT //30 //0x20 // experimentally determined value (using manual adjustment)
-#endif
+#define PWM_20PCNT     ( PWM_100PCNT / 5)          // 50
+#define PWM_21PCNT     ( 21 * PWM_100PCNT / 100)   // 52.5
+#define PWM_22PCNT     ( 22 * PWM_100PCNT / 100)   // 55    // $37
+#define PWM_23PCNT     ( 23 * PWM_100PCNT / 100)
+#define PWM_24PCNT     ( 24 * PWM_100PCNT / 100)
 
-
-
+#define PWM_DC_IDLE    PWM_22PCNT // stall 50% of the time
+ 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
  *  commutation step period.
@@ -59,7 +61,8 @@ extern uint8_t Log_Level; // tmp
 
 // 1 cycle = 6 * 8uS * 80 = 0.00384 S
 //#define BLDC_OL_TM_HI_SPD          (80 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
-#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 3.2ms
+//#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 3.2ms
+#define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
 
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
 #define BLDC_OL_TM_MANUAL_HI_LIM   (63 * BLDC_CT_SCALE) // 64 // stalls in the range of 62-64 dependng on delays
@@ -143,7 +146,7 @@ typedef enum COMMUTATION_SECTOR
 
 /* Public variables  ---------------------------------------------------------*/
 
- // 2 elements (sample 1 and sample 2)
+// 2 elements (sample 1 and sample 2)
 uint16_t Back_EMF_R[2];
 uint16_t Back_EMF_F[2];
 uint16_t Back_EMF_F0_MA;
@@ -161,10 +164,7 @@ BLDC_STATE_T BLDC_State;
 
 
 // max nr of back-EMF readings (3? 4? how many PWMs will be readale during each 60 degree float (of which only 30degree is seen w/ upp-erarm driving anyay!!)
-#define NR_BEMF_MSR 4
 
-static BACK_EMF_AD_t Rising_BEMF[NR_BEMF_MSR];
-static BACK_EMF_AD_t Falling_BEMF[NR_BEMF_MSR];
 
 /*
  * table of commutation states: confirmed that the elements of type
@@ -172,17 +172,17 @@ static BACK_EMF_AD_t Falling_BEMF[NR_BEMF_MSR];
  */
 static const DC_PWM_PH_STATES_t Commutation_States[] =
 {
-//        case 0:
+// sector 0:
     { DC_PWM_PLUS,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
-//        case 1:
+// sector 1:
     { DC_PWM_PLUS,      DC_OUTP_FLOAT_R, DC_OUTP_LO },
-//        case 2:
+// sector 2:
     { DC_OUTP_FLOAT_F,  DC_PWM_PLUS,     DC_OUTP_LO },
-//        case 3:
+// sector 3:
     { DC_OUTP_LO,       DC_PWM_PLUS,     DC_OUTP_FLOAT_R },
-//        case 4:
+// sector 4:
     { DC_OUTP_LO,       DC_OUTP_FLOAT_F, DC_PWM_PLUS },
-//        case 5:
+// sector 5:
     { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_PWM_PLUS }
 };
 
@@ -214,45 +214,6 @@ void set_dutycycle(uint16_t global_dutycycle)
     }
 }
 
-
-/*
- * back EMF readings are acquired on each phase
- */
-void read_BackEMF_ph( BACK_EMF_AD_t * p_BackEMF, THREE_PHASE_CHANNELS_t phase)
-{
-    switch(phase)
-    {
-    case PHASE_A:
-        p_BackEMF->phaseA = ADC1_GetBufferValue( 0 );
-        break;
-    case PHASE_B:
-        p_BackEMF->phaseB = ADC1_GetBufferValue( 1 );
-        break;
-    case PHASE_C:
-        p_BackEMF->phaseC = ADC1_GetBufferValue( 2 );
-        break;
-    default:
-        break;
-    }
-}
-
-/*
- * back EMF readings are being differentiated as to which slope they are acquired on
- */
-void read_BackEMF_ss(
-    THREE_PHASE_CHANNELS_t phase, DC_PWM_STATE_t state)
-{
-    int nnn = 0; // index of BEMF store array ... (0 for now)
-
-    if (DC_OUTP_FLOAT_R == state )
-    {
-        read_BackEMF_ph( &Rising_BEMF[nnn], phase);
-    }
-    else if (DC_OUTP_FLOAT_F == state )
-    {
-        read_BackEMF_ph( &Falling_BEMF[nnn], phase);
-    }
-}
 
 /*
  * intermediate function for setting PWM with positive or negative polarity
@@ -339,9 +300,12 @@ void delay(int time)
 
   */
 void comm_switch ( DC_PWM_PH_STATES_t  states )
+// void comm_switch ( uint8_t bldc_step)
 {
     THREE_PHASE_CHANNELS_t float_phase = PHASE_NONE;
     DC_PWM_STATE_t float_value= DC_NONE;
+
+//    DC_PWM_PH_STATES_t  states = Commutation_States[ bldc_step ];
 
     DC_PWM_STATE_t state0 = states.phaseA;
     DC_PWM_STATE_t state1 = states.phaseB;
@@ -360,8 +324,6 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
     TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
     TIM1_CtrlPWMOutputs(DISABLE);
 
-// Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
-    TIM1_Cmd(DISABLE);
 
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
@@ -399,7 +361,13 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
     }
 
 
+    /* delay ...pin setting
+     */
+    GPIOG->ODR |=  (1<<0); // TEST PIN ON
+
+
 // The "OFF" (non-PWMd) phase is asserted output pins to GPIO, driven Off
+// (this  phase was with already off, or was floating )
     if (DC_OUTP_LO == state0)
     {
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
@@ -422,42 +390,45 @@ void comm_switch ( DC_PWM_PH_STATES_t  states )
         GPIOC->CR1 |=  (1<<4);
     }
 
+
+/*
+ This delay waits for settling of flyback effect after the PWM transition. Back-EMF
+ can be read from the (previously energized) phase which is now floating (and of course for now, PWM is off!)
+*/
 #ifdef COMM_TIME_KLUDGE_DELAYS
-
-    GPIOG->ODR |=  (1<<0); // TEST PIN ON
-
-// kludges the timing to get "widest" presence of  b-EMF across as many as 3 comm timing steps
-// with the PWM mode 1 and up count. timing is delayed of first of the next PWM pulse chain ... see below, it is enough time to get the first A/D reading
-
-//delay(  60 /* 60 -> ~ 76us */  ); // 40 3F  ...    ? =stall 3e
-
-//delay(  80 ); //   42 41 40 ... stall 3f?
-
-//delay(  70 ); //   41 40 ... stall 3f?
 
 #ifdef PWM_8K // 8k PWM
 
-    delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
+//    delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
+    delay(  15 );        // about 20us
 
 #else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
     delay(  40 ); //   41 40 ... stall ?
 #endif
 
-    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
-
 #endif // COMM_TIME_KLUDGE_DELAYS
 
 
- /* exp. back-EMF reading hardcoded to phase "A" (ADC_0) */
-// Falling bEMF (t0) here at 0 degree
-// Rising bEMF (t0) here at end of 30 degreee.
 
-if (  DC_OUTP_FLOAT_F == state0 ){
+// Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
+    TIM1_Cmd(DISABLE);
 
- u16tmp = Back_EMF_F[0];
- Back_EMF_F[0] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
- Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
-}
+
+
+    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
+
+
+    /* Back-EMF reading hardcoded to phase "A" (ADC_0)
+		 * The falling Back-EMF should be readable at 0 degrees sector.
+		 * Rising back-EMF would need to be read beginning at the 30 degreess 
+		 * sector to see if it is above threshold ( around 0.7 v ).
+    */
+    if (  DC_OUTP_FLOAT_F == state0 )
+    {
+        u16tmp = Back_EMF_F[0];
+        Back_EMF_F[0] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
+        Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
+    }
 
 
     /*
@@ -583,8 +554,8 @@ void BLDC_Spd_inc()
         BLDC_State = BLDC_RAMPUP;
         // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
 
-            uart_print( "OFF->RAMP+\r\n");
-            Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
+        uart_print( "OFF->RAMP+\r\n");
+        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
     }
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
@@ -621,14 +592,9 @@ void BLDC_Update(void)
 
     case BLDC_ON:
         // do ON stuff
-#ifdef PWM_IS_MANUAL
-// doesn't need to set global uDC every time as it would be set once in the FSM
-// transition ramp->on ... but it doesn't hurt to assert it
-        set_dutycycle( Manual_uDC ) ;  // #ifdef SYMETRIC_PWM ...  (PWM_50PCNT +  Manual_uDC / 2)
-#else
-//         PWM_Set_DC( PWM_NOT_MANUAL_DEF ) ;
-#endif
+
         break;
+
     case BLDC_RAMPUP:
 
         set_dutycycle( PWM_DC_RAMPUP ) ;
@@ -642,17 +608,15 @@ void BLDC_Update(void)
             // TODO: the actual transition to ON state would be seeing the ramp-to speed
 // achieved in closed-loop operation
             BLDC_State = BLDC_ON;
-            set_dutycycle( PWM_NOT_MANUAL_DEF );
+            set_dutycycle( PWM_DC_IDLE );
 
             Log_Level = 16; // tmp debug
-        }
+            }
         break;
     }
 
-#if 1 //    ! MANUAL TEST
 //  update the timer for the OL commutation switch time
     TIM3_setup(BLDC_OL_comm_tm);
-#endif
 }
 
 /*
@@ -673,10 +637,11 @@ void BLDC_Step(void)
     if ( 0 == global_uDC )
     {
         // motor drive output is not active
-        GPIOC->ODR &=  ~(1<<5);
-        GPIOC->ODR &=  ~(1<<7);
-        GPIOG->ODR &=  ~(1<<1);
-        comm_switch( OFF_State );
+        GPIOC->ODR &=  ~(1<<5); //  /SD A
+        GPIOC->ODR &=  ~(1<<7); //  /SD B
+        GPIOG->ODR &=  ~(1<<1); //  /SD C
+
+        TIM1_CtrlPWMOutputs(DISABLE);
     }
     else
     {
