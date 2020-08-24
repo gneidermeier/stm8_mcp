@@ -612,6 +612,7 @@ void testUART(void)
  */
 void Periodic_task(void)
 {
+    uint16_t duty_cycle = 0;
     char sbuf[16] = "DC=";
     char cbuf[8] = { 0, 0 };
     char key;
@@ -636,16 +637,20 @@ void Periodic_task(void)
     {
         if (key == '+')
         {
-//            global_uDC += 1; // exp: needs to  be protected see set_dutycycle()
+            disableInterrupts();
+            duty_cycle = BLDC_PWMDC_Plus();
+            enableInterrupts();
             UARTputs("+++");
         }
         else if (key == '-')
         {
-//            global_uDC -= 1;  // exp:  needs to  be protected see set_dutycycle()
+            disableInterrupts();
+            duty_cycle = BLDC_PWMDC_Minus();
+            enableInterrupts();
             UARTputs("---");
         }
 
-        itoa(global_uDC, cbuf, 16);
+        itoa(duty_cycle, cbuf, 16);
         strcat(sbuf, cbuf);
         strcat(sbuf, "\r\n");
         UARTputs(sbuf);
@@ -667,9 +672,9 @@ main()
     BLDC_Stop();
     Log_Level = 0;
 
-    enableInterrupts(); // Enable interrupts . Interrupts are globally disabled by default
+    enableInterrupts(); // interrupts are globally disabled by default
 
-    uart_print("\033c"); // sends ANSI code to  clear the serial terminal 
+    uart_print("\033c"); // sends ANSI code to  clear the serial terminal
     uart_print("Program Startup....... \r\n");
 
     while(1)
@@ -683,14 +688,14 @@ main()
             disableInterrupts();
             BLDC_Stop();
             enableInterrupts();
-
+            // reset line couunter of the serial-port logger
             Line_Count = -1;
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-
+//  TEST DEV ONLY: manual adjustment of commutation cycle time
             disableInterrupts();
             BLDC_Spd_inc();
             enableInterrupts();
@@ -699,7 +704,7 @@ main()
         if ( ! (( GPIOE->IDR)&(1<<5)))
         {
             while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
-
+//  TEST DEV ONLY: manual adjustment of commutation cycle time
             disableInterrupts();
             BLDC_Spd_dec();
             enableInterrupts();

@@ -76,16 +76,17 @@ typedef  enum {
  */
 extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
 
-extern  uint16_t global_uDC;
-
-
 
 /*
  * prototypes
  */
-// these are in driver.c .. header?
-void BLDC_Spd_inc(void);
-void BLDC_Spd_dec(void);
+
+void BLDC_Spd_inc(void); // should go away
+void BLDC_Spd_dec(void);// should go away
+
+uint16_t BLDC_PWMDC_Plus(void);
+uint16_t BLDC_PWMDC_Minus(void);
+
 void BLDC_Stop(void);
 void BLDC_Step(void);
 void BLDC_Update(void);

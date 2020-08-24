@@ -207,6 +207,15 @@ void set_dutycycle(uint16_t global_dutycycle)
     global_uDC = global_dutycycle;
 }
 
+void inc_dutycycle(void)
+{
+    global_uDC += 1;
+}
+
+void dec_dutycycle(void)
+{
+     global_uDC -= 1;
+}
 
 /*
  * intermediate function for setting PWM with positive or negative polarity
@@ -517,6 +526,31 @@ void BLDC_Stop()
 }
 
 /*
+ * increment set and return present motor speed value
+ */
+uint16_t BLDC_PWMDC_Plus()
+{
+    if (BLDC_ON == BLDC_State )
+    {
+        inc_dutycycle();
+    }
+    return global_uDC;
+}
+
+/*
+ * decrement set and return present motor speed value
+ */
+uint16_t BLDC_PWMDC_Minus()
+{
+    if (BLDC_ON == BLDC_State)
+    {
+        dec_dutycycle();
+    }
+    return global_uDC;
+}
+
+
+/*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_dec()
@@ -623,6 +657,8 @@ void BLDC_Step(void)
     const uint8_t N_CSTEPS = 6;
 
     static COMMUTATION_SECTOR_t bldc_step = 0;
+
+
 
     bldc_step += 1;
     bldc_step %= N_CSTEPS;
