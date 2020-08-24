@@ -16,25 +16,22 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define ADC_N_CHANNELS 10       // [A0:A9]
+#define UARTputs  uart_print // tmp this is sometimes a coding std no-no
 
-//#define AINCH_COMMUATION_PD  9   // adjust pot to set "commutation" period
-//#define AINCH_PWM_DC         8   // adjust pot to PWM D.C. on FET outputs
+
+#define ADC_N_CHANNELS 10       // [A0:A9]
 
 
 /* Public variables  ---------------------------------------------------------*/
 
-uint16_t AnalogInputs[16]; // at least ADC NR CHANNELS .. tmp?
-
-
 uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
+uint8_t Log_Level;
 
 
 /* Private variables ---------------------------------------------------------*/
 
 //static
-uint8_t Log_Level;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -250,7 +247,7 @@ void UART_setup(void)
 *  Send a message to the debug port (UART1).
 *    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
 */
-void UARTputs(char *message)
+void uart_print(char *message)
 {
     char *ch = message;
     while (*ch)
@@ -260,6 +257,52 @@ void UARTputs(char *message)
         ch++;                               //  Grab the next character.
     }
 }
+
+/*
+ * https://www.st.com/resource/en/application_note/cd00282842-rs232-communications-with-a-terminal-using-the-stm8sdiscovery-stmicroelectronics.pdf
+ */
+/*******************************************************************************
+* Function Name  : SerialKeyPressed
+* Description    : Test to see if a key has been pressed on the HyperTerminal
+* Input          : - key: The key pressed
+* Output         : None
+* Return         : 1: Correct
+*                  0: Error
+*******************************************************************************/
+u8 SerialKeyPressed(char *key)
+{
+    FlagStatus flag  ;
+    /* First clear Rx buffer */
+    flag = UART2_GetFlagStatus(UART2_FLAG_RXNE);
+    if ( flag == SET)
+    {
+        *key = (char)UART2->DR;
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+/*******************************************************************************
+* Function Name  : GetKey
+* Description    : Get a key from the HyperTerminal
+* Input          : None
+* Output         : None
+* Return         : The Key Pressed
+*******************************************************************************/
+char GetKey(void)
+{
+    char key = 0;
+    /* Waiting for user input */
+    while (1)
+    {
+        if (SerialKeyPressed((char*)&key)) break;
+    }
+    return key;
+}
+
 
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
@@ -412,12 +455,11 @@ void TIM4_setup(void)
 
 // now reduce the pre-scaler, while sub-tasking the TIM3 ISR
 
- #ifdef CLOCK_16
-  #define TIM3_PSCR  0x03  // 2^3 == 8
- #else
-  #define TIM3_PSCR  0x02  // 2^2 == 4
- #endif
-
+#ifdef CLOCK_16
+#define TIM3_PSCR  0x03  // 2^3 == 8
+#else
+#define TIM3_PSCR  0x02  // 2^2 == 4
+#endif
 
 
 void TIM3_setup(uint16_t u_period)
@@ -488,6 +530,7 @@ static uint16_t Line_Count = 0;
 extern uint16_t BLDC_OL_comm_tm;
 extern uint16_t Back_EMF_R[2];
 extern uint16_t Back_EMF_F[2];
+extern uint16_t Back_EMF_F0_MA;
 
 
 /*
@@ -511,6 +554,17 @@ void testUART(void)
     itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
+#if 0
+////Back_EMF_F0_MA
+    strcat(sbuf, " bF0_ma=");
+    itoa( Back_EMF_F0_MA,     cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " bF0=");
+    itoa( Back_EMF_F[0],     cbuf, 16);
+    strcat(sbuf, cbuf);
+#endif
+
     strcat(sbuf, " A0=");
     itoa(ADC1_GetBufferValue(0), cbuf, 16);
     strcat(sbuf, cbuf);
@@ -531,7 +585,7 @@ void testUART(void)
     itoa(ADC1_GetBufferValue(9), cbuf, 16);
     strcat(sbuf, cbuf);
 
-#if 0 
+#if 0
 // A/D
     for (loop = 0; loop <  ADC_N_CHANNELS ; loop++)
     {
@@ -558,6 +612,10 @@ void testUART(void)
  */
 void Periodic_task(void)
 {
+    char sbuf[16] = "DC=";
+    char cbuf[8] = { 0, 0 };
+    char key;
+
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
      * simply designates number of reps ... spacing TBD? this task is now tied to
@@ -573,14 +631,25 @@ void Periodic_task(void)
 
         testUART();// tmp test
     }
-}
 
-/*
- * 
- */
-uart_print( char * sbuf ){
+    if (SerialKeyPressed((char*)&key))
+    {
+        if (key == '+')
+        {
+//            global_uDC += 1; // exp: needs to  be protected see set_dutycycle()
+            UARTputs("+++");
+        }
+        else if (key == '-')
+        {
+//            global_uDC -= 1;  // exp:  needs to  be protected see set_dutycycle()
+            UARTputs("---");
+        }
 
-    UARTputs(sbuf);
+        itoa(global_uDC, cbuf, 16);
+        strcat(sbuf, cbuf);
+        strcat(sbuf, "\r\n");
+        UARTputs(sbuf);
+    }
 }
 
 /*
