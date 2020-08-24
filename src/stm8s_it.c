@@ -26,6 +26,7 @@
 
 // hack, temp
 extern uint16_t BLDC_OL_comm_tm;
+extern  uint16_t global_uDC;
 
 
 /** @addtogroup I2C_EEPROM
@@ -342,7 +343,6 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 
     static uint8_t toggle = 0;
 
-    uint8_t Step_Enabled = 0;
 
 
     GPIOG->ODR |=  (1<<0); // test pin
@@ -367,7 +367,6 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
          */
         uint16_t cntr  = TIM1_GetCounter();
 
-        Step_Enabled = 1;
 
 #ifdef COMM_TIME_KLUDGE_DELAYS
 
@@ -385,8 +384,6 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 #endif
 
 
-// BLDC Step ..restarts the counter!
-//        bldc_step_modul = 0;
 
         BLDC_Step();
     }
