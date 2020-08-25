@@ -365,10 +365,10 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
          * experimentation has shown that things are running smoother if syncronizd w/
          * PWM .. sort of ;)
          */
-        uint16_t cntr  = TIM1_GetCounter();
+        uint16_t cntr  = 0;
 
 
-#ifdef COMM_TIME_KLUDGE_DELAYS
+#if 0 // #ifdef COMM_TIME_KLUDGE_DELAYS
 
         while( cntr < global_uDC ) // COUNTER MODE UP !!
         {
