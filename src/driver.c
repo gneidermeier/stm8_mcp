@@ -21,18 +21,18 @@ extern uint8_t Log_Level; // tmp
 #define PWM_100PCNT    TIM2_PWM_PD
 #define PWM_50PCNT     ( PWM_100PCNT / 2 )
 #define PWM_25PCNT     ( PWM_100PCNT / 4 )
+#define PWM_20PCNT     ( PWM_100PCNT / 5 )
+#define PWM_10PCNT     ( PWM_100PCNT / 10 )
 #define PWM_0PCNT      0
-#define PWM_DC_RAMPUP  PWM_50PCNT // 52 // exp. determined
+
+#define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
 
 
-#define PWM_20PCNT     ( PWM_100PCNT / 5)          // 50
-#define PWM_21PCNT     ( 21 * PWM_100PCNT / 100)   // 52.5
-#define PWM_22PCNT     ( 22 * PWM_100PCNT / 100)   // 55    // $37
-#define PWM_23PCNT     ( 23 * PWM_100PCNT / 100)
-#define PWM_24PCNT     ( 24 * PWM_100PCNT / 100)
+#define PWM_DC_RAMPUP  PWM_X_PCNT( 45 ) // from 50% ... better? (stalls 4/5)
 
-#define PWM_DC_IDLE    PWM_22PCNT // stall 50% of the time
- 
+#define PWM_DC_IDLE    PWM_X_PCNT( 22 ) // stall 50% of the time
+
+
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
  *  commutation step period.
@@ -64,6 +64,12 @@ extern uint8_t Log_Level; // tmp
 //#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 3.2ms
 #define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
 
+
+
+// 1 cycle = 6 * 8uS * 13 = 0.000624 S    (needs updated info here)
+#define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
+
+
 // 1 cycle = 6 * 8uS * 50 = 0.0024 S
 #define BLDC_OL_TM_MANUAL_HI_LIM   (63 * BLDC_CT_SCALE) // 64 // stalls in the range of 62-64 dependng on delays
 // advance to (and slightly past) "ideal" timing point
@@ -72,9 +78,6 @@ extern uint8_t Log_Level; // tmp
 // commutation period (manual speed-control input by adjusting PWM  duty-cycle)
 // The control loop will only have precision of 0.000008 S adjustment though (externally triggered comparator would be ideal )
 
-// 1 cycle = 6 * 8uS * 13 = 0.000624 S
-// 1 cycle = 6 * 8uS * 14 = 0.000672 S
-#define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
 
 
 /* Private types -----------------------------------------------------------*/
@@ -301,13 +304,12 @@ void delay(int time)
   * no change/disruption to  its PWM signal.
 
   */
-void comm_switch ( DC_PWM_PH_STATES_t  states )
-// void comm_switch ( uint8_t bldc_step)
+void comm_switch ( uint8_t bldc_step )
 {
     THREE_PHASE_CHANNELS_t float_phase = PHASE_NONE;
     DC_PWM_STATE_t float_value= DC_NONE;
 
-//    DC_PWM_PH_STATES_t  states = Commutation_States[ bldc_step ];
+    DC_PWM_PH_STATES_t  states = Commutation_States[ bldc_step ];
 
     DC_PWM_STATE_t state0 = states.phaseA;
     DC_PWM_STATE_t state1 = states.phaseB;
@@ -530,6 +532,12 @@ void BLDC_Stop()
  */
 uint16_t BLDC_PWMDC_Plus()
 {
+    if (BLDC_OFF == BLDC_State)
+    {
+//        BLDC_State = BLDC_RAMPUP;
+//        uart_print( "OFF->RAMP-\r\n");
+    }
+    else
     if (BLDC_ON == BLDC_State )
     {
         inc_dutycycle();
@@ -674,6 +682,6 @@ void BLDC_Step(void)
     }
     else // if (BLDC_ON == BLDC_State || BLDC_RAMP == BLDC_State)
     {
-        comm_switch( Commutation_States[ bldc_step ] );
+        comm_switch( bldc_step );
     }
 }
