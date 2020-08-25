@@ -317,8 +317,8 @@ void ADC1_setup(void)
 
 // configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
-              ADC1_CHANNEL_9,        // tmp ... test pots on CH8, CH9
-              ADC1_PRESSEL_FCPU_D18, // setting for largest divider for lowest rate (don't want to consume too much CPU svcing ADC)   ??????? idk
+              ADC1_CHANNEL_2,
+              ADC1_PRESSEL_FCPU_D2,
               ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO
               DISABLE,               // ExtTriggerState
               ADC1_ALIGN_RIGHT,
@@ -334,7 +334,9 @@ void ADC1_setup(void)
     in the data buffer registers ADC_DBxR.
     */
 //ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1)), ADC1_ALIGN_RIGHT);
-    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_8 | ADC1_CHANNEL_9)), ADC1_ALIGN_RIGHT);
+    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS,
+                          ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1 | ADC1_CHANNEL_2)),
+                          ADC1_ALIGN_RIGHT);
 
 //ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
@@ -554,7 +556,7 @@ void testUART(void)
     itoa(BLDC_OL_comm_tm, cbuf, 16);
     strcat(sbuf, cbuf);
 
-#if 0
+#if 1
 ////Back_EMF_F0_MA
     strcat(sbuf, " bF0_ma=");
     itoa( Back_EMF_F0_MA,     cbuf, 16);
