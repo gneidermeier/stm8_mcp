@@ -93,29 +93,19 @@ typedef enum DC_PWM_STATE
     DC_OUTP_FLOAT_R,
     DC_OUTP_FLOAT_F,
     DC_NONE
-} DC_PWM_STATE_t;
+} BLDC_PWM_STATE_t;
 
 /*
  * aggregate 3 phases into a struct for easy param passing and putting in table
  */
 typedef struct
 {
-    DC_PWM_STATE_t phaseA;
-    DC_PWM_STATE_t phaseB;
-    DC_PWM_STATE_t phaseC;
+    BLDC_PWM_STATE_t phA;
+    BLDC_PWM_STATE_t phB;
+    BLDC_PWM_STATE_t phC;
 }
-DC_PWM_PH_STATES_t;
+BLDC_COMM_STEP_t;
 
-/*
- * define an integer "triplet" type for storing accumulated back-EMF values
- */
-typedef struct
-{
-    uint16_t phaseA;
-    uint16_t phaseB;
-    uint16_t phaseC;
-}
-BACK_EMF_AD_t;
 
 
 // enumerate 3 phases
@@ -125,7 +115,7 @@ typedef enum THREE_PHASE_CHANNELS
     PHASE_A,
     PHASE_B,
     PHASE_C
-} THREE_PHASE_CHANNELS_t;
+} BLDC_PHASE_t;
 
 //enumerate available PWM drive modes
 typedef enum PWM_MODE
@@ -171,7 +161,7 @@ BLDC_STATE_T BLDC_State;
  * table of commutation states: confirmed that the elements of type
  * DC_PWM_PH_STATES t are occurpying 3-bytes each and packed (odd-aligned bytes should generally not be a problem for the CPU or the comp/linker)
  */
-static const DC_PWM_PH_STATES_t Commutation_States[] =
+static const BLDC_COMM_STEP_t Commutation_Steps[] =
 {
 // sector 0:
     { DC_PWM_PLUS,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
@@ -226,7 +216,7 @@ void dec_dutycycle(void)
  *
  * This could probably be done better given a more coherent read of the PWM/timer confugration in the MCU reference manual!!
  */
-uint16_t get_pwm_dc(uint8_t chan /* unused */, DC_PWM_STATE_t state)
+uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
 {
     uint16_t pulse = PWM_0PCNT;
 
@@ -306,14 +296,12 @@ void delay(int time)
   */
 void comm_switch ( uint8_t bldc_step )
 {
-    THREE_PHASE_CHANNELS_t float_phase = PHASE_NONE;
-    DC_PWM_STATE_t float_value= DC_NONE;
+    BLDC_PHASE_t float_phase = PHASE_NONE;
+    BLDC_PWM_STATE_t float_value = DC_NONE;
 
-    DC_PWM_PH_STATES_t  states = Commutation_States[ bldc_step ];
-
-    DC_PWM_STATE_t state0 = states.phaseA;
-    DC_PWM_STATE_t state1 = states.phaseB;
-    DC_PWM_STATE_t state2 = states.phaseC;
+    BLDC_PWM_STATE_t state0 = Commutation_Steps[ bldc_step ].phA;
+    BLDC_PWM_STATE_t state1 = Commutation_Steps[ bldc_step ].phB;
+    BLDC_PWM_STATE_t state2 = Commutation_Steps[ bldc_step ].phC;
 
     uint16_t u16tmp;
 
@@ -424,7 +412,7 @@ void comm_switch ( uint8_t bldc_step )
 
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
 		 * The falling Back-EMF should be readable at 0 degrees sector.
-		 * Rising back-EMF would need to be read beginning at the 30 degreess 
+		 * Rising back-EMF would need to be read beginning at the 30 degreess
 		 * sector to see if it is above threshold ( around 0.7 v ).
     */
     if (  DC_OUTP_FLOAT_F == state0 )
@@ -640,8 +628,7 @@ void BLDC_Update(void)
         }
         else
         {
-            // TODO: the actual transition to ON state would be seeing the ramp-to speed
-// achieved in closed-loop operation
+            // TODO: the actual transition to ON state would be seeing the ramp-to speed achieved in closed-loop operation
             BLDC_State = BLDC_ON;
             set_dutycycle( PWM_DC_IDLE );
 
@@ -655,13 +642,9 @@ void BLDC_Update(void)
 }
 
 /*
- * TODO: schedule at 15degree intervals? (see TIM3)	????
- Start a short timer on which ISR will then  trigger the A/D with proper timing  .... at 1/4 of the comm. cycle ?
- So TIM3 would not stepp 6 times but 6x4 times? (4 times precision?)
  */
 void BLDC_Step(void)
 {
-    const DC_PWM_PH_STATES_t OFF_State = { DC_OUTP_OFF, DC_OUTP_OFF, DC_OUTP_OFF };
     const uint8_t N_CSTEPS = 6;
 
     static COMMUTATION_SECTOR_t bldc_step = 0;
