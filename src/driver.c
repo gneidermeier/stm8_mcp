@@ -12,9 +12,7 @@
 #include "stm8s.h"
 #include "parameter.h" // app defines
 
-
 extern uint8_t Log_Level; // tmp
-
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -27,11 +25,9 @@ extern uint8_t Log_Level; // tmp
 
 #define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
 
-
 #define PWM_DC_RAMPUP  PWM_X_PCNT( 45 ) // from 50% ... better? (stalls 4/5)
 
 #define PWM_DC_IDLE    PWM_X_PCNT( 22 ) // stall 50% of the time
-
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -44,7 +40,6 @@ extern uint8_t Log_Level; // tmp
  *
  * RPS = (1 / cycle_time * 6)
  */
-
 
 //   BLDC_CT_SCALE  ... needs to be linked to TIM3 Presacalar! (changing this is not working right now ... )
 // BLDC_CT_SCALE must be > 2 (and must be power of 2)
@@ -59,25 +54,12 @@ extern uint8_t Log_Level; // tmp
 // 1 cycle = 6 * 8uS * 512 = 0.024576 S
 #define BLDC_OL_TM_LO_SPD         (512 * BLDC_CT_SCALE)  // start of ramp
 
-// 1 cycle = 6 * 8uS * 80 = 0.00384 S
-//#define BLDC_OL_TM_HI_SPD          (80 * BLDC_CT_SCALE)  // end of ramp ... period ~ 4mS
-//#define BLDC_OL_TM_HI_SPD          (68 * BLDC_CT_SCALE)  // end of ramp ... period ~ 3.2ms
 #define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
-
-
 
 // 1 cycle = 6 * 8uS * 13 = 0.000624 S    (needs updated info here)
 #define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
 
-
-// 1 cycle = 6 * 8uS * 50 = 0.0024 S
-#define BLDC_OL_TM_MANUAL_HI_LIM   (63 * BLDC_CT_SCALE) // 64 // stalls in the range of 62-64 dependng on delays
-// advance to (and slightly past) "ideal" timing point
-
-// any "speed" setting higher than HI_LIM would be by closed-loop control of
-// commutation period (manual speed-control input by adjusting PWM  duty-cycle)
-// The control loop will only have precision of 0.000008 S adjustment though (externally triggered comparator would be ideal )
-
+#define BLDC_OL_TM_MANUAL_HI_LIM   LUDICROUS_SPEED
 
 
 /* Private types -----------------------------------------------------------*/
@@ -97,8 +79,9 @@ typedef enum DC_PWM_STATE
 
 /*
  * aggregate 3 phases into a struct for easy param passing and putting in table
+ * There could be other information put in there if needed to ease the step transitions logic.
  */
-typedef struct
+typedef struct /* COMM_STEP */
 {
     BLDC_PWM_STATE_t phA;
     BLDC_PWM_STATE_t phB;
@@ -107,9 +90,10 @@ typedef struct
 BLDC_COMM_STEP_t;
 
 
-
-// enumerate 3 phases
-typedef enum THREE_PHASE_CHANNELS
+/*
+ * 3 electrical phases (use as index for BLDC_PWM_Chann_Cfg)
+ */
+typedef enum /* THREE_PHASE_CHANNELS */
 {
     PHASE_NONE,
     PHASE_A,
@@ -117,16 +101,16 @@ typedef enum THREE_PHASE_CHANNELS
     PHASE_C
 } BLDC_PHASE_t;
 
-//enumerate available PWM drive modes
-typedef enum PWM_MODE
+// PWM drive modes
+typedef enum /* PWM_MODE */
 {
     UPPER_ARM,
     LOWER_ARM
     // SYMETRICAL ... upper and lower arms driven (complementary) .. maybe no use for it
 } PWM_MODE_t;
 
-//enumerate commutation "sectors" (steps)
-typedef enum COMMUTATION_SECTOR
+// commutation "sectors" (steps)
+typedef enum /* COMMUTATION_SECTOR */
 {
     SECTOR_1,
     SECTOR_2,
@@ -136,8 +120,32 @@ typedef enum COMMUTATION_SECTOR
     SECTOR_6
 } COMMUTATION_SECTOR_t;
 
+// tmp?
+#define BLDC_PWM_CH1   TIM1_CHANNEL_1//                     = ((uint8_t)0x00),
+#define BLDC_PWM_CH2   TIM1_CHANNEL_2//                     = ((uint8_t)0x01),
+#define BLDC_PWM_CH3   TIM1_CHANNEL_3//                     = ((uint8_t)0x02),
+#define BLDC_PWM_CH4   TIM1_CHANNEL_4//                     = ((uint8_t)0x03)
+#define BLDC_PWM_CH_Z  (-1)  // help for my kludgey lookup table indexing
+
+typedef TIM1_Channel_TypeDef BLDC_Channel_TypeDef ;
+
 
 /* Public variables  ---------------------------------------------------------*/
+
+/*
+ * can be indexed by BLDC_PHASE_t
+ */
+static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
+{
+
+// note PWM 0 at index 0
+    -1, // make sure this can be element 0 is invalid (allows index initializers to default to 0 i.e. index OOR)
+        BLDC_PWM_CH2, // PWM 1
+        BLDC_PWM_CH3, // PWM 2
+        BLDC_PWM_CH4, // PWM 3
+        BLDC_PWM_CH_Z  //  meh
+};
+#define BLDC_CH_NG  (sizeof( BLDC_PWM_Chann_Cfg ) - 1)  // idk ... get the max index, make it invalid so that element 0 can be valid default
 
 // 2 elements (sample 1 and sample 2)
 uint16_t Back_EMF_R[2];
@@ -152,10 +160,6 @@ BLDC_STATE_T BLDC_State;
 
 
 /* Private variables ---------------------------------------------------------*/
-
-
-// max nr of back-EMF readings (3? 4? how many PWMs will be readale during each 60 degree float (of which only 30degree is seen w/ upp-erarm driving anyay!!)
-
 
 /*
  * table of commutation states: confirmed that the elements of type
@@ -180,10 +184,6 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 
 static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 
-/*
- * RUNNING OUT OF RAM!!!!!!!!!!!!!!!
- */
-
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -207,7 +207,7 @@ void inc_dutycycle(void)
 
 void dec_dutycycle(void)
 {
-     global_uDC -= 1;
+    global_uDC -= 1;
 }
 
 /*
@@ -255,19 +255,6 @@ void delay(int time)
 }
 
 
-/*
- * see Issue #6
- * At the end of driven sectors (2 x 60 degree = 120 degrees driving duration),
- * the PWM would be in an indeterminate state (hi or lo) depending on TIM1 duty-cycle
- * and how the comm. switch timing (TIM3) happens to line up with it (if comm. switch
- * happends during on or off segment)..
- * Only by calling TIM1_DeInit() has it been possible to
- * assert the state of the PWM signal on the sector that is being transitioned ->FLOAT .
- * But this has been a problem in that, the 2 consecutive driving sectors should not
- * really be reconfigured unless there is a way to do it w/o causing a disruption during
- * the 120 driving semgnet which appears as voltage noise spike on the motor phase output
- */
-
 /**
   * @brief  .
   * @par Parameters:
@@ -292,30 +279,90 @@ void delay(int time)
   *
   * Ideally, when a phase is a 60degress (half of its time) there should be
   * no change/disruption to  its PWM signal.
-
   */
-void comm_switch ( uint8_t bldc_step )
+void comm_switch (uint8_t bldc_step)
 {
+    static COMMUTATION_SECTOR_t prev_bldc_step = 0;
+
+    BLDC_PWM_STATE_t prev_A, prev_B, prev_C ;
+    BLDC_PWM_STATE_t state0, state1, state2;
+
     BLDC_PHASE_t float_phase = PHASE_NONE;
     BLDC_PWM_STATE_t float_value = DC_NONE;
+    int itemp = 0;
 
-    BLDC_PWM_STATE_t state0 = Commutation_Steps[ bldc_step ].phA;
-    BLDC_PWM_STATE_t state1 = Commutation_Steps[ bldc_step ].phB;
-    BLDC_PWM_STATE_t state2 = Commutation_Steps[ bldc_step ].phC;
+    /*
+     * handle  prev_bldc_step ??
+    */
+    prev_A = Commutation_Steps[ prev_bldc_step ].phA;
+    prev_B = Commutation_Steps[ prev_bldc_step ].phB;
+    prev_C = Commutation_Steps[ prev_bldc_step ].phC;
+    prev_bldc_step = bldc_step;
 
-    uint16_t u16tmp;
+
+    if (DC_OUTP_FLOAT_R == prev_A || DC_OUTP_FLOAT_F == prev_A)
+    {
+        float_phase = PHASE_A;
+        float_value= state0;
+    }
+    else if (DC_OUTP_FLOAT_R == prev_B || DC_OUTP_FLOAT_F == prev_B)
+    {
+        float_phase = PHASE_B;
+        float_value= state1;
+    }
+    else if (DC_OUTP_FLOAT_R == prev_C || DC_OUTP_FLOAT_F == prev_C)
+    {
+        float_phase = PHASE_C;
+        float_value= state2;
+    }
+    else
+    {
+        float_phase = PHASE_NONE;
+        float_value = DC_NONE;
+    }
+
+    /* measure rising back-EMF here before shutting off the energized
+     */
+    if (DC_OUTP_FLOAT_R == float_value)
+    {
+    }
+
+
+    state0 = Commutation_Steps[ bldc_step ].phA;
+    state1 = Commutation_Steps[ bldc_step ].phB;
+    state2 = Commutation_Steps[ bldc_step ].phC;
+    /*
+     * disable PWM on the driving phase (change only on prev phase also Plus i.e. 120 degrees )
+     */
+    itemp = 0;
+    if ( DC_PWM_PLUS == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
+    {
+        itemp = BLDC_PWM_Chann_Cfg[ PHASE_A ];
+    }
+    if ( DC_PWM_PLUS == prev_B  && ( DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1 ) )
+    {
+        itemp = BLDC_PWM_Chann_Cfg[ PHASE_B ];
+    }
+    if ( DC_PWM_PLUS == prev_C  && ( DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2 ) )
+    {
+        itemp = BLDC_PWM_Chann_Cfg[ PHASE_C ];
+    }
+
 
     /* todo: look into this?:
         "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
         is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
         */
     TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // dsable interrupts ???? .. (there is an ISR triggered as soon as the channel/PWM disabled
-
+#if 0
     TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
     TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
     TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
-    TIM1_CtrlPWMOutputs(DISABLE);
+#else
+    TIM1_CCxCmd(itemp, DISABLE);
+#endif
 
+    TIM1_CtrlPWMOutputs(DISABLE);
 
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
@@ -357,7 +404,6 @@ void comm_switch ( uint8_t bldc_step )
      */
     GPIOG->ODR |=  (1<<0); // TEST PIN ON
 
-
 // The "OFF" (non-PWMd) phase is asserted output pins to GPIO, driven Off
 // (this  phase was with already off, or was floating )
     if (DC_OUTP_LO == state0)
@@ -383,10 +429,10 @@ void comm_switch ( uint8_t bldc_step )
     }
 
 
-/*
- This delay waits for settling of flyback effect after the PWM transition. Back-EMF
- can be read from the (previously energized) phase which is now floating (and of course for now, PWM is off!)
-*/
+    /*
+     This delay waits for settling of flyback effect after the PWM transition. Back-EMF
+     can be read from the (previously energized) phase which is now floating (and of course for now, PWM is off!)
+    */
 #ifdef COMM_TIME_KLUDGE_DELAYS
 
 #ifdef PWM_8K // 8k PWM
@@ -400,24 +446,21 @@ void comm_switch ( uint8_t bldc_step )
 
 #endif // COMM_TIME_KLUDGE_DELAYS
 
+    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
 
 
 // Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
     TIM1_Cmd(DISABLE);
 
 
-
-    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
-
-
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
-		 * The falling Back-EMF should be readable at 0 degrees sector.
-		 * Rising back-EMF would need to be read beginning at the 30 degreess
-		 * sector to see if it is above threshold ( around 0.7 v ).
-    */
+     * The falling Back-EMF should be readable at 0 degrees sector.
+     * Rising back-EMF would need to be read beginning at the 30 degreess
+     * sector to see if it is above threshold ( around 0.7 v ).
+     */
     if (  DC_OUTP_FLOAT_F == state0 )
     {
-        u16tmp = Back_EMF_F[0];
+        uint16_t u16tmp = Back_EMF_F[0];
         Back_EMF_F[0] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
         Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
     }
@@ -525,8 +568,7 @@ uint16_t BLDC_PWMDC_Plus()
 //        BLDC_State = BLDC_RAMPUP;
 //        uart_print( "OFF->RAMP-\r\n");
     }
-    else
-    if (BLDC_ON == BLDC_State )
+    else if (BLDC_ON == BLDC_State )
     {
         inc_dutycycle();
     }
@@ -633,7 +675,7 @@ void BLDC_Update(void)
             set_dutycycle( PWM_DC_IDLE );
 
             Log_Level = 16; // tmp debug
-            }
+        }
         break;
     }
 
@@ -649,11 +691,6 @@ void BLDC_Step(void)
 
     static COMMUTATION_SECTOR_t bldc_step = 0;
 
-
-
-    bldc_step += 1;
-    bldc_step %= N_CSTEPS;
-
     if (BLDC_OFF == BLDC_State )
     {
         // motor drive output is not active
@@ -665,6 +702,9 @@ void BLDC_Step(void)
     }
     else // if (BLDC_ON == BLDC_State || BLDC_RAMP == BLDC_State)
     {
+        bldc_step += 1;
+        bldc_step %= N_CSTEPS;
+
         comm_switch( bldc_step );
     }
 }
