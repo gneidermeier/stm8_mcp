@@ -77,6 +77,22 @@ typedef enum DC_PWM_STATE
     DC_NONE
 } BLDC_PWM_STATE_t;
 
+
+/*
+ * bitfield mappings for sector:
+ *  :2 High drive
+ *  :2 Low drive
+ *  :2 Rising float transition
+ *  :2 Falling float transition
+ *  typedef uint_8 SECTOR_BITF_t
+ */
+typedef uint8_t SECTOR_PHASE_MAPPING_t ;
+// e.g.
+// BLDC_PHASE_t bar = PHASE_A;
+// SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
+#define SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ ) 
+// SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
+ 
 /*
  * aggregate 3 phases into a struct for easy param passing and putting in table
  * There could be other information put in there if needed to ease the step transitions logic.
@@ -353,16 +369,9 @@ void comm_switch (uint8_t bldc_step)
         "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
         is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
         */
-    TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // dsable interrupts ???? .. (there is an ISR triggered as soon as the channel/PWM disabled
-#if 0
-    TIM1_CCxCmd(TIM1_CHANNEL_2, DISABLE);
-    TIM1_CCxCmd(TIM1_CHANNEL_3, DISABLE);
-    TIM1_CCxCmd(TIM1_CHANNEL_4, DISABLE);
-#else
-    TIM1_CCxCmd(itemp, DISABLE);
-#endif
+//    TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // not using the ISR right now
 
-    TIM1_CtrlPWMOutputs(DISABLE);
+    TIM1_CCxCmd(itemp, DISABLE);
 
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
@@ -450,7 +459,7 @@ void comm_switch (uint8_t bldc_step)
 
 
 // Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
-    TIM1_Cmd(DISABLE);
+//    TIM1_Cmd(DISABLE);
 
 
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
@@ -534,11 +543,10 @@ void comm_switch (uint8_t bldc_step)
     }
 
 // counterparts to Disable commands above
-    TIM1_SetCounter(0);
-    TIM1_CtrlPWMOutputs(ENABLE);
-
-    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
-    TIM1_Cmd(ENABLE);
+//    TIM1_SetCounter(0);
+    TIM1_CtrlPWMOutputs(ENABLE);              // apparently this is required after re-config PWM
+//    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE); // not using ISR presently
+//    TIM1_Cmd(ENABLE);
 }
 
 
