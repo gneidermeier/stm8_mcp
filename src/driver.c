@@ -68,8 +68,8 @@ extern uint8_t Log_Level; // tmp
 typedef enum DC_PWM_STATE
 {
     DC_OUTP_OFF,
-    DC_PWM_PLUS,
-    DC_PWM_MINUS, // complimented i.e. (100% - DC)
+//    DC_PWM_PLUS,
+//    DC_PWM_MINUS, // complimented i.e. (100% - DC)
     DC_OUTP_HI,
     DC_OUTP_LO,
     DC_OUTP_FLOAT_R,
@@ -178,23 +178,23 @@ BLDC_STATE_T BLDC_State;
 /* Private variables ---------------------------------------------------------*/
 
 /*
- * table of commutation states: confirmed that the elements of type
- * DC_PWM_PH_STATES t are occurpying 3-bytes each and packed (odd-aligned bytes should generally not be a problem for the CPU or the comp/linker)
+ * This table simply defines the "trapezoidal" waveform in 6-steps.
+ * The underlying PWM management scheme would be introduced elsewheres.
  */
 static const BLDC_COMM_STEP_t Commutation_Steps[] =
 {
 // sector 0:
-    { DC_PWM_PLUS,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
+    { DC_OUTP_HI,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
 // sector 1:
-    { DC_PWM_PLUS,      DC_OUTP_FLOAT_R, DC_OUTP_LO },
+    { DC_OUTP_HI,      DC_OUTP_FLOAT_R, DC_OUTP_LO },
 // sector 2:
-    { DC_OUTP_FLOAT_F,  DC_PWM_PLUS,     DC_OUTP_LO },
+    { DC_OUTP_FLOAT_F,  DC_OUTP_HI,     DC_OUTP_LO },
 // sector 3:
-    { DC_OUTP_LO,       DC_PWM_PLUS,     DC_OUTP_FLOAT_R },
+    { DC_OUTP_LO,       DC_OUTP_HI,     DC_OUTP_FLOAT_R },
 // sector 4:
-    { DC_OUTP_LO,       DC_OUTP_FLOAT_F, DC_PWM_PLUS },
+    { DC_OUTP_LO,       DC_OUTP_FLOAT_F, DC_OUTP_HI },
 // sector 5:
-    { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_PWM_PLUS }
+    { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_OUTP_HI }
 };
 
 
@@ -245,14 +245,14 @@ uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
         pulse = PWM_0PCNT;
         break;
     case DC_OUTP_HI:
-        pulse = PWM_100PCNT;
-        break;
-    case DC_PWM_PLUS:
+//        pulse = PWM_100PCNT;
+//        break;
+//    case DC_PWM_PLUS:
         pulse = global_uDC;
         break;
-    case DC_PWM_MINUS: // complimented i.e. (100% - DC)
-        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse
-        break;
+//    case DC_PWM_MINUS: // complimented i.e. (100% - DC)
+//        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse
+//        break;
     }
 
     return pulse;
@@ -351,15 +351,15 @@ void comm_switch (uint8_t bldc_step)
      * disable PWM on the driving phase (change only on prev phase also Plus i.e. 120 degrees )
      */
     itemp = 0;
-    if ( DC_PWM_PLUS == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
+    if ( DC_OUTP_HI == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
     {
         itemp = BLDC_PWM_Chann_Cfg[ PHASE_A ];
     }
-    if ( DC_PWM_PLUS == prev_B  && ( DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1 ) )
+    if ( DC_OUTP_HI == prev_B  && ( DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1 ) )
     {
         itemp = BLDC_PWM_Chann_Cfg[ PHASE_B ];
     }
-    if ( DC_PWM_PLUS == prev_C  && ( DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2 ) )
+    if ( DC_OUTP_HI == prev_C  && ( DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2 ) )
     {
         itemp = BLDC_PWM_Chann_Cfg[ PHASE_C ];
     }
@@ -484,7 +484,7 @@ void comm_switch (uint8_t bldc_step)
     {
         if (DC_OUTP_FLOAT_R != state0 && DC_OUTP_FLOAT_F != state0)
         {
-            if (DC_PWM_PLUS == state0 /* MINUS? */)
+            if (DC_OUTP_HI == state0)
             {
                 TIM1_SetCompare2( get_pwm_dc(0, state0) );
                 TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
@@ -505,7 +505,7 @@ void comm_switch (uint8_t bldc_step)
     {
         if (DC_OUTP_FLOAT_R != state1 && DC_OUTP_FLOAT_F != state1)
         {
-            if (DC_PWM_PLUS == state1 /* MINUS? */)
+            if (DC_OUTP_HI == state1)
             {
                 TIM1_SetCompare3( get_pwm_dc(1, state1) );
                 TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
@@ -526,7 +526,7 @@ void comm_switch (uint8_t bldc_step)
     {
         if (DC_OUTP_FLOAT_R != state2 && DC_OUTP_FLOAT_F != state2)
         {
-            if (DC_PWM_PLUS == state2 /* MINUS? */)
+            if (DC_OUTP_HI == state2)
             {
                 TIM1_SetCompare4( get_pwm_dc(2, state2) );
                 TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
