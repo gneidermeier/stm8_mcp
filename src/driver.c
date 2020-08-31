@@ -90,7 +90,7 @@ typedef uint8_t SECTOR_PHASE_MAPPING_t ;
 // e.g.
 // BLDC_PHASE_t bar = PHASE_A;
 // SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
-#define SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ ) 
+#define SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ )
 // SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
 
 /*
@@ -167,6 +167,7 @@ static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
 uint16_t Back_EMF_R[2];
 uint16_t Back_EMF_F[2];
 uint16_t Back_EMF_F0_MA;
+uint16_t Back_EMF_R0_MA;
 
 uint16_t BLDC_OL_comm_tm;   // could be private
 
@@ -305,7 +306,6 @@ void comm_switch (uint8_t bldc_step)
 
     BLDC_PHASE_t float_phase = PHASE_NONE;
     BLDC_PWM_STATE_t float_value = DC_NONE;
-    int itemp = 0;
 
     /*
      * handle  prev_bldc_step ??
@@ -315,7 +315,9 @@ void comm_switch (uint8_t bldc_step)
     prev_C = Commutation_Steps[ prev_bldc_step ].phC;
     prev_bldc_step = bldc_step;
 
-
+ /* 
+  * find out which phase floating ... dumB
+ */
     if (DC_OUTP_FLOAT_R == prev_A || DC_OUTP_FLOAT_F == prev_A)
     {
         float_phase = PHASE_A;
@@ -337,11 +339,16 @@ void comm_switch (uint8_t bldc_step)
         float_value = DC_NONE;
     }
 
+#if 0
     /* measure rising back-EMF here before shutting off the energized
      */
     if (DC_OUTP_FLOAT_R == float_value)
     {
+        uint16_t u16tmp = Back_EMF_R[0];
+        Back_EMF_R[0 /* float phase */ ] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
+        Back_EMF_R0_MA  = (u16tmp +  Back_EMF_R[0]) / 2;
     }
+#endif
 
 
     state0 = Commutation_Steps[ bldc_step ].phA;
@@ -350,28 +357,21 @@ void comm_switch (uint8_t bldc_step)
     /*
      * disable PWM on the driving phase (change only on prev phase also Plus i.e. 120 degrees )
      */
-    itemp = 0;
     if ( DC_OUTP_HI == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
     {
-        itemp = BLDC_PWM_Chann_Cfg[ PHASE_A ];
+        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_A ], DISABLE );
     }
     if ( DC_OUTP_HI == prev_B  && ( DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1 ) )
     {
-        itemp = BLDC_PWM_Chann_Cfg[ PHASE_B ];
+        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_B ], DISABLE );
     }
     if ( DC_OUTP_HI == prev_C  && ( DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2 ) )
     {
-        itemp = BLDC_PWM_Chann_Cfg[ PHASE_C ];
+        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_C ], DISABLE );
     }
 
 
-    /* todo: look into this?:
-        "For correct operation, preload registers must be enabled when the timer is in PWM mode. This
-        is not mandatory in one-pulse mode (OPM bit set in TIM1_CR1 register)."
-        */
-//    TIM1_ITConfig(TIM1_IT_UPDATE, DISABLE); // not using the ISR right now
 
-    TIM1_CCxCmd(itemp, DISABLE);
 
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
