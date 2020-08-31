@@ -92,7 +92,7 @@ typedef uint8_t SECTOR_PHASE_MAPPING_t ;
 // SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
 #define SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ ) 
 // SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
- 
+
 /*
  * aggregate 3 phases into a struct for easy param passing and putting in table
  * There could be other information put in there if needed to ease the step transitions logic.
@@ -160,7 +160,7 @@ static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
         BLDC_PWM_CH3, // PWM 2
         BLDC_PWM_CH4, // PWM 3
         BLDC_PWM_CH_Z  //  meh
-};
+    };
 #define BLDC_CH_NG  (sizeof( BLDC_PWM_Chann_Cfg ) - 1)  // idk ... get the max index, make it invalid so that element 0 can be valid default
 
 // 2 elements (sample 1 and sample 2)
@@ -447,8 +447,8 @@ void comm_switch (uint8_t bldc_step)
 #ifdef PWM_8K // 8k PWM
 
 //    delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
-    delay(  15 );        // about 20us
-
+//    delay(  15 );        // about 20us
+    delay(  45 );        // make sure the back-EMF is somewhat settled after demag-time
 #else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
     delay(  40 ); //   41 40 ... stall ?
 #endif
@@ -480,73 +480,25 @@ void comm_switch (uint8_t bldc_step)
      * PWMd, the other is continuously Off. Both driving IR2104s must be enabeld
      * by setting its /SD input line.
      */
-    if (DC_OUTP_OFF != state0)
+    if (DC_OUTP_HI == state0)
     {
-        if (DC_OUTP_FLOAT_R != state0 && DC_OUTP_FLOAT_F != state0)
-        {
-            if (DC_OUTP_HI == state0)
-            {
-                TIM1_SetCompare2( get_pwm_dc(0, state0) );
-                TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
-                // set /SD A ON
-//        GPIOC->ODR |=  (1<<5);      // A.
-            }
-            else if (DC_OUTP_LO == state0)
-            {
-// let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
-            }
-
-//            GPIOC->ODR |=  (1<<5);      // set /SD A On  ... assert On below ...
-        }
-//        else // floating phase, assert /SD A OFF and other two phase-legs enabled
+        TIM1_SetCompare2( get_pwm_dc(0, state0) );
+        TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
     }
 
-    if (DC_OUTP_OFF != state1)
+    if (DC_OUTP_HI == state1)
     {
-        if (DC_OUTP_FLOAT_R != state1 && DC_OUTP_FLOAT_F != state1)
-        {
-            if (DC_OUTP_HI == state1)
-            {
-                TIM1_SetCompare3( get_pwm_dc(1, state1) );
-                TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
-                // set /SD B ON
-//        GPIOG->ODR |=   (1<<7);
-            }
-            else if (DC_OUTP_LO == state1)
-            {
-// let the Timer PWM channel remain disabled, PC3 set LO, set /SD B  On
-            }
-
-//            GPIOG->ODR |=   (1<<7);     // set /SD B  On  ... assert On below ...
-        }
-//        else // floating phase, assert /SD B OFF and other two phase-legs enabled
+        TIM1_SetCompare3( get_pwm_dc(1, state1) );
+        TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
     }
 
-    if (DC_OUTP_OFF != state2)
+    if (DC_OUTP_HI == state2)
     {
-        if (DC_OUTP_FLOAT_R != state2 && DC_OUTP_FLOAT_F != state2)
-        {
-            if (DC_OUTP_HI == state2)
-            {
-                TIM1_SetCompare4( get_pwm_dc(2, state2) );
-                TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
-                // set /SD C ON
-//        GPIOG->ODR |=   (1<<1);     // C
-            }
-            else if (DC_OUTP_LO == state2)
-            {
-// let the Timer PWM channel remain disabled, PC4 set LO, set /SD C  On
-            }
-//            GPIOG->ODR |=   (1<<1);     // set /SD C  On ... assert On below ...
-        }
-//        else // floating phase, assert /SD C OFF and other two phase-legs enabled
+        TIM1_SetCompare4( get_pwm_dc(2, state2) );
+        TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
     }
 
-// counterparts to Disable commands above
-//    TIM1_SetCounter(0);
     TIM1_CtrlPWMOutputs(ENABLE);              // apparently this is required after re-config PWM
-//    TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE); // not using ISR presently
-//    TIM1_Cmd(ENABLE);
 }
 
 
