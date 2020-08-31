@@ -307,9 +307,7 @@ void comm_switch (uint8_t bldc_step)
     BLDC_PHASE_t float_phase = PHASE_NONE;
     BLDC_PWM_STATE_t float_value = DC_NONE;
 
-    /*
-     * handle  prev_bldc_step ??
-    */
+    // grab the phases states of previous sector 
     prev_A = Commutation_Steps[ prev_bldc_step ].phA;
     prev_B = Commutation_Steps[ prev_bldc_step ].phB;
     prev_C = Commutation_Steps[ prev_bldc_step ].phC;
@@ -339,7 +337,7 @@ void comm_switch (uint8_t bldc_step)
         float_value = DC_NONE;
     }
 
-#if 0
+#if 1
     /* measure rising back-EMF here before shutting off the energized
      */
     if (DC_OUTP_FLOAT_R == float_value)
@@ -354,8 +352,9 @@ void comm_switch (uint8_t bldc_step)
     state0 = Commutation_Steps[ bldc_step ].phA;
     state1 = Commutation_Steps[ bldc_step ].phB;
     state2 = Commutation_Steps[ bldc_step ].phC;
+
     /*
-     * disable PWM on the driving phase (change only on prev phase also Plus i.e. 120 degrees )
+     * disable PWM if previous driving phase is finished (120 degrees)
      */
     if ( DC_OUTP_HI == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
     {
@@ -371,72 +370,52 @@ void comm_switch (uint8_t bldc_step)
     }
 
 
-
-
-
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
         float_phase = PHASE_A;
         float_value= state0;
-
         GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
-        // other two legs have /SD enabled
-// /SD A OFF
-        GPIOC->ODR |=   (1<<7);
-        GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
         float_phase = PHASE_B;
         float_value= state1;
-
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
-        // other two legs have /SD enabled
-        GPIOC->ODR |=   (1<<5);
-// /SD B OFF
-        GPIOG->ODR |=   (1<<1);
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
         float_phase = PHASE_C;
         float_value= state2;
-
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
-        // other two legs have /SD enabled
-        GPIOC->ODR |=   (1<<5);
-        GPIOC->ODR |=   (1<<7);
-// /SD C OFF
+    }
+
+
+/*
+ * The "OFF" (non-PWMd) phase is asserted output pins to GPIO, driven Off (IR2104 enabled)
+ */
+    if (DC_OUTP_LO == state0)
+    {
+// let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
+        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+        GPIOC->ODR |=   (1<<5);  // set C5 ( /SD A )
+    }
+    else if (DC_OUTP_LO == state1)
+    {
+// let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
+        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+        GPIOC->ODR |=   (1<<7);  // set C7 ( /SD B )
+    }
+    else if (DC_OUTP_LO == state2)
+    {
+// let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
+        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+        GPIOG->ODR |=   (1<<1);  // set G1 ( /SD C )
     }
 
 
     /* delay ...pin setting
      */
     GPIOG->ODR |=  (1<<0); // TEST PIN ON
-
-// The "OFF" (non-PWMd) phase is asserted output pins to GPIO, driven Off
-// (this  phase was with already off, or was floating )
-    if (DC_OUTP_LO == state0)
-    {
-// let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
-        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-        GPIOC->DDR |=  (1<<2);
-        GPIOC->CR1 |=  (1<<2);
-    }
-    else if (DC_OUTP_LO == state1)
-    {
-// let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
-        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-        GPIOC->DDR |=  (1<<3);
-        GPIOC->CR1 |=  (1<<3);
-    }
-    else if (DC_OUTP_LO == state2)
-    {
-// let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
-        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-        GPIOC->DDR |=  (1<<4);
-        GPIOC->CR1 |=  (1<<4);
-    }
-
 
     /*
      This delay waits for settling of flyback effect after the PWM transition. Back-EMF
@@ -450,16 +429,13 @@ void comm_switch (uint8_t bldc_step)
 //    delay(  15 );        // about 20us
     delay(  45 );        // make sure the back-EMF is somewhat settled after demag-time
 #else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
-    delay(  40 ); //   41 40 ... stall ?
+//    delay(  40 ); //   41 40 ... stall ?
+    delay(  30 );        // 
 #endif
 
 #endif // COMM_TIME_KLUDGE_DELAYS
 
     GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
-
-
-// Finished with the counter, so disble TIM1 completely, prior to doing PWM reconfig
-//    TIM1_Cmd(DISABLE);
 
 
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
@@ -470,7 +446,7 @@ void comm_switch (uint8_t bldc_step)
     if (  DC_OUTP_FLOAT_F == state0 )
     {
         uint16_t u16tmp = Back_EMF_F[0];
-        Back_EMF_F[0] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
+        Back_EMF_F[0 /* phase */ ] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
         Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
     }
 
@@ -484,21 +460,24 @@ void comm_switch (uint8_t bldc_step)
     {
         TIM1_SetCompare2( get_pwm_dc(0, state0) );
         TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
+        GPIOC->ODR |=   (1<<5);  // set /SD A
     }
 
     if (DC_OUTP_HI == state1)
     {
         TIM1_SetCompare3( get_pwm_dc(1, state1) );
         TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
+        GPIOC->ODR |=   (1<<7); // set  /SD B
     }
 
     if (DC_OUTP_HI == state2)
     {
         TIM1_SetCompare4( get_pwm_dc(2, state2) );
         TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
+        GPIOG->ODR |=   (1<<1); // set /SD C
     }
 
-    TIM1_CtrlPWMOutputs(ENABLE);              // apparently this is required after re-config PWM
+    TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 
