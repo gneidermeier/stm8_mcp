@@ -596,7 +596,7 @@ void BLDC_Update(void)
 
 /*
  */
-void BLDC_Step(void)
+static void bldc_comm_step(void)
 {
     const uint8_t N_CSTEPS = 6;
 
@@ -617,5 +617,52 @@ void BLDC_Step(void)
         bldc_step %= N_CSTEPS;
 
         comm_switch( bldc_step );
+    }
+}
+
+/*
+ */
+int sample(int arg){
+}
+
+
+#define TIM3_RATE_MODULUS   4 // each modulus factor of 2 must relate to a reduction factor of 2 in TIM3 prescale
+
+/*
+ */
+void BLDC_Step(void)
+{
+    static uint8_t bldc_step_modul; // internal counter for sub-tasking the TIM3 period
+
+    if (BLDC_OFF != BLDC_State )
+    {
+        int index = bldc_step_modul % TIM3_RATE_MODULUS;
+
+        sample(index);
+
+        switch(index)
+        {
+        case 0:	
+            break;
+        case 1:
+            break;
+        case 2:
+            break;
+        case 3:
+            // commutation step obviously done only once on the base-period
+            bldc_comm_step();
+            break;
+        }
+
+        bldc_step_modul += 1; // can be allowed to rollover as modulus is pwrOf2
+    }
+    else
+    {
+        // motor drive output is not active
+        GPIOC->ODR &=  ~(1<<5); //  /SD A
+        GPIOC->ODR &=  ~(1<<7); //  /SD B
+        GPIOG->ODR &=  ~(1<<1); //  /SD C
+
+        TIM1_CtrlPWMOutputs(DISABLE);
     }
 }

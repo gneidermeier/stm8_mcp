@@ -455,12 +455,11 @@ void TIM4_setup(void)
  */
 // ideally, TIM3 prescaler would be tied to  BLDC_CT_SCALE
 
-// now reduce the pre-scaler, while sub-tasking the TIM3 ISR
-
+// factor /2 and #define TIM3_RATE_MODULUS   4 
 #ifdef CLOCK_16
-#define TIM3_PSCR  0x03  // 2^3 == 8
+#define TIM3_PSCR  0x02  // 2^3 == 8
 #else
-#define TIM3_PSCR  0x02  // 2^2 == 4
+#define TIM3_PSCR  0x01  // 2^2 == 4
 #endif
 
 

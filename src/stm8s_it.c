@@ -370,37 +370,11 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
 INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-    static uint8_t bldc_step_modul; // internal counter for sub-tasking the TIM3 period
-
     static uint8_t toggle = 0;
-
-
 
     GPIOG->ODR |=  (1<<0); // test pin
 
-    bldc_step_modul += 1; // can be allowed to rollover as modulus is power of 2
-
-
-// commutation obviously done only once on the base-period
-    if (  0 == ( bldc_step_modul % TIM3_RATE_MODULUS ) )
-    {
-        /*
-         * allow TIM1 freerunning counter to let the present PWM cycle expire.
-         * Seems to help with maintaining/not-interfering-with stability of the back-EMF signal.
-         * (On this CPU - no nested interrupt? )
-         * The timing seems to workprovide small delay to wait for back-emf voltage to "recover" from flyback
-         * experimentation has shown that things are running smoother if syncronizd w/
-         * PWM .. sort of ;)
-         */
-        uint16_t cntr  = 0;
-
-
-        BLDC_Step();
-    }
-
-    // if (0 != Step_Enabled)
-    //    BLDC_Step();
-
+    BLDC_Step();
 
     GPIOG->ODR &=  ~(1<<0); // test pin
 

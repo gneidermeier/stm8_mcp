@@ -32,10 +32,6 @@
 
 
 
- #define TIM3_RATE_MODULUS   2 // each modulus factor of 2 must relate to a reduction factor of 2 in TIM3 prescale
-
-
-
 
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
 // 1/12000 = 0.000083 = 8.3 * 10^(-5) 
