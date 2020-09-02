@@ -70,11 +70,33 @@ typedef  enum {
   BLDC_ON
 } BLDC_STATE_T;
 
+/*
+ * 3 electrical phases (use as index for BLDC_PWM_Chann_Cfg)
+ */
+typedef enum /* THREE_PHASE_CHANNELS */
+{
+    PHASE_NONE,
+    PHASE_A,
+    PHASE_B,
+    PHASE_C
+} BLDC_PHASE_t;
+
+typedef  uint16_t *  Global_ADC_Phase_t ;
+
 
 /*
  * variables
  */
 extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
+
+
+// how many ADCs can be saved in a single (60deg) commutation sector (how many PWM ISR per sector? depends on motor speed and PWM freq.)
+#define ADC_PHASE_BUF_SZ  8  // make this power of 2 so modulus can be used 
+
+
+extern Global_ADC_Phase_t Global_ADC_PhaseABC_ptr[];  // pointers to ADC phase buffers
+
+extern uint8_t BackEMF_Sample_Index;
 
 
 /*

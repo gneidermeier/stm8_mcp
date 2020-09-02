@@ -212,6 +212,11 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 }
 
+extern uint16_t Global_ADC_Phase_A[]; // tmp
+extern uint16_t Global_ADC_Phase_B[]; // tmp
+extern uint16_t Global_ADC_Phase_C[]; // tmp
+extern uint16_t Float_phase;
+extern uint8_t Sample_Index; // tmp
 /**
   * @brief  Timer1 Update/Overflow/Trigger/Break Interrupt routine.
   * @param  None
@@ -219,7 +224,11 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-   static uint8_t toggle;
+    static uint8_t toggle;
+
+    uint16_t index = BackEMF_Sample_Index % ADC_PHASE_BUF_SZ ;
+    uint8_t phase = -1;
+
     toggle ^= 1; // tmp test
 #if 1 // tmp test
     if (toggle){
@@ -237,11 +246,33 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
     }
 #endif
 
-/*
- used PWM MODE 1 and UP count so the ISR would occur at end of PWM idle-time.
- Doesn't need to use an A/D ISR so far, can just read the A/D input buffer (continuous scanning)
- How to know what channel to read?
-*/
+// avoids having to read more than 1 ADC channels in each ISR
+
+// assert(BackEMF_Sample_Index < 8)
+    index = BackEMF_Sample_Index % ADC_PHASE_BUF_SZ ;
+
+    if (PHASE_A == Float_phase)
+    {
+        phase = 0;
+//        Global_ADC_Phase_A[ BackEMF_Sample_Index ] = ADC1_GetBufferValue( phase );
+        Global_ADC_PhaseABC_ptr[phase][ index ] = ADC1_GetBufferValue( phase );
+    }
+    else if (PHASE_B == Float_phase)
+    {
+        phase = 1;
+//        Global_ADC_Phase_B[ BackEMF_Sample_Index ] = ADC1_GetBufferValue( phase );
+        Global_ADC_PhaseABC_ptr[phase][ index ] = ADC1_GetBufferValue( phase );
+    }
+    else if (PHASE_C == Float_phase)
+    {
+        phase = 2;
+//        Global_ADC_Phase_C[ BackEMF_Sample_Index ] = ADC1_GetBufferValue( phase );
+        Global_ADC_PhaseABC_ptr[phase][ index ] = ADC1_GetBufferValue( phase );
+    }
+//  Global_ADC_Phase_A[ phase ] = ADC1_GetBufferValue( phase );
+
+    BackEMF_Sample_Index += 1;
+
     // must reset the tmer interrupt flag
     TIM1->SR1 &= ~TIM1_SR1_UIF;
 //TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
@@ -347,11 +378,7 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 
     GPIOG->ODR |=  (1<<0); // test pin
 
-    bldc_step_modul += 1;
-
-
-// falling bEMF (2) here at 30 degree
-// rising bEMF (2)  here at end of 60 degreee
+    bldc_step_modul += 1; // can be allowed to rollover as modulus is power of 2
 
 
 // commutation obviously done only once on the base-period
@@ -368,23 +395,6 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
         uint16_t cntr  = 0;
 
 
-#if 0 // #ifdef COMM_TIME_KLUDGE_DELAYS
-
-        while( cntr < global_uDC ) // COUNTER MODE UP !!
-        {
-//        pre_cntr = cntr;// test
-            cntr = TIM1_GetCounter();
-            if (cntr > 0)  // confirms that the counter is at 0 until end of idle-time, then (begins up-count and pulse turns on)
-            {
-                GPIOG->ODR |=  (1<<0); //
-            }
-        }
-
-        GPIOG->ODR &=  ~(1<<0); //
-#endif
-
-
-
         BLDC_Step();
     }
 
@@ -393,11 +403,6 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 
 
     GPIOG->ODR &=  ~(1<<0); // test pin
-
-
-// Falling bEMF (1) here at 0 degree
-// Rising bEMF (1) here at end of 30 degreee.
-
 
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;

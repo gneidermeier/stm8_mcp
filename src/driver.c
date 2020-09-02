@@ -106,16 +106,6 @@ typedef struct /* COMM_STEP */
 BLDC_COMM_STEP_t;
 
 
-/*
- * 3 electrical phases (use as index for BLDC_PWM_Chann_Cfg)
- */
-typedef enum /* THREE_PHASE_CHANNELS */
-{
-    PHASE_NONE,
-    PHASE_A,
-    PHASE_B,
-    PHASE_C
-} BLDC_PHASE_t;
 
 // PWM drive modes
 typedef enum /* PWM_MODE */
@@ -174,13 +164,18 @@ uint16_t Back_EMF_F_tmp;
 uint16_t Back_EMF_F0_MA_tmp;
 
 
-#define PHASE_BUF_SZ 8 // arbitrary ... nr of PWMs per sector (depends on PWM freq. and motor speed obviously!)
-uint16_t Global_ADC_Phase_A[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
-uint16_t Global_ADC_Phase_B[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
-uint16_t Global_ADC_Phase_C[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
+uint16_t Global_ADC_Phase_A[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
+uint16_t Global_ADC_Phase_B[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
+uint16_t Global_ADC_Phase_C[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
+
+// prefer to work with an array of pointers rather than a double-array
+Global_ADC_Phase_t Global_ADC_PhaseABC_ptr[] = { Global_ADC_Phase_A, Global_ADC_Phase_B, Global_ADC_Phase_C };
 
 BLDC_PHASE_t Float_phase = PHASE_NONE;
 BLDC_PWM_STATE_t Float_value = DC_NONE;
+
+uint8_t BackEMF_Sample_Index;
+
 
 
 uint16_t BLDC_OL_comm_tm;   // could be private
@@ -318,8 +313,6 @@ void comm_switch (uint8_t bldc_step)
     BLDC_PWM_STATE_t prev_A, prev_B, prev_C ;
     BLDC_PWM_STATE_t state0, state1, state2;
 
-    BLDC_PHASE_t float_phase = PHASE_NONE;
-    BLDC_PWM_STATE_t float_value = DC_NONE;
 
     // grab the phases states of previous sector 
     prev_A = Commutation_Steps[ prev_bldc_step ].phA;
@@ -350,26 +343,26 @@ void comm_switch (uint8_t bldc_step)
         TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_C ], DISABLE );
     }
 
-/*
+
     Float_value = DC_NONE;
     Float_phase = PHASE_NONE;
-*/
+
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
-        float_phase = PHASE_A;
-        float_value= state0;
+        Float_phase = PHASE_A;
+        Float_value = state0;
         GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
-        float_phase = PHASE_B;
-        float_value= state1;
+        Float_phase = PHASE_B;
+        Float_value = state1;
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
-        float_phase = PHASE_C;
-        float_value= state2;
+        Float_phase = PHASE_C;
+        Float_value = state2;
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
     }
 
