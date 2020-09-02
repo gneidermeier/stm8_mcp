@@ -163,11 +163,25 @@ static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
     };
 #define BLDC_CH_NG  (sizeof( BLDC_PWM_Chann_Cfg ) - 1)  // idk ... get the max index, make it invalid so that element 0 can be valid default
 
-// 2 elements (sample 1 and sample 2)
-uint16_t Back_EMF_R[2];
-uint16_t Back_EMF_F[2];
+// back-EMF measurements are acquired 4x each commutation sector 
+uint16_t Back_EMF_R[4];
+uint16_t Back_EMF_F[4];
+
 uint16_t Back_EMF_F0_MA;
 uint16_t Back_EMF_R0_MA;
+
+uint16_t Back_EMF_F_tmp;
+uint16_t Back_EMF_F0_MA_tmp;
+
+
+#define PHASE_BUF_SZ 8 // arbitrary ... nr of PWMs per sector (depends on PWM freq. and motor speed obviously!)
+uint16_t Global_ADC_Phase_A[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
+uint16_t Global_ADC_Phase_B[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
+uint16_t Global_ADC_Phase_C[PHASE_BUF_SZ];  // 3 phases ADC are read each TIM1 ISR
+
+BLDC_PHASE_t Float_phase = PHASE_NONE;
+BLDC_PWM_STATE_t Float_value = DC_NONE;
+
 
 uint16_t BLDC_OL_comm_tm;   // could be private
 
@@ -313,40 +327,7 @@ void comm_switch (uint8_t bldc_step)
     prev_C = Commutation_Steps[ prev_bldc_step ].phC;
     prev_bldc_step = bldc_step;
 
- /* 
-  * find out which phase floating ... dumB
- */
-    if (DC_OUTP_FLOAT_R == prev_A || DC_OUTP_FLOAT_F == prev_A)
-    {
-        float_phase = PHASE_A;
-        float_value= state0;
-    }
-    else if (DC_OUTP_FLOAT_R == prev_B || DC_OUTP_FLOAT_F == prev_B)
-    {
-        float_phase = PHASE_B;
-        float_value= state1;
-    }
-    else if (DC_OUTP_FLOAT_R == prev_C || DC_OUTP_FLOAT_F == prev_C)
-    {
-        float_phase = PHASE_C;
-        float_value= state2;
-    }
-    else
-    {
-        float_phase = PHASE_NONE;
-        float_value = DC_NONE;
-    }
 
-#if 1
-    /* measure rising back-EMF here before shutting off the energized
-     */
-    if (DC_OUTP_FLOAT_R == float_value)
-    {
-        uint16_t u16tmp = Back_EMF_R[0];
-        Back_EMF_R[0 /* float phase */ ] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
-        Back_EMF_R0_MA  = (u16tmp +  Back_EMF_R[0]) / 2;
-    }
-#endif
 
 
     state0 = Commutation_Steps[ bldc_step ].phA;
@@ -369,7 +350,10 @@ void comm_switch (uint8_t bldc_step)
         TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_C ], DISABLE );
     }
 
-
+/*
+    Float_value = DC_NONE;
+    Float_phase = PHASE_NONE;
+*/
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
         float_phase = PHASE_A;
@@ -413,10 +397,6 @@ void comm_switch (uint8_t bldc_step)
     }
 
 
-    /* delay ...pin setting
-     */
-    GPIOG->ODR |=  (1<<0); // TEST PIN ON
-
     /*
      This delay waits for settling of flyback effect after the PWM transition. Back-EMF
      can be read from the (previously energized) phase which is now floating (and of course for now, PWM is off!)
@@ -435,7 +415,6 @@ void comm_switch (uint8_t bldc_step)
 
 #endif // COMM_TIME_KLUDGE_DELAYS
 
-    GPIOG->ODR &=  ~(1<<0); // TEST PIN OFF
 
 
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
@@ -445,9 +424,9 @@ void comm_switch (uint8_t bldc_step)
      */
     if (  DC_OUTP_FLOAT_F == state0 )
     {
-        uint16_t u16tmp = Back_EMF_F[0];
-        Back_EMF_F[0 /* phase */ ] = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
-        Back_EMF_F0_MA  = (u16tmp +  Back_EMF_F[0]) / 2;
+        uint16_t u16tmp = Back_EMF_F_tmp;
+        Back_EMF_F_tmp = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
+        Back_EMF_F0_MA_tmp  = ( u16tmp +  Back_EMF_F_tmp ) / 2;
     }
 
 

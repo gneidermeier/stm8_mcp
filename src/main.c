@@ -530,10 +530,13 @@ void clock_setup(void)
 static uint16_t Line_Count = 0;
 
 extern uint16_t BLDC_OL_comm_tm;
-extern uint16_t Back_EMF_R[2];
-extern uint16_t Back_EMF_F[2];
+extern uint16_t Back_EMF_R[];
+extern uint16_t Back_EMF_F[];
 extern uint16_t Back_EMF_F0_MA;
+extern uint16_t Back_EMF_R0_MA;
 
+extern uint16_t Back_EMF_F_tmp;
+extern uint16_t Back_EMF_F0_MA_tmp;
 
 /*
  * temp, todo better function
@@ -557,13 +560,13 @@ void testUART(void)
     strcat(sbuf, cbuf);
 
 #if 1
-////Back_EMF_F0_MA
+// tmep ... log the test back-EMF falling-float transition
     strcat(sbuf, " bF0_ma=");
-    itoa( Back_EMF_F0_MA,     cbuf, 16);
+    itoa( Back_EMF_F0_MA_tmp,     cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " bF0=");
-    itoa( Back_EMF_F[0],     cbuf, 16);
+    itoa( Back_EMF_F_tmp,     cbuf, 16);
     strcat(sbuf, cbuf);
 #endif
 
@@ -578,7 +581,7 @@ void testUART(void)
     strcat(sbuf, " A2=");
     itoa(ADC1_GetBufferValue(2), cbuf, 16);
     strcat(sbuf, cbuf);
-
+#if 0
     strcat(sbuf, " A8=");
     itoa(ADC1_GetBufferValue(8), cbuf, 16);
     strcat(sbuf, cbuf);
@@ -586,7 +589,7 @@ void testUART(void)
     strcat(sbuf, " A9=");
     itoa(ADC1_GetBufferValue(9), cbuf, 16);
     strcat(sbuf, cbuf);
-
+#endif
 #if 0
 // A/D
     for (loop = 0; loop <  ADC_N_CHANNELS ; loop++)
