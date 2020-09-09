@@ -54,7 +54,8 @@ extern uint8_t Log_Level; // tmp
 // 1 cycle = 6 * 8uS * 512 = 0.024576 S
 #define BLDC_OL_TM_LO_SPD         (512 * BLDC_CT_SCALE)  // start of ramp
 
-#define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
+//#define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
+#define BLDC_OL_TM_HI_SPD          (65 * BLDC_CT_SCALE)  // apparently 65 is sweet spot now Sep-4
 
 // 1 cycle = 6 * 8uS * 13 = 0.000624 S    (needs updated info here)
 #define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
