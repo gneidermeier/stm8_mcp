@@ -303,7 +303,16 @@ char GetKey(void)
     return key;
 }
 
-
+/*
+ * ADC clock must be between 1 MHz and 4 or 6 MHz ... use D4 here (good for 4 - 16 Mhz cpu clock @ D4)
+ */
+#ifdef CLOCK_16
+// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D16
+#else
+// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D8  // 1 Mhz, min sample rate
+// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // maybe theres no reason to change it
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 4 ->  8/4=2 and 16/4=4 which are both in the req'd range of 1-4Mhz
+#endif
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
  */
@@ -318,7 +327,7 @@ void ADC1_setup(void)
 // configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
               ADC1_CHANNEL_2,
-              ADC1_PRESSEL_FCPU_D2,
+              ADC_DIVIDER,
               ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO
               DISABLE,               // ExtTriggerState
               ADC1_ALIGN_RIGHT,
@@ -333,7 +342,6 @@ void ADC1_setup(void)
     A single conversion is performed for each channel starting with AIN0 and the data is stored
     in the data buffer registers ADC_DBxR.
     */
-//ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS, ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1)), ADC1_ALIGN_RIGHT);
     ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS,
                           ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1 | ADC1_CHANNEL_2)),
                           ADC1_ALIGN_RIGHT);
@@ -536,7 +544,8 @@ extern uint16_t Back_EMF_R0_MA;
 
 extern uint16_t Back_EMF_F_tmp;
 extern uint16_t Back_EMF_F0_MA_tmp;
-
+extern uint16_t Back_EMF_R_tmp;
+extern uint16_t Back_EMF_R0_MA_tmp;
 /*
  * temp, todo better function
  */
@@ -568,7 +577,17 @@ void testUART(void)
     itoa( Back_EMF_F_tmp,     cbuf, 16);
     strcat(sbuf, cbuf);
 #endif
+#if 1
+// tmep ... log the test back-EMF falling-float transition
+    strcat(sbuf, " bR0_ma=");
+    itoa( Back_EMF_R0_MA_tmp,     cbuf, 16);
+    strcat(sbuf, cbuf);
 
+    strcat(sbuf, " bR0=");
+    itoa( Back_EMF_R_tmp,     cbuf, 16);
+    strcat(sbuf, cbuf);
+#endif
+#if 0
     strcat(sbuf, " A0=");
     itoa(ADC1_GetBufferValue(0), cbuf, 16);
     strcat(sbuf, cbuf);
@@ -580,6 +599,7 @@ void testUART(void)
     strcat(sbuf, " A2=");
     itoa(ADC1_GetBufferValue(2), cbuf, 16);
     strcat(sbuf, cbuf);
+#endif
 #if 0
     strcat(sbuf, " A8=");
     itoa(ADC1_GetBufferValue(8), cbuf, 16);
