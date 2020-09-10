@@ -55,7 +55,8 @@ extern uint8_t Log_Level; // tmp
 #define BLDC_OL_TM_LO_SPD         (512 * BLDC_CT_SCALE)  // start of ramp
 
 //#define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
-#define BLDC_OL_TM_HI_SPD          (65 * BLDC_CT_SCALE)  // apparently 65 is sweet spot now Sep-4
+//#define BLDC_OL_TM_HI_SPD          (65 * BLDC_CT_SCALE)  // apparently 65 is sweet spot now Sep-4
+#define BLDC_OL_TM_HI_SPD          (64 * BLDC_CT_SCALE)
 
 // 1 cycle = 6 * 8uS * 13 = 0.000624 S    (needs updated info here)
 #define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
@@ -154,29 +155,12 @@ static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
     };
 #define BLDC_CH_NG  (sizeof( BLDC_PWM_Chann_Cfg ) - 1)  // idk ... get the max index, make it invalid so that element 0 can be valid default
 
-// back-EMF measurements are acquired 4x each commutation sector 
-uint16_t Back_EMF_R[4];
-uint16_t Back_EMF_F[4];
-
-uint16_t Back_EMF_F0_MA;
-uint16_t Back_EMF_R0_MA;
 
 uint16_t Back_EMF_F_tmp;
 uint16_t Back_EMF_F0_MA_tmp;
 
-
-uint16_t Global_ADC_Phase_A[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
-uint16_t Global_ADC_Phase_B[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
-uint16_t Global_ADC_Phase_C[ ADC_PHASE_BUF_SZ ];  // 3 phases ADC are read each TIM1 ISR
-
-// prefer to work with an array of pointers rather than a double-array
-Global_ADC_Phase_t Global_ADC_PhaseABC_ptr[] = { Global_ADC_Phase_A, Global_ADC_Phase_B, Global_ADC_Phase_C };
-
-BLDC_PHASE_t Float_phase = PHASE_NONE;
-BLDC_PWM_STATE_t Float_value = DC_NONE;
-
-uint8_t BackEMF_Sample_Index;
-
+uint16_t Back_EMF_R_tmp;
+uint16_t Back_EMF_R0_MA_tmp;
 
 
 uint16_t BLDC_OL_comm_tm;   // could be private
@@ -222,17 +206,17 @@ static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
   * None
   * @retval void None
   */
-void set_dutycycle(uint16_t global_dutycycle)
+static void set_dutycycle(uint16_t global_dutycycle)
 {
     global_uDC = global_dutycycle;
 }
 
-void inc_dutycycle(void)
+static void inc_dutycycle(void)
 {
     global_uDC += 1;
 }
 
-void dec_dutycycle(void)
+static void dec_dutycycle(void)
 {
     global_uDC -= 1;
 }
@@ -241,9 +225,9 @@ void dec_dutycycle(void)
  * intermediate function for setting PWM with positive or negative polarity
  * Provides an "inverted" (complimentary) duty-cycle if [state0 < 0]
  *
- * This could probably be done better given a more coherent read of the PWM/timer confugration in the MCU reference manual!!
+ * is pretty much crufty crud at this point
  */
-uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
+static uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
 {
     uint16_t pulse = PWM_0PCNT;
 
@@ -272,7 +256,7 @@ uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
 /*
  * crude
  */
-void delay(int time)
+static void delay(int time)
 {
     int d;
     for (d = 0 ; d < time; d++)
@@ -281,6 +265,36 @@ void delay(int time)
     }
 }
 
+/*
+ * for now the ADC channels for back-EMF are single-channel conversions
+ */
+static uint16_t sample(ADC1_Channel_TypeDef adc_channel)
+{
+    uint16_t u16tmp;
+
+    ADC1_ConversionConfig(
+        ADC1_CONVERSIONMODE_SINGLE, adc_channel,  ADC1_ALIGN_RIGHT);
+
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+    ADC1_Cmd(ENABLE);
+
+// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
+    ADC1_StartConversion();
+
+// Wait until the conversion is done ... delay in an ISR .. blah
+
+// GPIOG->ODR |=  (1<<0); // set test pin
+
+        while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET /* 0 */ );
+//    delay(15); // check time on scope .. thia delay can probably avoid the while() ??!?
+// GPIOG->ODR &=  ~(1<<0); // clear test pin
+
+    u16tmp = ADC1_GetBufferValue(adc_channel); // ADC1_GetConversionValue();
+
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
+
+    return u16tmp;
+}
 
 /**
   * @brief  .
@@ -306,13 +320,22 @@ void delay(int time)
   *
   * Ideally, when a phase is a 60degress (half of its time) there should be
   * no change/disruption to  its PWM signal.
+  *
+  * TIM1 counter is not reset or cleared - only the PWM TIM1 channel is changed
+  * for the phase, so the overall PWM rate should be maintained. 
+  * This routine is getting excessively long (50us) and is quite possble to 
+  * overrun the TIM1 time.for PWM pulse? That would add to jitter.
   */
-void comm_switch (uint8_t bldc_step)
+static void comm_switch (uint8_t bldc_step)
 {
     static COMMUTATION_SECTOR_t prev_bldc_step = 0;
 
     BLDC_PWM_STATE_t prev_A, prev_B, prev_C ;
     BLDC_PWM_STATE_t state0, state1, state2;
+
+    uint16_t u16tmp;
+
+    GPIOG->ODR &=  ~(1<<0); // clear test pin
 
 
     // grab the phases states of previous sector 
@@ -322,14 +345,15 @@ void comm_switch (uint8_t bldc_step)
     prev_bldc_step = bldc_step;
 
 
-
-
     state0 = Commutation_Steps[ bldc_step ].phA;
     state1 = Commutation_Steps[ bldc_step ].phB;
     state2 = Commutation_Steps[ bldc_step ].phC;
 
     /*
-     * disable PWM if previous driving phase is finished (120 degrees)
+     * Disable PWM of previous driving phase is finished (120 degrees). Note that
+     * an active TIM1 PWM pulse could be interrupted. Probably adds to the overall jitter
+     * It's possible that there could be benefit to a delay here to wait for 
+     * the PWM pulse (as long as overal time of this function is not excessive...which  it already is!
      */
     if ( DC_OUTP_HI == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
     {
@@ -345,25 +369,17 @@ void comm_switch (uint8_t bldc_step)
     }
 
 
-    Float_value = DC_NONE;
-    Float_phase = PHASE_NONE;
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
-        Float_phase = PHASE_A;
-        Float_value = state0;
         GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
-        Float_phase = PHASE_B;
-        Float_value = state1;
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
-        Float_phase = PHASE_C;
-        Float_value = state2;
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
     }
 
@@ -391,36 +407,47 @@ void comm_switch (uint8_t bldc_step)
     }
 
 
-    /*
-     This delay waits for settling of flyback effect after the PWM transition. Back-EMF
-     can be read from the (previously energized) phase which is now floating (and of course for now, PWM is off!)
-    */
+/*
+ * This delay waits for settling of flyback effect after the PWM transition - only needed for getting 
+ * falling Back-EMF signal 
+ */
 #ifdef COMM_TIME_KLUDGE_DELAYS
 
-#ifdef PWM_8K // 8k PWM
+ GPIOG->ODR |=  (1<<0); // set test pin
 
-//    delay(  75 ); // back-EMF "window" of severl steps, but uugghhh ! delay is very noticeable on scope trace!!!!
-//    delay(  15 );        // about 20us
-    delay(  45 );        // make sure the back-EMF is somewhat settled after demag-time
-#else //  12k PWM .. longer delay makes the back-EMF "window" wider by a couple steps ... but uuugghhh delay !
-//    delay(  40 ); //   41 40 ... stall ?
-    delay(  30 );        // 
+#ifdef PWM_8K // 8k PWM
+// this is "only" about 25us here, and seems flyback from PWM-on takes almost 20us anyway!!!
+    delay( 20  );   //                  CT=0201 bF0_ma=00E9
+#else
+ asdf
 #endif
 
+ GPIOG->ODR &=  ~(1<<0); // clear test pin 
 #endif // COMM_TIME_KLUDGE_DELAYS
 
 
-
     /* Back-EMF reading hardcoded to phase "A" (ADC_0)
-     * The falling Back-EMF should be readable at 0 degrees sector.
-     * Rising back-EMF would need to be read beginning at the 30 degreess
-     * sector to see if it is above threshold ( around 0.7 v ).
      */
     if (  DC_OUTP_FLOAT_F == state0 )
     {
-        uint16_t u16tmp = Back_EMF_F_tmp;
-        Back_EMF_F_tmp = ADC1_GetBufferValue( 0 /* hardcoded to phase "A" (ADC_0) */);
-        Back_EMF_F0_MA_tmp  = ( u16tmp +  Back_EMF_F_tmp ) / 2;
+//GPIOG->ODR |=  (1<<0); // set test pin
+        u16tmp = sample( ADC1_CHANNEL_0 );
+//GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
+
+        Back_EMF_F_tmp = u16tmp;
+
+        Back_EMF_F0_MA_tmp  = ( u16tmp + Back_EMF_F0_MA_tmp ) / 2;
+    }
+    else // should not have 2 adjacent float sectors on the same phase
+    if (  DC_OUTP_FLOAT_R == prev_A ) // 
+    {
+    //GPIOG->ODR |=  (1<<0); // set test pin
+        u16tmp = sample( ADC1_CHANNEL_0 );
+//GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
+
+        Back_EMF_R_tmp = u16tmp;
+
+        Back_EMF_R0_MA_tmp  = ( u16tmp + Back_EMF_R0_MA_tmp ) / 2;
     }
 
 
@@ -543,7 +570,9 @@ void BLDC_Spd_inc()
 
 
 /*
- * BLDC Update: handle the BLDC state
+ * BLDC Update: 
+ *  Called from ISR
+ *  Handle the BLDC state: 
  *      Off: nothing
  *      Rampup: get BLDC up to sync speed to est. comm. sync.
  *              Once the HI OL speed (frequency) is reached, then the idle speed
@@ -621,15 +650,12 @@ static void bldc_comm_step(void)
     }
 }
 
-/*
- */
-int sample(int arg){
-}
 
 
 #define TIM3_RATE_MODULUS   4 // each modulus factor of 2 must relate to a reduction factor of 2 in TIM3 prescale
 
 /*
+ * called from ISR
  */
 void BLDC_Step(void)
 {
@@ -639,11 +665,9 @@ void BLDC_Step(void)
     {
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
-        sample(index);
-
         switch(index)
         {
-        case 0:	
+        case 0:
             break;
         case 1:
             break;
