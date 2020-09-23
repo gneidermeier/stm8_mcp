@@ -32,37 +32,42 @@ extern uint8_t Log_Level; // tmp
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
  *  commutation step period.
- * See TIM3 setup - base period is 0.000008 Seconds (8 uSecs)
- * For the theoretical 15000 RPM motor:
- *   15000 / 60 = 250 rps
- *   cycles per sec = 250 * 6 = 1500
- *   1 cycle = 1/1500 = .000667 S
+ * See TIM3 setup - base period is 0.000000250 seconds (0.25 usec) in order to 
+ * provide high precision for controlling the commutation time, and each commutation step 
+ * unit is 4x TIM3 periods for back-EMF sampling at 1/4 and 3/4 in the commutation period.
  *
- * RPS = (1 / cycle_time * 6)
+ * For the theoretical 1100kv motor @ 13.8v -> ~15000 RPM:
+ *   15000 / 60 = 250 rps
+ *   "Electrical cycles" per sec = 250 * (12/2) = 1500 ... where (12/2) is nr. of pole-pairs.
+ *   Time of 1 cycle = 1/1500 = 0.000667 seconds  (360 degrees of 1 electrical cycle)
+ *
+ *   1 commutation sector is 60 degrees. 
+ *   Using TIM3 to get 4 updates per sector, and 360/15degrees=24 so ..
+ *
+ *   0.000667 seconds / 24 = 0.00002778 sec  (the "1/4 sector time" is 27.78us )
+ *   ... divided by TIM3 base period (0.25 us)  -> 111 counts 
  */
 
-//   BLDC_CT_SCALE  ... needs to be linked to TIM3 Presacalar! (changing this is not working right now ... )
-// BLDC_CT_SCALE must be > 2 (and must be power of 2)
-//#define RAMP_SCALAR   ( BLDC_CT_SCALE / 2 )   // ... 2/5 stalls   :(
-//#define RAMP_SCALAR   ( 2 ) // somehow this relates to the BLDC Commutation Timer scaling?
-#define RAMP_SCALAR   ( 1 ) // not sure how much this matters .. stalls 40-50% of the time ?? L:J:???
+#define TIM3_RATE_MODULUS   4 // each commutation sector of 60-degrees spans 4x TIM3 periods
 
-// the OL comm time is shortened by 1 rammp-unit (e.g. 2 counts @ 0.000008S per count where 8uS is the TIM3 bit-time)
-// the ramp shortens the OL comm-time by 1 RU each ramp-step with each ramp step is the TIM1 period of ~1mS
-#define BLDC_ONE_RAMP_UNIT          (1 * BLDC_CT_SCALE)
 
-// 1 cycle = 6 * 8uS * 512 = 0.024576 S
-#define BLDC_OL_TM_LO_SPD         (512 * BLDC_CT_SCALE)  // start of ramp
+#define BLDC_OL_TM_LO_SPD          (512 * 2 * TIM3_RATE_MODULUS) // start of ramp
 
-//#define BLDC_OL_TM_HI_SPD          (69 * BLDC_CT_SCALE)  // CT=$0230   // 560/8=70
-//#define BLDC_OL_TM_HI_SPD          (65 * BLDC_CT_SCALE)  // apparently 65 is sweet spot now Sep-4
-#define BLDC_OL_TM_HI_SPD          (64 * BLDC_CT_SCALE)
+//  1 / (3ms * (12/2) ) = motor freq.
+#define BLDC_OL_TM_HI_SPD          (64 * 2 * TIM3_RATE_MODULUS)
 
-// 1 cycle = 6 * 8uS * 13 = 0.000624 S    (needs updated info here)
-#define LUDICROUS_SPEED            (13 * BLDC_CT_SCALE)  // 15kRPM would be ~13.8 counts
+//   0.000667 seconds / 24 / 0.25us = 111 counts
+#define LUDICROUS_SPEED            (13.875f * 2 * TIM3_RATE_MODULUS) // note; won't be possible until D.C. and comm-time are sync'd i.e. closed-loop
 
 #define BLDC_OL_TM_MANUAL_HI_LIM   LUDICROUS_SPEED
 
+/*
+ * Slope of what is basically a linear startup ramp, commutation time (i.e. TIM3)
+ * period) decremented by fixed amount each control-loop timestep. Slope 
+ * determined by experiment (conservative to avoid stalling the motor!) 
+ */ 
+#define BLDC_ONE_COMM_STEP         TIM3_RATE_MODULUS  // each commutation step unit is 4x TIM3 periods
+#define BLDC_ONE_RAMP_UNIT         BLDC_ONE_COMM_STEP
 
 /* Private types -----------------------------------------------------------*/
 
@@ -417,7 +422,8 @@ static void comm_switch (uint8_t bldc_step)
 
 #ifdef PWM_8K // 8k PWM
 // this is "only" about 25us here, and seems flyback from PWM-on takes almost 20us anyway!!!
-    delay( 20  );   //                  CT=0201 bF0_ma=00E9
+ //   delay( 20  );   //                  CT=0201 bF0_ma=00E9
+ delay( 10  ); // yes I seem to keep messing with this
 #else
  asdf
 #endif
@@ -430,9 +436,9 @@ static void comm_switch (uint8_t bldc_step)
      */
     if (  DC_OUTP_FLOAT_F == state0 )
     {
-//GPIOG->ODR |=  (1<<0); // set test pin
+GPIOG->ODR |=  (1<<0); // set test pin
         u16tmp = sample( ADC1_CHANNEL_0 );
-//GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
+GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
 
         Back_EMF_F_tmp = u16tmp;
 
@@ -441,9 +447,9 @@ static void comm_switch (uint8_t bldc_step)
     else // should not have 2 adjacent float sectors on the same phase
     if (  DC_OUTP_FLOAT_R == prev_A ) // 
     {
-    //GPIOG->ODR |=  (1<<0); // set test pin
+GPIOG->ODR |=  (1<<0); // set test pin
         u16tmp = sample( ADC1_CHANNEL_0 );
-//GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
+GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
 
         Back_EMF_R_tmp = u16tmp;
 
@@ -611,7 +617,6 @@ void BLDC_Update(void)
         }
         else
         {
-            // TODO: the actual transition to ON state would be seeing the ramp-to speed achieved in closed-loop operation
             BLDC_State = BLDC_ON;
             set_dutycycle( PWM_DC_IDLE );
 
@@ -650,10 +655,6 @@ static void bldc_comm_step(void)
     }
 }
 
-
-
-#define TIM3_RATE_MODULUS   4 // each modulus factor of 2 must relate to a reduction factor of 2 in TIM3 prescale
-
 /*
  * called from ISR
  */
@@ -664,7 +665,9 @@ void BLDC_Step(void)
     if (BLDC_OFF != BLDC_State )
     {
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
-
+/*
+ use ' 000 and 111' as invalid, so it can be a 3-bit code
+*/
         switch(index)
         {
         case 0:
