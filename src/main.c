@@ -77,6 +77,22 @@ char * itoa(uint16_t u16in, char *sbuf, int base)
 
 /*
  * some of this bulk could be reduced with macros
+ * or otherwise would be suitable for STM8 Peripheral Library.
+ * Noting the situation regarding unused IO pins ... I am trying to assert the 
+ * configuration on the few pins needed as GPIO (general purpose IO and noting 
+ * that the specific module initialization (A/D, TIMx - and these are done
+ * mostly with STM8 PL) will handle setting up suitable IO pin behavior.
+
+ * 11.4 Reset configuration
+ *  All I/O pins are generally input floating under reset (i.e. during the reset phase) and at reset
+ *  state (i.e. after reset release). However, a few pins may have a different behavior. Refer to
+ *  the datasheet pinout description for all details.
+ * 11.5 Unused I/O pins
+ *  Unused I/O pins must not be left floating to avoid extra current consumption. They must be
+ *  put into one of the following configurations:
+ *  connected to VDD or VSS by external pull-up or pull-down resistor and kept as input
+ *  floating (reset state), configured as input with internal pull-up/down resistor,
+ *  configured as output push-pull low.
 */
 void GPIO_Config(void)
 {
@@ -85,7 +101,6 @@ void GPIO_Config(void)
     GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
-
 
 // Controls the /SD pins of IR2104s on PC5, PC7, PG1
 ///////////  // tried E2, E0, D1 but E2 not work as output ... ???
@@ -155,25 +170,27 @@ void GPIO_Config(void)
 // PA6 as button input (B+)
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-    GPIOA->DDR |= (1 << 5);  // PD.5 as output
+#if 0
+    GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
     GPIOA->CR1 |= (1 << 5);  // push pull output
     GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
-
+#endif
 // PE5 as button input (B-)
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
-    GPIOE->DDR |= (1 << 3);  // PE.3 as output
+#if 0
+    GPIOE->DDR |= (1 << 3);  // PE.3 as OUTPUT
     GPIOE->CR1 |= (1 << 3);  // push pull output
     GPIOE->ODR &= ~(1 << 3); // set pin off to use as gnd of button
-
-
+#endif
+#if 0 // UartX_Init()
 // UART2 D5: Rx, D6: Tx
     GPIOD->DDR &= ~(1 << 5); // PD.5 as input
     GPIOD->CR1 |= (1 << 5);  // pull up w/o interrupts
     GPIOD->DDR |= (1 << 6);  // PD.6 as output
     GPIOD->CR1 |= (1 << 6);  // push pull output
     GPIOD->ODR |= (1 << 6);  // use as hi-side of button
-
+#endif
 
 // PE.6 AIN9
     GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
@@ -439,7 +456,7 @@ void TIM4_setup(void)
 //    const uint8_t T4_Period = 255;    // Period = 2.048mS
 // set this for ~1mS to use in place of TIM1 as ramp timer
 //const uint8_t T4_Period = 128;    // Period = 1.02mS
-    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ... double up on ADC ?
+    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ... 
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -459,38 +476,18 @@ void TIM4_setup(void)
  *
  *  @8Mhz, fMASTER period ==  0.000000125 S
  *   Timer Step:
- *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
+ *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
-// ideally, TIM3 prescaler would be tied to  BLDC_CT_SCALE
 
 // factor /2 and #define TIM3_RATE_MODULUS   4 
 #ifdef CLOCK_16
-#define TIM3_PSCR  0x02  // 2^3 == 8
+#define TIM3_PSCR  0x02  // 2^2 == 4
 #else
-#define TIM3_PSCR  0x01  // 2^2 == 4
+#define TIM3_PSCR  0x01  // 2^1 == 2
 #endif
 
-
-void TIM3_setup(uint16_t u_period)
+void TIM3_setup(uint16_t period)
 {
-    const uint16_t MAX_SWITCH_TIME = 0xfffe;
-    const uint16_t MIN_SWITCH_TIME = 1;
-
-    uint16_t period = u_period;  // uses all 3-bits of TIM3 prescaler
-
-    if (period < MIN_SWITCH_TIME)
-    {
-        period = MIN_SWITCH_TIME;  // protect against setting a 0 period
-    }
-
-    if (period > MAX_SWITCH_TIME)
-    {
-        period = MAX_SWITCH_TIME; // lower limit
-    }
-
-// @8Mhz, fMASTER period ==  0.000000125 S
-//  Timer Step:
-//    step = 1 / 8Mhz * prescaler = 0.000000125 * (2^6) = 0.000008 S
     TIM3->PSCR = TIM3_PSCR;
 
     TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet
@@ -665,6 +662,9 @@ void Periodic_task(void)
             duty_cycle = BLDC_PWMDC_Plus();
             enableInterrupts();
             UARTputs("+++");
+
+           Log_Level = 255;// enable continous/verbous log
+
         }
         else if (key == '-')
         {
