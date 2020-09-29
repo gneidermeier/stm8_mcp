@@ -11,6 +11,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s.h"
 #include "parameter.h" // app defines
+#include "pwm_stm8s.h"
 
 extern uint8_t Log_Level; // tmp
 
@@ -133,32 +134,12 @@ typedef enum /* COMMUTATION_SECTOR */
     SECTOR_6
 } COMMUTATION_SECTOR_t;
 
-// tmp?
-#define BLDC_PWM_CH1   TIM1_CHANNEL_1//                     = ((uint8_t)0x00),
-#define BLDC_PWM_CH2   TIM1_CHANNEL_2//                     = ((uint8_t)0x01),
-#define BLDC_PWM_CH3   TIM1_CHANNEL_3//                     = ((uint8_t)0x02),
-#define BLDC_PWM_CH4   TIM1_CHANNEL_4//                     = ((uint8_t)0x03)
-#define BLDC_PWM_CH_Z  (-1)  // help for my kludgey lookup table indexing
 
-typedef TIM1_Channel_TypeDef BLDC_Channel_TypeDef ;
 
 
 /* Public variables  ---------------------------------------------------------*/
 
-/*
- * can be indexed by BLDC_PHASE_t
- */
-static const BLDC_Channel_TypeDef BLDC_PWM_Chann_Cfg[ ] =
-{
 
-// note PWM 0 at index 0
-    -1, // make sure this can be element 0 is invalid (allows index initializers to default to 0 i.e. index OOR)
-        BLDC_PWM_CH2, // PWM 1
-        BLDC_PWM_CH3, // PWM 2
-        BLDC_PWM_CH4, // PWM 3
-        BLDC_PWM_CH_Z  //  meh
-    };
-#define BLDC_CH_NG  (sizeof( BLDC_PWM_Chann_Cfg ) - 1)  // idk ... get the max index, make it invalid so that element 0 can be valid default
 
 
 uint16_t Back_EMF_F_tmp;
@@ -232,7 +213,7 @@ static void dec_dutycycle(void)
  *
  * is pretty much crufty crud at this point
  */
-static uint16_t get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
+static uint16_t _get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
 {
     uint16_t pulse = PWM_0PCNT;
 
@@ -362,15 +343,15 @@ static void comm_switch (uint8_t bldc_step)
      */
     if ( DC_OUTP_HI == prev_A  && ( DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0 ) )
     {
-        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_A ], DISABLE );
+        PWM_PhA_Disable();
     }
     if ( DC_OUTP_HI == prev_B  && ( DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1 ) )
     {
-        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_B ], DISABLE );
+        PWM_PhB_Disable();
     }
     if ( DC_OUTP_HI == prev_C  && ( DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2 ) )
     {
-        TIM1_CCxCmd( BLDC_PWM_Chann_Cfg[ PHASE_C ], DISABLE );
+        PWM_PhC_Disable();
     }
 
 
@@ -464,26 +445,21 @@ GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
      */
     if (DC_OUTP_HI == state0)
     {
-        TIM1_SetCompare2( get_pwm_dc(0, state0) );
-        TIM1_CCxCmd(TIM1_CHANNEL_2, ENABLE);
+        PWM_PhA_Enable( global_uDC /* get_pwm_dc(0, state0) */ );
         GPIOC->ODR |=   (1<<5);  // set /SD A
     }
 
     if (DC_OUTP_HI == state1)
     {
-        TIM1_SetCompare3( get_pwm_dc(1, state1) );
-        TIM1_CCxCmd(TIM1_CHANNEL_3, ENABLE);
+        PWM_PhB_Enable( global_uDC /* get_pwm_dc(1, state1) */ );
         GPIOC->ODR |=   (1<<7); // set  /SD B
     }
 
     if (DC_OUTP_HI == state2)
     {
-        TIM1_SetCompare4( get_pwm_dc(2, state2) );
-        TIM1_CCxCmd(TIM1_CHANNEL_4, ENABLE);
+        PWM_PhC_Enable( global_uDC /* get_pwm_dc(2, state2) */ );
         GPIOG->ODR |=   (1<<1); // set /SD C
     }
-
-    TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 
@@ -495,12 +471,18 @@ void BLDC_Stop()
 {
     if (BLDC_OFF != BLDC_State)
     {
+// should probably assert what the /SD pins are doing as well (depends wether motor
+// should be braked or left windmilling??
+        PWM_PhA_Disable();
+        PWM_PhB_Disable();
+        PWM_PhC_Disable();
+
         Log_Level = 0;
         uart_print( "STOP\r\n");
     }
 
     BLDC_State = BLDC_OFF;
-    set_dutycycle( 0 );
+    set_dutycycle( PWM_0PCNT );
 }
 
 /*

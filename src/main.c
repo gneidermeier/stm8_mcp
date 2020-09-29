@@ -127,7 +127,7 @@ void GPIO_Config(void)
     GPIOC->DDR |=  (1<<6);
     GPIOC->CR1 |=  (1<<6);
 
-#if 0 // doesn't seem to matter ... these are set by TIM2 PWM API calls ??
+#if 0 // these are set by TIM2 PWM API calls 
 // 3 PWM Channels
 // T2.PWM.CH3
     GPIOA->ODR |=  (1<<3);  // PA3
@@ -442,6 +442,50 @@ void TIM1_setup(void)
 }
 
 /*
+ * 9/30 .. verbatim from code of AN3332
+ */
+#define CCR1_Val  ((u16)0 /* 500 */) // Configure channel 1 Pulse Width
+#define CCR2_Val  ((u16)0 /* 250 */) // Configure channel 2 Pulse Width
+#define CCR3_Val  ((u16)0 /* 750 */) // Configure channel 3 Pulse Width
+
+#ifdef CLOCK_16
+ #define TIM2_PRESCALER TIM2_PRESCALER_8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#else
+ #define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+#endif
+
+
+void TIM2_setup(void)
+{
+    /* TIM2 Peripheral Configuration */
+    TIM2_DeInit();
+
+    /* Set TIM2 Frequency to 2Mhz */
+    TIM2_TimeBaseInit(TIM2_PRESCALER, TIM2_PWM_PD);
+    /* Channel 1 PWM configuration */
+    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR1_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC1PreloadConfig(ENABLE);
+
+    /* Channel 2 PWM configuration */
+    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR2_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC2PreloadConfig(ENABLE);
+
+    /* Channel 3 PWM configuration */
+    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR3_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC3PreloadConfig(ENABLE);
+
+    /* Enables TIM2 peripheral Preload register on ARR */
+    TIM2_ARRPreloadConfig(ENABLE);
+
+
+    TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
+
+    /* Enable TIM2 */
+    TIM2_Cmd(ENABLE);
+}
+
+
+/*
  * Configure Timer 4 as general purpose fixed time-base reference
  * Timer 4 & 6 are 8-bit basic timers
  *
@@ -478,8 +522,6 @@ void TIM4_setup(void)
  *   Timer Step:
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
-
-// factor /2 and #define TIM3_RATE_MODULUS   4 
 #ifdef CLOCK_16
 #define TIM3_PSCR  0x02  // 2^2 == 4
 #else
@@ -691,6 +733,7 @@ main()
     UART_setup();
     ADC1_setup();
     TIM1_setup();
+    TIM2_setup();
     TIM4_setup();
 
     BLDC_Stop();

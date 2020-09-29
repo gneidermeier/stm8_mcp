@@ -28,7 +28,6 @@
 #define COMM_TIME_KLUDGE_DELAYS 
 
 
- #define BLDC_CT_SCALE  8
 
 
 
@@ -66,16 +65,6 @@ typedef  enum {
   BLDC_ON
 } BLDC_STATE_T;
 
-/*
- * 3 electrical phases (use as index for BLDC_PWM_Chann_Cfg)
- */
-typedef enum /* THREE_PHASE_CHANNELS */
-{
-    PHASE_NONE,
-    PHASE_A,
-    PHASE_B,
-    PHASE_C
-} BLDC_PHASE_t;
 
 typedef  uint16_t *  Global_ADC_Phase_t ;
 

@@ -292,7 +292,12 @@ String.6.0=2010,1,14,10,36,49
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\inc]
 ElemType=Folder
 PathName=STM8S_StdPeriph_Lib\inc
+Child=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\inc...\..\inc\stm8s_conf.h
 Next=Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src
+
+[Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\inc...\..\inc\stm8s_conf.h]
+ElemType=File
+PathName=..\..\inc\stm8s_conf.h
 
 [Root.STM8S_StdPeriph_Lib.STM8S_StdPeriph_Lib\src]
 ElemType=Folder
@@ -493,6 +498,11 @@ Next=Root.Source Files...\..\src\main.c
 [Root.Source Files...\..\src\main.c]
 ElemType=File
 PathName=..\..\src\main.c
+Next=Root.Source Files...\..\src\pwm_stm8s.c
+
+[Root.Source Files...\..\src\pwm_stm8s.c]
+ElemType=File
+PathName=..\..\src\pwm_stm8s.c
 Next=Root.Source Files...\..\src\stm8_interrupt_vector.c
 
 [Root.Source Files...\..\src\stm8_interrupt_vector.c]
@@ -580,6 +590,11 @@ String.6.0=2010,1,14,10,36,49
 [Root.Include Files...\..\inc\parameter.h]
 ElemType=File
 PathName=..\..\inc\parameter.h
+Next=Root.Include Files...\..\inc\pwm_stm8s.h
+
+[Root.Include Files...\..\inc\pwm_stm8s.h]
+ElemType=File
+PathName=..\..\inc\pwm_stm8s.h
 Next=Root.Include Files...\..\inc\stm8s_it.h
 
 [Root.Include Files...\..\inc\stm8s_it.h]

@@ -219,25 +219,6 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-    static uint8_t toggle;
-
-    toggle ^= 1; // tmp test
-#if 1 // tmp test
-    if (toggle){
-        GPIOD->ODR |= (1 << LED);
-    } else {
-        GPIOD->ODR &= ~(1 << LED);
-    }
-#endif
-#if  0
-// tmp test
-    if (toggle){
-        GPIOA->ODR |= (1 << 3);
-    } else {
-        GPIOA->ODR &= ~(1 << 3);
-    }
-#endif
-
     // must reset the tmer interrupt flag
     TIM1->SR1 &= ~TIM1_SR1_UIF;
 //TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
@@ -290,22 +271,11 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+#if 1 // tmp test
     static uint8_t toggle;
-    static uint8_t count20ms = 0;
-
-    count20ms += 1;
-
-/*
- * create a reference signal @50Hz/20mS ... set LED0 (test signal to OTS ESC for testing)
- */
-#if 0
-    if (count20ms > TIM2_COUNT_LED0_PD)
-    {
-        count20ms = 0;
+    if (toggle ^= 1){
         GPIOD->ODR |= (1 << LED);
-    }
-    else if (count20ms > Duty_cycle_pcnt_LED0)
-    {
+    } else {
         GPIOD->ODR &= ~(1 << LED);
     }
 #endif
@@ -500,16 +470,14 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 {
-    static uint8_t toggle = 0;
-#if 0
-toggle ^= 1;
-    if ( toggle ){
-        GPIOG->ODR &= ~(1<<0);
-    }else {
-        GPIOG->ODR |=  (1<<0);
+#if 0 // tmp test
+    static uint8_t toggle;
+    if (toggle ^= 1){
+        GPIOD->ODR |= (1 << LED);
+    } else {
+        GPIOD->ODR &= ~(1 << LED);
     }
 #endif
-
 
     BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context
 
