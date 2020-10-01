@@ -18,17 +18,19 @@ extern uint8_t Log_Level; // tmp
 /* Private defines -----------------------------------------------------------*/
 
 #define PWM_100PCNT    TIM2_PWM_PD
-#define PWM_50PCNT     ( PWM_100PCNT / 2 )
-#define PWM_25PCNT     ( PWM_100PCNT / 4 )
-#define PWM_20PCNT     ( PWM_100PCNT / 5 )
-#define PWM_10PCNT     ( PWM_100PCNT / 10 )
 #define PWM_0PCNT      0
+
+#define PWM_10PCNT     ( PWM_100PCNT / 10 )
+#define PWM_20PCNT     ( PWM_100PCNT / 5 )
+#define PWM_25PCNT     ( PWM_100PCNT / 4 )
+#define PWM_50PCNT     ( PWM_100PCNT / 2 )
+
 
 #define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
 
-#define PWM_DC_RAMPUP  PWM_X_PCNT( 45 ) // from 50% ... better? (stalls 4/5)
+#define PWM_DC_RAMPUP  PWM_X_PCNT( 45 )
 
-#define PWM_DC_IDLE    PWM_X_PCNT( 22 ) // stall 50% of the time
+#define PWM_DC_IDLE    PWM_X_PCNT( 22 )
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -197,46 +199,25 @@ static void set_dutycycle(uint16_t global_dutycycle)
     global_uDC = global_dutycycle;
 }
 
+/*
+ * these functions don't do real range checking, they just assert against 
+ * integer rollover (which shouldn't happen anyway?)
+ * see BLDC_Spd_dec() etc.
+ */
 static void inc_dutycycle(void)
 {
-    global_uDC += 1;
+    if (global_uDC < 0xFFFE)
+    {
+        global_uDC += 1;
+    }
 }
 
 static void dec_dutycycle(void)
 {
-    global_uDC -= 1;
-}
-
-/*
- * intermediate function for setting PWM with positive or negative polarity
- * Provides an "inverted" (complimentary) duty-cycle if [state0 < 0]
- *
- * is pretty much crufty crud at this point
- */
-static uint16_t _get_pwm_dc(uint8_t chan /* unused */, BLDC_PWM_STATE_t state)
-{
-    uint16_t pulse = PWM_0PCNT;
-
-    switch(state)
+    if (global_uDC > 0)
     {
-    default:
-    case DC_OUTP_FLOAT_R:
-    case DC_OUTP_FLOAT_F:
-    case DC_OUTP_LO:
-        pulse = PWM_0PCNT;
-        break;
-    case DC_OUTP_HI:
-//        pulse = PWM_100PCNT;
-//        break;
-//    case DC_PWM_PLUS:
-        pulse = global_uDC;
-        break;
-//    case DC_PWM_MINUS: // complimented i.e. (100% - DC)
-//        pulse = TIM2_PWM_PD - global_uDC; // inverse pulse
-//        break;
+        global_uDC -= 1;
     }
-
-    return pulse;
 }
 
 /*
@@ -335,6 +316,13 @@ static void comm_switch (uint8_t bldc_step)
     state1 = Commutation_Steps[ bldc_step ].phB;
     state2 = Commutation_Steps[ bldc_step ].phC;
 
+
+// before messing w/ PWM, firgure out if the previous float phase was A and if
+// so (only ph. A for now) then collect the back-EMF sample(s) . 
+// [1] and [3]  should add to 0 (15 degree and 45 degree)
+// [2] should be at 0-crossing (30 degree)
+
+
     /*
      * Disable PWM of previous driving phase is finished (120 degrees). Note that
      * an active TIM1 PWM pulse could be interrupted. Probably adds to the overall jitter
@@ -358,14 +346,17 @@ static void comm_switch (uint8_t bldc_step)
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
+//    PWM_PhA_OUTP_LO( 0 );
         GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
+//    PWM_PhB_OUTP_LO( 0 );
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
+//    PWM_PhC_OUTP_LO( 0 );
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
     }
 
@@ -376,20 +367,24 @@ static void comm_switch (uint8_t bldc_step)
     if (DC_OUTP_LO == state0)
     {
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
-        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-        GPIOC->ODR |=   (1<<5);  // set C5 ( /SD A )
+//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+        PWM_PhA_OUTP_LO( 0 );
+        GPIOC->ODR |=   (1<<5);  // set /SD A
+
     }
     else if (DC_OUTP_LO == state1)
     {
 // let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
-        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-        GPIOC->ODR |=   (1<<7);  // set C7 ( /SD B )
+//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+        PWM_PhB_OUTP_LO( 0 );
+        GPIOC->ODR |=   (1<<7); // set  /SD B
     }
     else if (DC_OUTP_LO == state2)
     {
 // let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
-        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-        GPIOG->ODR |=   (1<<1);  // set G1 ( /SD C )
+//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+        PWM_PhC_OUTP_LO( 0 );
+        GPIOG->ODR |=   (1<<1); // set /SD C
     }
 
 
@@ -413,8 +408,9 @@ static void comm_switch (uint8_t bldc_step)
 #endif // COMM_TIME_KLUDGE_DELAYS
 
 
-    /* Back-EMF reading hardcoded to phase "A" (ADC_0)
-     */
+/*
+ * Back-EMF reading hardcoded to phase "A" (ADC_0)
+ */
     if (  DC_OUTP_FLOAT_F == state0 )
     {
 GPIOG->ODR |=  (1<<0); // set test pin
@@ -445,19 +441,19 @@ GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
      */
     if (DC_OUTP_HI == state0)
     {
-        PWM_PhA_Enable( global_uDC /* get_pwm_dc(0, state0) */ );
+        PWM_PhA_Enable( global_uDC );
         GPIOC->ODR |=   (1<<5);  // set /SD A
     }
 
     if (DC_OUTP_HI == state1)
     {
-        PWM_PhB_Enable( global_uDC /* get_pwm_dc(1, state1) */ );
+        PWM_PhB_Enable( global_uDC );
         GPIOC->ODR |=   (1<<7); // set  /SD B
     }
 
     if (DC_OUTP_HI == state2)
     {
-        PWM_PhC_Enable( global_uDC /* get_pwm_dc(2, state2) */ );
+        PWM_PhC_Enable( global_uDC );
         GPIOG->ODR |=   (1<<1); // set /SD C
     }
 }
@@ -497,6 +493,7 @@ uint16_t BLDC_PWMDC_Plus()
     }
     else if (BLDC_ON == BLDC_State )
     {
+//if (DC < PWM_DC_RAMPUP)
         inc_dutycycle();
     }
     return global_uDC;
@@ -509,6 +506,7 @@ uint16_t BLDC_PWMDC_Minus()
 {
     if (BLDC_ON == BLDC_State)
     {
+// if (DC > PWM_20PCNT)
         dec_dutycycle();
     }
     return global_uDC;
@@ -647,9 +645,7 @@ void BLDC_Step(void)
     if (BLDC_OFF != BLDC_State )
     {
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
-/*
- use ' 000 and 111' as invalid, so it can be a 3-bit code
-*/
+
         switch(index)
         {
         case 0:

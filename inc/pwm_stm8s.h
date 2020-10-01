@@ -15,6 +15,37 @@
 
 /* Public defines -----------------------------------------------------------*/
 
+#if 1
+/*
+ * bleh yuk erg
+ */
+// PD4 set LO 
+#define PWM_PhA_OUTP_LO( _ARG_ ) \
+    GPIOD->ODR &=  ~(1<<4);      \
+    GPIOD->DDR |=  (1<<4);      \
+    GPIOD->CR1 |=  (1<<4);
+
+// PD3 set LO
+#define PWM_PhB_OUTP_LO( _ARG_ ) \
+    GPIOD->ODR &=  ~(1<<3);      \
+    GPIOD->DDR |=  (1<<3);      \
+    GPIOD->CR1 |=  (1<<3);
+
+// PA3 set LO
+#define PWM_PhC_OUTP_LO( _ARG_ ) \
+    GPIOA->ODR &=  ~(1<<3);      \
+    GPIOA->DDR |=  (1<<3);      \
+    GPIOA->CR1 |=  (1<<3);
+
+#else
+// TIM1 PWM Chnnels
+//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+
+//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+
+//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+#endif
+
 
 /* Public types -----------------------------------------------------------*/
 
