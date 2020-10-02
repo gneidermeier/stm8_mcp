@@ -346,20 +346,17 @@ static void comm_switch (uint8_t bldc_step)
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
-//    PWM_PhA_OUTP_LO( 0 );
-//        GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
+//    PWM_PhA_OUTP_LO( 0 ); ?
         PWM_PhA_HB_DISABLE(0);
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
-//    PWM_PhB_OUTP_LO( 0 );
-        GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
+//    PWM_PhB_OUTP_LO( 0 ); ?
         PWM_PhB_HB_DISABLE(0);
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
-//    PWM_PhC_OUTP_LO( 0 );
-        GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
+//    PWM_PhC_OUTP_LO( 0 ); ?
         PWM_PhC_HB_DISABLE(0);
     }
 
@@ -416,6 +413,7 @@ static void comm_switch (uint8_t bldc_step)
 /*
  * Back-EMF reading hardcoded to phase "A" (ADC_0)
  */
+#if 0
     if (  DC_OUTP_FLOAT_F == state0 )
     {
 GPIOG->ODR |=  (1<<0); // set test pin
@@ -437,6 +435,7 @@ GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
 
         Back_EMF_R0_MA_tmp  = ( u16tmp + Back_EMF_R0_MA_tmp ) / 2;
     }
+#endif
 
 
     /*
@@ -475,11 +474,14 @@ void BLDC_Stop()
 {
     if (BLDC_OFF != BLDC_State)
     {
-// should probably assert what the /SD pins are doing as well (depends wether motor
-// should be braked or left windmilling??
         PWM_PhA_Disable();
+        PWM_PhA_HB_DISABLE(0);
+
         PWM_PhB_Disable();
+        PWM_PhB_HB_DISABLE(0);
+
         PWM_PhC_Disable();
+        PWM_PhC_HB_DISABLE(0);
 
         Log_Level = 0;
         uart_print( "STOP\r\n");

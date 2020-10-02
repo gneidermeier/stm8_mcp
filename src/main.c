@@ -105,6 +105,7 @@ void GPIO_Config(void)
 // Controls the /SD pins of IR2104s on PC5, PC7, PG1
 ///////////  // tried E2, E0, D1 but E2 not work as output ... ???
 // C5, C7, and G1 are CN2 pin 6, 8, 12 so 3 leads can go in one connector shell ;)
+#if 0
     GPIOC->ODR &=  ~(1<<5);
     GPIOC->DDR |=  (1<<5);
     GPIOC->CR1 |=  (1<<5);
@@ -116,50 +117,36 @@ void GPIO_Config(void)
     GPIOG->ODR &=  ~(1<<1);
     GPIOG->DDR |=  (1<<1);
     GPIOG->CR1 |=  (1<<1);
+#endif
+
+// SD/A = PD2 SD/B=PD1  SD/C=PA5  .... however D1 not working for me as intended, E0 instead (GN: 10-2)
+    GPIOD->ODR &=  ~(1<<2);
+    GPIOD->DDR |=  (1<<2);
+    GPIOD->CR1 |=  (1<<2);
+
+    GPIOD->ODR &=  ~(1<<1); //?
+    GPIOD->DDR |=  (1<<1); //?
+    GPIOD->CR1 |=  (1<<1); //?
+
+GPIOE->ODR &=  ~(1<<0); //E0 data 
+    GPIOE->DDR |=  (1<<0); //E0 dir
+    GPIOE->CR1 |=  (1<<0); //E0	cfg
+
+    GPIOA->ODR &= ~(1 << 5); // set pin off 
+    GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
+    GPIOA->CR1 |= (1 << 5);  // push pull output
+
 
 ////////////
-// use PC6 (CN2-9) and PG0 (CN2-11) as test pins
+// use PG0 (CN2-11) as test pins
     GPIOG->ODR &= ~(1<<0);
     GPIOG->DDR |=  (1<<0);
     GPIOG->CR1 |=  (1<<0);
 
-    GPIOC->ODR |=  (1<<6); 				//  cathode of LED on PC6
-    GPIOC->DDR |=  (1<<6);
-    GPIOC->CR1 |=  (1<<6);
 
-#if 0 // these are set by TIM2 PWM API calls 
-// 3 PWM Channels
-// T2.PWM.CH3
-    GPIOA->ODR |=  (1<<3);  // PA3
-    GPIOA->DDR |=  (1<<3);
-    GPIOA->CR1 |=  (1<<3);
-// T2.PWM.CH2
-    GPIOD->ODR |=  (1<<3);  // PD3
-    GPIOD->DDR |=  (1<<3);
-    GPIOD->CR1 |=  (1<<3);
-// T2.PWM.CH1
-    GPIOD->ODR |=  (1<<4);  // PD4
-    GPIOD->DDR |=  (1<<4);
-    GPIOD->CR1 |=  (1<<4);
-#endif
-#if 0 // TIM1 CH1, CH2, CH3, CH4
-// T1.PWM.CH1
-    GPIOC->ODR |=  (1<<1);  // PC1
-    GPIOC->DDR |=  (1<<1);
-    GPIOC->CR1 |=  (1<<1);
-// T1.PWM.CH2
-    GPIOC->ODR |=  (1<<2);  // PC2
-    GPIOC->DDR |=  (1<<2);
-    GPIOC->CR1 |=  (1<<2);
-// T1.PWM.CH3
-    GPIOC->ODR |=  (1<<3);  // PC3
-    GPIOC->DDR |=  (1<<3);
-    GPIOC->CR1 |=  (1<<3);
-// T1.PWM.CH4
-    GPIOC->ODR |=  (1<<4);  // PC4
+    GPIOC->ODR |=  (1<<4);  // PC4 .. tmp test
     GPIOC->DDR |=  (1<<4);
     GPIOC->CR1 |=  (1<<4);
-#endif
 
 // INPUTS
 // PA4 as button input (Stop)
@@ -170,19 +157,11 @@ void GPIO_Config(void)
 // PA6 as button input (B+)
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-#if 0
-    GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
-    GPIOA->CR1 |= (1 << 5);  // push pull output
-    GPIOA->ODR &= ~(1 << 5); // set pin off to use as gnd of button
-#endif
+
 // PE5 as button input (B-)
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
-#if 0
-    GPIOE->DDR |= (1 << 3);  // PE.3 as OUTPUT
-    GPIOE->CR1 |= (1 << 3);  // push pull output
-    GPIOE->ODR &= ~(1 << 3); // set pin off to use as gnd of button
-#endif
+
 #if 0 // UartX_Init()
 // UART2 D5: Rx, D6: Tx
     GPIOD->DDR &= ~(1 << 5); // PD.5 as input
@@ -324,11 +303,9 @@ char GetKey(void)
  * ADC clock must be between 1 MHz and 4 or 6 MHz ... use D4 here (good for 4 - 16 Mhz cpu clock @ D4)
  */
 #ifdef CLOCK_16
-// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D16
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D8  // 8 -> 16/8 = 2
 #else
-// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D8  // 1 Mhz, min sample rate
-// #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // maybe theres no reason to change it
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 4 ->  8/4=2 and 16/4=4 which are both in the req'd range of 1-4Mhz
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 4 ->  8/4 = 2 
 #endif
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc

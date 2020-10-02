@@ -38,11 +38,54 @@
     GPIOA->CR1 |=  (1<<3);
 
 /*
- * Half-bridge enables ... specific to certain pin on the MC as well
+ * Half-bridge enables ... specific to certain pin 
  * as the device specific ... IR2104 is the /SD pin
  *
- * Combie enable/disable using _ARG_ ?
+ * Combine enable/disable using _ARG_ ?
  */
+ // D2 D1 A5
+
+#define PWM_PhA_HB_ENABLE( _ARG_ ) \
+    GPIOD->ODR |=   (1<<2);  // set /SD A
+
+#define PWM_PhB_HB_ENABLE( _ARG_ ) \
+    GPIOE->ODR |=   (1<<0); // set  /SD B         E0
+//    GPIOD->ODR |=   (1<<1); // set  /SD B        D1
+
+#define PWM_PhC_HB_ENABLE( _ARG_ ) \
+    GPIOA->ODR |=   (1<<5); // set  /SD C
+
+/*
+ * Half-bridge dis-ables ... specific to certain pin 
+ * as the device specific ... IR2104 is the /SD pin
+ */
+#define PWM_PhA_HB_DISABLE( _ARG_ ) \
+    GPIOD->ODR &=   ~(1<<2);  // clr /SD A
+
+#define PWM_PhB_HB_DISABLE( _ARG_ ) \
+    GPIOE->ODR &=   ~(1<<0); // clr  /SD B    E0
+//    GPIOD->ODR &=   ~(1<<1); // clr  /SD B    D1
+
+#define PWM_PhC_HB_DISABLE( _ARG_ ) \
+    GPIOA->ODR &=   ~(1<<5); // clr  /SD C
+
+
+#else
+
+// TIM1 PWM Chnnels ...legacy ... not maintained
+
+//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
+
+//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
+
+//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
+
+/*
+ * Half-bridge enables ... specific to certain pin 
+ * as the device specific ... IR2104 is the /SD pin
+ */
+ // C5 C7 G1
+
 #define PWM_PhA_HB_ENABLE( _ARG_ ) \
     GPIOC->ODR |=   (1<<5);  // set /SD A
 
@@ -53,7 +96,7 @@
     GPIOG->ODR |=   (1<<1); // set  /SD C
 
 /*
- * Half-bridge dis-ables ... specific to certain pin on the MC as well
+ * Half-bridge dis-ables ... specific to certain pin 
  * as the device specific ... IR2104 is the /SD pin
  */
 #define PWM_PhA_HB_DISABLE( _ARG_ ) \
@@ -65,15 +108,7 @@
 #define PWM_PhC_HB_DISABLE( _ARG_ ) \
     GPIOG->ODR &=   ~(1<<1); // clr  /SD C
 
-
-#else
-// TIM1 PWM Chnnels
-//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-
-//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-
-//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-#endif
+#endif                                           ////// TIM 1
 
 
 /* Public types -----------------------------------------------------------*/
