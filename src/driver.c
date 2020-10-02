@@ -347,17 +347,20 @@ static void comm_switch (uint8_t bldc_step)
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
     {
 //    PWM_PhA_OUTP_LO( 0 );
-        GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
+//        GPIOC->ODR &=  ~(1<<5);      // /SD A OFF
+        PWM_PhA_HB_DISABLE(0);
     }
     else if (DC_OUTP_FLOAT_R == state1 || DC_OUTP_FLOAT_F == state1)
     {
 //    PWM_PhB_OUTP_LO( 0 );
         GPIOC->ODR &=   ~(1<<7);     // /SD B OFF
+        PWM_PhB_HB_DISABLE(0);
     }
     else if (DC_OUTP_FLOAT_R == state2 || DC_OUTP_FLOAT_F == state2)
     {
 //    PWM_PhC_OUTP_LO( 0 );
         GPIOG->ODR &=   ~(1<<1);     // /SD C OFF
+        PWM_PhC_HB_DISABLE(0);
     }
 
 
@@ -369,22 +372,24 @@ static void comm_switch (uint8_t bldc_step)
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
 //        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
         PWM_PhA_OUTP_LO( 0 );
-        GPIOC->ODR |=   (1<<5);  // set /SD A
-
+//        GPIOC->ODR |=   (1<<5);  // set /SD A
+        PWM_PhA_HB_ENABLE(1);
     }
     else if (DC_OUTP_LO == state1)
     {
 // let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
 //        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
         PWM_PhB_OUTP_LO( 0 );
-        GPIOC->ODR |=   (1<<7); // set  /SD B
+//        GPIOC->ODR |=   (1<<7); // set  /SD B
+        PWM_PhB_HB_ENABLE(1);
     }
     else if (DC_OUTP_LO == state2)
     {
 // let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
 //        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
         PWM_PhC_OUTP_LO( 0 );
-        GPIOG->ODR |=   (1<<1); // set /SD C
+//        GPIOG->ODR |=   (1<<1); // set /SD C
+        PWM_PhC_HB_ENABLE(1);
     }
 
 
@@ -442,19 +447,22 @@ GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
     if (DC_OUTP_HI == state0)
     {
         PWM_PhA_Enable( global_uDC );
-        GPIOC->ODR |=   (1<<5);  // set /SD A
+//        GPIOC->ODR |=   (1<<5);  // set /SD A
+PWM_PhA_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state1)
     {
         PWM_PhB_Enable( global_uDC );
-        GPIOC->ODR |=   (1<<7); // set  /SD B
+//        GPIOC->ODR |=   (1<<7); // set  /SD B
+PWM_PhB_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state2)
     {
         PWM_PhC_Enable( global_uDC );
         GPIOG->ODR |=   (1<<1); // set /SD C
+PWM_PhC_HB_ENABLE(1);
     }
 }
 
