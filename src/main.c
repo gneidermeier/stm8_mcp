@@ -31,6 +31,7 @@
 
 uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
+uint8_t Log_Level;         // global log-level
 
 
 /* Private variables ---------------------------------------------------------*/

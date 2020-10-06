@@ -15,15 +15,12 @@
 #ifndef PARAMETER_H
 #define PARAMETER_H
 
-
 // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
 #include <stm8s.h>
 
 //#define CLOCK_16
 
 #define PWM_8K
-
-
 
 
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
@@ -39,7 +36,6 @@
 // @12k:
 //  0.000083 / 0.5 us  = 166.67 counts
 
-
 #ifdef PWM_8K
   #define TIM2_PWM_PD    250   // 125uS 
 #else // 12kHz
@@ -47,12 +43,12 @@
 #endif
 
 
-#define LED  0
+#define LED  0  // STM8-Discovery board built-in LED on PIN D0
+
 
 extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
 
-
-
+extern uint8_t Log_Level;   // global log-level
 
 
 #endif // PARAMETER_H

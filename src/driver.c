@@ -153,10 +153,6 @@ typedef  enum {
 
 /* Public variables  ---------------------------------------------------------*/
 
-uint8_t Log_Level;
-
-
-
 uint16_t Back_EMF_F_tmp;
 uint16_t Back_EMF_F0_MA_tmp;
 
