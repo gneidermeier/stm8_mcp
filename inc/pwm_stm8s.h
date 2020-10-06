@@ -11,7 +11,9 @@
 #define PWM_STM_S_H
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm8s.h"
+
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
 
 /* Public defines -----------------------------------------------------------*/
 

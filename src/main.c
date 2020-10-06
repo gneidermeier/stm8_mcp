@@ -10,8 +10,13 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
-#include "stm8s.h"
-#include "parameter.h" // app defines
+
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
+
+// app headers
+#include "driver.h" 
+#include "parameter.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -26,7 +31,6 @@
 
 uint8_t TaskRdy;           // flag for timer interrupt for BG task timing
 
-uint8_t Log_Level;
 
 
 /* Private variables ---------------------------------------------------------*/

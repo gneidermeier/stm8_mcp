@@ -30,8 +30,9 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm8s.h"
-//#include "parameter.h" // app defines
+
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
 
 
 /* Private defines -----------------------------------------------------------*/

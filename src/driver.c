@@ -9,11 +9,17 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm8s.h"
+
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
+
 #include "parameter.h" // app defines
 #include "pwm_stm8s.h"
 
-extern uint8_t Log_Level; // tmp
+
+// presently is in main.c .. header?
+extern void TIM3_setup(uint16_t u16period);
+
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -137,10 +143,17 @@ typedef enum /* COMMUTATION_SECTOR */
 } COMMUTATION_SECTOR_t;
 
 
+// motor running-cycle state machine
+typedef  enum {
+  BLDC_OFF,
+  BLDC_RAMPUP,
+  BLDC_ON
+} BLDC_STATE_T;
 
 
 /* Public variables  ---------------------------------------------------------*/
 
+uint8_t Log_Level;
 
 
 
@@ -394,7 +407,7 @@ static void comm_switch (uint8_t bldc_step)
  * This delay waits for settling of flyback effect after the PWM transition - only needed for getting 
  * falling Back-EMF signal 
  */
-#ifdef COMM_TIME_KLUDGE_DELAYS
+#if 0 // #ifdef COMM_TIME_KLUDGE_DELAYS .. this is going away
 
  GPIOG->ODR |=  (1<<0); // set test pin
 

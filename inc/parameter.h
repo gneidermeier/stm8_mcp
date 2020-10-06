@@ -16,18 +16,12 @@
 #define PARAMETER_H
 
 
-/*
- * defines
- */
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
 
 //#define CLOCK_16
 
 #define PWM_8K
-
-
-#define COMM_TIME_KLUDGE_DELAYS 
-
-
 
 
 
@@ -55,51 +49,10 @@
 
 #define LED  0
 
-
-/*
- * Types
- */
-typedef  enum {
-  BLDC_OFF,
-  BLDC_RAMPUP,
-  BLDC_ON
-} BLDC_STATE_T;
-
-
-typedef  uint16_t *  Global_ADC_Phase_t ;
-
-
-/*
- * variables
- */
 extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
 
 
-// how many ADCs can be saved in a single (60deg) commutation sector (how many PWM ISR per sector? depends on motor speed and PWM freq.)
-#define ADC_PHASE_BUF_SZ  8  // make this power of 2 so modulus can be used 
 
-
-extern Global_ADC_Phase_t Global_ADC_PhaseABC_ptr[];  // pointers to ADC phase buffers
-
-extern uint8_t BackEMF_Sample_Index;
-
-
-/*
- * prototypes
- */
-
-void BLDC_Spd_inc(void); // should go away
-void BLDC_Spd_dec(void);// should go away
-
-uint16_t BLDC_PWMDC_Plus(void);
-uint16_t BLDC_PWMDC_Minus(void);
-
-void BLDC_Stop(void);
-void BLDC_Step(void);
-void BLDC_Update(void);
-
-// presently is in main.c .. header?
-void TIM3_setup(uint16_t u16period);
 
 
 #endif // PARAMETER_H

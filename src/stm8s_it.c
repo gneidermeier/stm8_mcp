@@ -22,11 +22,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
 #include "parameter.h" //  app defines
-
-
-// hack, temp
-extern uint16_t BLDC_OL_comm_tm;
-extern  uint16_t global_uDC;
+#include "driver.h"
 
 
 /** @addtogroup I2C_EEPROM
