@@ -25,26 +25,14 @@
  */
 
 
-
-
-typedef  uint16_t *  Global_ADC_Phase_t ;
+/*
+ * types
+ */
 
 
 /*
  * variables
  */
-
-
-extern uint8_t Log_Level;
-
-
-// how many ADCs can be saved in a single (60deg) commutation sector (how many PWM ISR per sector? depends on motor speed and PWM freq.)
-#define ADC_PHASE_BUF_SZ  8  // make this power of 2 so modulus can be used 
-
-
-extern Global_ADC_Phase_t Global_ADC_PhaseABC_ptr[];  // pointers to ADC phase buffers
-
-extern uint8_t BackEMF_Sample_Index;
 
 
 /*
