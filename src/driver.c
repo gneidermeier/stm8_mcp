@@ -76,7 +76,13 @@ extern uint16_t Back_EMF_Falling_4[4];
 #define BLDC_OL_TM_LO_SPD          (512 * 2 * TIM3_RATE_MODULUS) // start of ramp
 
 //  1 / (3ms * (12/2) ) = motor freq.
-#define BLDC_OL_TM_HI_SPD          (64 * 2 * TIM3_RATE_MODULUS)
+// experimentally the motor is very close to timed at the set PWM duty-cycle (22%)
+//#define BLDC_OL_TM_HI_SPD          (66.25f * 2 * TIM3_RATE_MODULUS)
+#define BLDC_OL_TM_HI_SPD          0x0212 // (66.25f * 2 * TIM3_RATE_MODULUS)
+/*
+#error clnk Debug\stvd_project.lkf:1 @svlreg missing for function f_TIM4_UPD_OVF_IRQHandler
+ The command: "clnk -lC:\Lib  -o Debug\stvd_project.sm8 -mDebug\stvd_project.map Debug\stvd_project.lkf " has failed, the returned value is: 1
+*/
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 #define LUDICROUS_SPEED            (13.875f * 2 * TIM3_RATE_MODULUS) // note; won't be possible until D.C. and comm-time are sync'd i.e. closed-loop
