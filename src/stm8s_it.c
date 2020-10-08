@@ -25,6 +25,12 @@
 #include "driver.h"
 
 
+// hack, temp
+extern uint16_t  _ADC_Global;
+
+void bemf_samp_start( void );
+void bemf_samp_get(void);
+
 /** @addtogroup I2C_EEPROM
   * @{
   */
@@ -276,6 +282,8 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 #endif
 
+    bemf_samp_start();
+
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
 }
@@ -438,6 +446,16 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   */
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
 {
+#if 1 // tmp test
+    static uint8_t toggle;
+    if (toggle ^= 1){
+        GPIOC->ODR |= (1 << 4);
+    } else {
+        GPIOC->ODR &= ~(1 << 4);
+    }
+#endif
+
+    bemf_samp_get();
 
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.

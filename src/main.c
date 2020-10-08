@@ -305,12 +305,14 @@ char GetKey(void)
 }
 
 /*
- * ADC clock must be between 1 MHz and 4 or 6 MHz ... use D4 here (good for 4 - 16 Mhz cpu clock @ D4)
+ * set ADC clock to 4Mhz  - sample time from the data sheet @ 4Mhz
+ * min sample time .75 useconds @ fADC = 4Mhz
+ * conversion time = 14 * 1/2000000 = 0.0000035 seconds (3.5 us)
  */
 #ifdef CLOCK_16
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D8  // 8 -> 16/8 = 2
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 8 -> 16/4 = 4
 #else
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 4 ->  8/4 = 2 
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // 4 ->  8/2 = 4 
 #endif
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
@@ -324,18 +326,16 @@ void ADC1_setup(void)
     ADC1_DeInit();
 
 // configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
-    ADC1_Init(ADC1_CONVERSIONMODE_SINGLE,
-              ADC1_CHANNEL_2,
+    ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
+              ADC1_CHANNEL_2,        // i.e. Ch 0, 1 and 2 are enabled
               ADC_DIVIDER,
-              ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO
+              ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO ... not presently using any ex triggern
               DISABLE,               // ExtTriggerState
               ADC1_ALIGN_RIGHT,
               ADC1_SCHMITTTRIG_ALL,
               DISABLE);              // SchmittTriggerState
 
-#ifdef ADC_EOCIE // interrupted ADC messes w/ motor
-    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE);
-#endif
+    ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE); // grab the sample in the ISR
 
     /*
     A single conversion is performed for each channel starting with AIN0 and the data is stored
@@ -346,13 +346,13 @@ void ADC1_setup(void)
                           ADC1_ALIGN_RIGHT);
 
 //ADC1_DataBufferCmd(ENABLE);
-    ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to 9 (as defined in ADC1_Init)
+    ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to n (as defined in ADC1_Init)
 
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
     ADC1_Cmd(ENABLE);
 
 // ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
-    ADC1_StartConversion();
+    ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
 /*
@@ -558,15 +558,10 @@ void clock_setup(void)
 static uint16_t Line_Count = 0;
 
 extern uint16_t BLDC_OL_comm_tm;
-extern uint16_t Back_EMF_R[];
-extern uint16_t Back_EMF_F[];
-extern uint16_t Back_EMF_F0_MA;
-extern uint16_t Back_EMF_R0_MA;
+extern int Back_EMF_Falling_Int_PhX;
 
-extern uint16_t Back_EMF_F_tmp;
-extern uint16_t Back_EMF_F0_MA_tmp;
-extern uint16_t Back_EMF_R_tmp;
-extern uint16_t Back_EMF_R0_MA_tmp;
+uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
+
 /*
  * temp, todo better function
  */
@@ -589,25 +584,28 @@ void testUART(void)
     strcat(sbuf, cbuf);
 
 #if 1
-// tmep ... log the test back-EMF falling-float transition
-    strcat(sbuf, " bF0_ma=");
-    itoa( Back_EMF_F0_MA_tmp,     cbuf, 16);
+    strcat(sbuf, " bFi=");
+    itoa( Back_EMF_Falling_Int_PhX,     cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " bF0=");
-    itoa( Back_EMF_F_tmp,     cbuf, 16);
-    strcat(sbuf, cbuf);
-#endif
-#if 1
 // tmep ... log the test back-EMF falling-float transition
-    strcat(sbuf, " bR0_ma=");
-    itoa( Back_EMF_R0_MA_tmp,     cbuf, 16);
+    strcat(sbuf, " 000=");
+    itoa( Back_EMF_Falling_4[0],     cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " bR0=");
-    itoa( Back_EMF_R_tmp,     cbuf, 16);
+    strcat(sbuf, " 001=");
+    itoa( Back_EMF_Falling_4[1],     cbuf, 16);
     strcat(sbuf, cbuf);
+
+    strcat(sbuf, " 002=");
+    itoa( Back_EMF_Falling_4[2],     cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " 003=");
+    itoa( Back_EMF_Falling_4[3],     cbuf, 16);
+    strcat(sbuf, cbuf);	
 #endif
+
 #if 0
     strcat(sbuf, " A0=");
     itoa(ADC1_GetBufferValue(0), cbuf, 16);

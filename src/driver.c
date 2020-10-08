@@ -17,11 +17,24 @@
 #include "pwm_stm8s.h"
 
 
-// presently is in main.c .. header?
+// presently is in main.c .. header? prove you are a true coding sociopath use more globals
 extern void TIM3_setup(uint16_t u16period);
+extern uint16_t Back_EMF_Falling_4[4];
 
 
 /* Private defines -----------------------------------------------------------*/
+
+// divider: 33k/22k
+//  22/(22+33)=0.4
+// 0.4 * 13.8v = 5.52 ... don't care that if Vdc 13.8v applied, ADCin clips 5v ADC vref!
+// 5.52 = 2.76v ........... 1/2 Vdc in proportion to the resisitor divider
+//  2.76v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
+//   x = 1024 * 2.76/5 = 565   (0x0235)
+#define DC_HALF_REF  0x0235
+
+#define GET_BACK_EMF_ADC( ) \
+    ( _ADC_Global - DC_HALF_REF )
+
 
 #define PWM_100PCNT    TIM2_PWM_PD
 #define PWM_0PCNT      0
@@ -74,7 +87,7 @@ extern void TIM3_setup(uint16_t u16period);
  * Slope of what is basically a linear startup ramp, commutation time (i.e. TIM3)
  * period) decremented by fixed amount each control-loop timestep. Slope 
  * determined by experiment (conservative to avoid stalling the motor!) 
- */ 
+ */
 #define BLDC_ONE_COMM_STEP         TIM3_RATE_MODULUS  // each commutation step unit is 4x TIM3 periods
 #define BLDC_ONE_RAMP_UNIT         BLDC_ONE_COMM_STEP
 
@@ -84,8 +97,6 @@ extern void TIM3_setup(uint16_t u16period);
 typedef enum DC_PWM_STATE
 {
     DC_OUTP_OFF,
-//    DC_PWM_PLUS,
-//    DC_PWM_MINUS, // complimented i.e. (100% - DC)
     DC_OUTP_HI,
     DC_OUTP_LO,
     DC_OUTP_FLOAT_R,
@@ -95,23 +106,23 @@ typedef enum DC_PWM_STATE
 
 
 /*
- * bitfield mappings for sector:
+ * bitfield mappings for sector (experiment, not presently used):
  *  :2 High drive
  *  :2 Low drive
  *  :2 Rising float transition
  *  :2 Falling float transition
  *  typedef uint_8 SECTOR_BITF_t
  */
-typedef uint8_t SECTOR_PHASE_MAPPING_t ;
+typedef uint8_t _SECTOR_PHASE_MAPPING_t ;
 // e.g.
 // BLDC_PHASE_t bar = PHASE_A;
 // SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
-#define SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ )
+#define _SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ )
 // SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
 
 /*
- * aggregate 3 phases into a struct for easy param passing and putting in table
- * There could be other information put in there if needed to ease the step transitions logic.
+ * One commutation step consists of the states of the 3 phases - condensed into 
+ * a struct for easy param passing and aggregating into a table.
  */
 typedef struct /* COMM_STEP */
 {
@@ -121,15 +132,6 @@ typedef struct /* COMM_STEP */
 }
 BLDC_COMM_STEP_t;
 
-
-
-// PWM drive modes
-typedef enum /* PWM_MODE */
-{
-    UPPER_ARM,
-    LOWER_ARM
-    // SYMETRICAL ... upper and lower arms driven (complementary) .. maybe no use for it
-} PWM_MODE_t;
 
 // commutation "sectors" (steps)
 typedef enum /* COMMUTATION_SECTOR */
@@ -144,21 +146,21 @@ typedef enum /* COMMUTATION_SECTOR */
 
 
 // motor running-cycle state machine
-typedef  enum {
-  BLDC_OFF,
-  BLDC_RAMPUP,
-  BLDC_ON
+typedef enum
+{
+    BLDC_OFF,
+    BLDC_RAMPUP,
+    BLDC_ON
 } BLDC_STATE_T;
 
 
 /* Public variables  ---------------------------------------------------------*/
 
-uint16_t Back_EMF_F_tmp;
-uint16_t Back_EMF_F0_MA_tmp;
+uint16_t _ADC_Global;
+uint16_t Back_EMF_15304560[4];
 
-uint16_t Back_EMF_R_tmp;
-uint16_t Back_EMF_R0_MA_tmp;
-
+int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine signed int happens to be ...
+                              // todo: stms8.h has  typedef   signed long     int32_t; 
 
 uint16_t BLDC_OL_comm_tm;   // could be private
 
@@ -242,9 +244,9 @@ static void delay(int time)
 }
 
 /*
- * for now the ADC channels for back-EMF are single-channel conversions
+ * back-EMF single-channel ADC start and polls on ADC1_FLAG_EOC end-of-conversion
  */
-static uint16_t sample(ADC1_Channel_TypeDef adc_channel)
+static uint16_t _sample(ADC1_Channel_TypeDef adc_channel)
 {
     uint16_t u16tmp;
 
@@ -259,11 +261,8 @@ static uint16_t sample(ADC1_Channel_TypeDef adc_channel)
 
 // Wait until the conversion is done ... delay in an ISR .. blah
 
-// GPIOG->ODR |=  (1<<0); // set test pin
-
-        while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET /* 0 */ );
+    while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET /* 0 */ );
 //    delay(15); // check time on scope .. thia delay can probably avoid the while() ??!?
-// GPIOG->ODR &=  ~(1<<0); // clear test pin
 
     u16tmp = ADC1_GetBufferValue(adc_channel); // ADC1_GetConversionValue();
 
@@ -271,6 +270,40 @@ static uint16_t sample(ADC1_Channel_TypeDef adc_channel)
 
     return u16tmp;
 }
+
+/*
+ * back-EMF single-channel start and let ISR to signal EOC
+ * Only doing phase A right now if that will suffice.
+ *
+ * Noted AN2658 "sampling time is not customizable and
+ * depends on the ADC clock (3 ADC clocks)"
+ */
+uint16_t bemf_samp_start( void )
+{
+    const ADC1_Channel_TypeDef ADC1_Channel0 = ADC1_CHANNEL_0; // only phase A
+    uint16_t u16tmp;
+
+    ADC1_ConversionConfig(
+        ADC1_CONVERSIONMODE_SINGLE, ADC1_Channel0, ADC1_ALIGN_RIGHT);
+
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+    ADC1_Cmd(ENABLE);
+
+// ADON = 1 for the 2nd time => starts the ADC conversion
+    ADC1_StartConversion();
+
+    return u16tmp;
+}
+
+/*
+ * back-EMF single-channel get sample - only CH 0
+ * Called from ADC1 ISR
+ */
+void bemf_samp_get(void)
+{
+    _ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 ); // ADC1_GetConversionValue();
+}
+
 
 /**
   * @brief  .
@@ -309,28 +342,15 @@ static void comm_switch (uint8_t bldc_step)
     BLDC_PWM_STATE_t prev_A, prev_B, prev_C ;
     BLDC_PWM_STATE_t state0, state1, state2;
 
-    uint16_t u16tmp;
-
-    GPIOG->ODR &=  ~(1<<0); // clear test pin
-
-
     // grab the phases states of previous sector 
     prev_A = Commutation_Steps[ prev_bldc_step ].phA;
     prev_B = Commutation_Steps[ prev_bldc_step ].phB;
     prev_C = Commutation_Steps[ prev_bldc_step ].phC;
     prev_bldc_step = bldc_step;
 
-
     state0 = Commutation_Steps[ bldc_step ].phA;
     state1 = Commutation_Steps[ bldc_step ].phB;
     state2 = Commutation_Steps[ bldc_step ].phC;
-
-
-// before messing w/ PWM, firgure out if the previous float phase was A and if
-// so (only ph. A for now) then collect the back-EMF sample(s) . 
-// [1] and [3]  should add to 0 (15 degree and 45 degree)
-// [2] should be at 0-crossing (30 degree)
-
 
     /*
      * Disable PWM of previous driving phase is finished (120 degrees). Note that
@@ -350,7 +370,6 @@ static void comm_switch (uint8_t bldc_step)
     {
         PWM_PhC_Disable();
     }
-
 
 
     if (DC_OUTP_FLOAT_R == state0 || DC_OUTP_FLOAT_F == state0)
@@ -398,54 +417,11 @@ static void comm_switch (uint8_t bldc_step)
         PWM_PhC_HB_ENABLE(1);
     }
 
-
 /*
  * This delay waits for settling of flyback effect after the PWM transition - only needed for getting 
  * falling Back-EMF signal 
  */
-#if 0 // #ifdef COMM_TIME_KLUDGE_DELAYS .. this is going away
-
- GPIOG->ODR |=  (1<<0); // set test pin
-
-#ifdef PWM_8K // 8k PWM
-// this is "only" about 25us here, and seems flyback from PWM-on takes almost 20us anyway!!!
- //   delay( 20  );   //                  CT=0201 bF0_ma=00E9
- delay( 10  ); // yes I seem to keep messing with this
-#else
- asdf
-#endif
-
- GPIOG->ODR &=  ~(1<<0); // clear test pin 
-#endif // COMM_TIME_KLUDGE_DELAYS
-
-
-/*
- * Back-EMF reading hardcoded to phase "A" (ADC_0)
- */
-#if 0
-    if (  DC_OUTP_FLOAT_F == state0 )
-    {
-GPIOG->ODR |=  (1<<0); // set test pin
-        u16tmp = sample( ADC1_CHANNEL_0 );
-GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
-
-        Back_EMF_F_tmp = u16tmp;
-
-        Back_EMF_F0_MA_tmp  = ( u16tmp + Back_EMF_F0_MA_tmp ) / 2;
-    }
-    else // should not have 2 adjacent float sectors on the same phase
-    if (  DC_OUTP_FLOAT_R == prev_A ) // 
-    {
-GPIOG->ODR |=  (1<<0); // set test pin
-        u16tmp = sample( ADC1_CHANNEL_0 );
-GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
-
-        Back_EMF_R_tmp = u16tmp;
-
-        Back_EMF_R0_MA_tmp  = ( u16tmp + Back_EMF_R0_MA_tmp ) / 2;
-    }
-#endif
-
+// delay( 10  );
 
     /*
      * reconfig and re-enable PWM of the driving channels. One driving channel is
@@ -456,21 +432,21 @@ GPIOG->ODR &=  ~(1<<0); // clear test pin ... should have 14 us ???
     {
         PWM_PhA_Enable( global_uDC );
 //        GPIOC->ODR |=   (1<<5);  // set /SD A
-PWM_PhA_HB_ENABLE(1);
+        PWM_PhA_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state1)
     {
         PWM_PhB_Enable( global_uDC );
 //        GPIOC->ODR |=   (1<<7); // set  /SD B
-PWM_PhB_HB_ENABLE(1);
+        PWM_PhB_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state2)
     {
         PWM_PhC_Enable( global_uDC );
         GPIOG->ODR |=   (1<<1); // set /SD C
-PWM_PhC_HB_ENABLE(1);
+        PWM_PhC_HB_ENABLE(1);
     }
 }
 
@@ -628,54 +604,77 @@ void BLDC_Update(void)
     TIM3_setup(BLDC_OL_comm_tm);
 }
 
-/*
- */
-static void bldc_comm_step(void)
-{
-    const uint8_t N_CSTEPS = 6;
-
-    static COMMUTATION_SECTOR_t bldc_step = 0;
-
-    if (BLDC_OFF == BLDC_State )
-    {
-        // motor drive output is not active
-        GPIOC->ODR &=  ~(1<<5); //  /SD A
-        GPIOC->ODR &=  ~(1<<7); //  /SD B
-        GPIOG->ODR &=  ~(1<<1); //  /SD C
-
-        TIM1_CtrlPWMOutputs(DISABLE);
-    }
-    else // if (BLDC_ON == BLDC_State || BLDC_RAMP == BLDC_State)
-    {
-        bldc_step += 1;
-        bldc_step %= N_CSTEPS;
-
-        comm_switch( bldc_step );
-    }
-}
 
 /*
  * called from ISR
+ *
+// This eastblishthe error-signal ... next sprint to implement the contorl feedback loop!
+// measures at 4 15-degree intervals - [1] and [2] ae the valid ones to itegrate
+// Note at this low idle/open-loop speed there are only about 4 PWM @ 8k during
+// a 60-degree sector.
+// Pulses close to start/end of the secctor are problematic anyway as the ADC 
+// ISR ends up getting blocked by the TIM3 ISR ... the BLDC_Step() takes about
+// to 40us on case 3!
+
  */
 void BLDC_Step(void)
 {
-    static uint8_t bldc_step_modul; // internal counter for sub-tasking the TIM3 period
+    const uint8_t N_CSTEPS = 6;
+
+    static uint8_t bldc_step_modul; // internal counter for sub-dividing the TIM3 period
+
+    static COMMUTATION_SECTOR_t bldc_step = 0;
+
+    // grab the state of previous sector (before advancing the 6-step sequence)
+    BLDC_PWM_STATE_t     prev_A = Commutation_Steps[ bldc_step ].phA;
+
+    int16_t back_EMF_int;
+
 
     if (BLDC_OFF != BLDC_State )
     {
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
+// Note if wanting all 3 phases would need to coordinate here to set the
+// correct ADC channel to sample.
+
         switch(index)
         {
         case 0:
+            Back_EMF_15304560[0] = GET_BACK_EMF_ADC( );
             break;
         case 1:
+            Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
             break;
         case 2:
+            Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
             break;
         case 3:
-            // commutation step obviously done only once on the base-period
-            bldc_comm_step();
+            Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
+
+// should add the integral steps in each step case ;)
+            back_EMF_int = Back_EMF_15304560[1] + Back_EMF_15304560[2];
+
+            if ( DC_OUTP_FLOAT_R == prev_A )
+            {
+            } // else 
+            if (DC_OUTP_FLOAT_F == prev_A )
+            {
+// refresh the global that is dsplayed on terminal
+// memcpy (Back_EMF_15304560, Back_EMF_Falling_4, sizeof(uint16), 4);
+            Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
+            Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
+            Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
+            Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
+
+            Back_EMF_Falling_Int_PhX = back_EMF_int; // theoretically, nearing 0 when motor is in time!
+            }
+
+            bldc_step += 1;
+            bldc_step %= N_CSTEPS;
+
+            comm_switch( bldc_step );
+
             break;
         }
 
