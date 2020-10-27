@@ -47,9 +47,12 @@ extern uint16_t Back_EMF_Falling_4[4];
 
 #define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
 
-#define PWM_DC_RAMPUP  PWM_X_PCNT( 45 )
+/*
+ * precision is 1/TIM2_PWM_PD = 0.4% per count
+ */
+#define PWM_DC_RAMPUP  PWM_X_PCNT( 14 )
 
-#define PWM_DC_IDLE    PWM_X_PCNT( 22 )
+#define PWM_DC_IDLE    PWM_X_PCNT( 11.6 )
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -76,13 +79,7 @@ extern uint16_t Back_EMF_Falling_4[4];
 #define BLDC_OL_TM_LO_SPD          (512 * 2 * TIM3_RATE_MODULUS) // start of ramp
 
 //  1 / (3ms * (12/2) ) = motor freq.
-// experimentally the motor is very close to timed at the set PWM duty-cycle (22%)
-//#define BLDC_OL_TM_HI_SPD          (66.25f * 2 * TIM3_RATE_MODULUS)
-#define BLDC_OL_TM_HI_SPD          0x0212 // (66.25f * 2 * TIM3_RATE_MODULUS)
-/*
-#error clnk Debug\stvd_project.lkf:1 @svlreg missing for function f_TIM4_UPD_OVF_IRQHandler
- The command: "clnk -lC:\Lib  -o Debug\stvd_project.sm8 -mDebug\stvd_project.map Debug\stvd_project.lkf " has failed, the returned value is: 1
-*/
+#define BLDC_OL_TM_HI_SPD       0x03C0 // in-time @ 11.6% 
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 #define LUDICROUS_SPEED            (13.875f * 2 * TIM3_RATE_MODULUS) // note; won't be possible until D.C. and comm-time are sync'd i.e. closed-loop
@@ -95,7 +92,7 @@ extern uint16_t Back_EMF_Falling_4[4];
  * determined by experiment (conservative to avoid stalling the motor!) 
  */
 #define BLDC_ONE_COMM_STEP         TIM3_RATE_MODULUS  // each commutation step unit is 4x TIM3 periods
-#define BLDC_ONE_RAMP_UNIT         BLDC_ONE_COMM_STEP
+#define BLDC_ONE_RAMP_UNIT          ( BLDC_ONE_COMM_STEP / 2 ) // should be a power of 2: COMM_STEP / 2 = 2
 
 /* Private types -----------------------------------------------------------*/
 
@@ -163,7 +160,7 @@ typedef enum
 /* Public variables  ---------------------------------------------------------*/
 
 uint16_t _ADC_Global;
-uint16_t Back_EMF_15304560[4];
+static uint16_t Back_EMF_15304560[4];
 
 int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine signed int happens to be ...
                               // todo: stms8.h has  typedef   signed long     int32_t; 
@@ -172,7 +169,7 @@ uint16_t BLDC_OL_comm_tm;   // could be private
 
 uint16_t global_uDC;
 
-BLDC_STATE_T BLDC_State;
+static BLDC_STATE_T BLDC_State;
 
 
 /* Private variables ---------------------------------------------------------*/

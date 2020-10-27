@@ -424,18 +424,14 @@ void TIM1_setup(void)
 }
 
 /*
- * 9/30 .. verbatim from code of AN3332
+ * Setup TIM2 PWM
+ * Reference: AN3332
  */
-#define CCR1_Val  ((u16)0 /* 500 */) // Configure channel 1 Pulse Width
-#define CCR2_Val  ((u16)0 /* 250 */) // Configure channel 2 Pulse Width
-#define CCR3_Val  ((u16)0 /* 750 */) // Configure channel 3 Pulse Width
-
 #ifdef CLOCK_16
  #define TIM2_PRESCALER TIM2_PRESCALER_8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
  #define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
 #endif
-
 
 void TIM2_setup(void)
 {
@@ -445,15 +441,15 @@ void TIM2_setup(void)
     /* Set TIM2 Frequency to 2Mhz */
     TIM2_TimeBaseInit(TIM2_PRESCALER, TIM2_PWM_PD);
     /* Channel 1 PWM configuration */
-    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR1_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
     TIM2_OC1PreloadConfig(ENABLE);
 
     /* Channel 2 PWM configuration */
-    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR2_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
     TIM2_OC2PreloadConfig(ENABLE);
 
     /* Channel 3 PWM configuration */
-    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, CCR3_Val, TIM2_OCPOLARITY_LOW );
+    TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
     TIM2_OC3PreloadConfig(ENABLE);
 
     /* Enables TIM2 peripheral Preload register on ARR */
@@ -557,6 +553,7 @@ void clock_setup(void)
 
 static uint16_t Line_Count = 0;
 
+extern uint16_t global_uDC;
 extern uint16_t BLDC_OL_comm_tm;
 extern int Back_EMF_Falling_Int_PhX;
 
@@ -581,6 +578,10 @@ void testUART(void)
 
     strcat(sbuf, " CT=");
     itoa(BLDC_OL_comm_tm, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " DC=");
+    itoa( global_uDC,     cbuf, 16);
     strcat(sbuf, cbuf);
 
 #if 1
@@ -617,15 +618,6 @@ void testUART(void)
 
     strcat(sbuf, " A2=");
     itoa(ADC1_GetBufferValue(2), cbuf, 16);
-    strcat(sbuf, cbuf);
-#endif
-#if 0
-    strcat(sbuf, " A8=");
-    itoa(ADC1_GetBufferValue(8), cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " A9=");
-    itoa(ADC1_GetBufferValue(9), cbuf, 16);
     strcat(sbuf, cbuf);
 #endif
 #if 0
