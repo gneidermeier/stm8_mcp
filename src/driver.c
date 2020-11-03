@@ -27,7 +27,7 @@ extern uint16_t Back_EMF_Falling_4[4];
 // divider: 33k/22k
 //  22/(22+33)=0.4
 // 0.4 * 13.8v = 5.52 ... don't care that if Vdc 13.8v applied, ADCin clips 5v ADC vref!
-// 5.52 = 2.76v ........... 1/2 Vdc in proportion to the resisitor divider
+// 5.52 / 2 = 2.76v ........... 1/2 Vdc in proportion to the resister divider
 //  2.76v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
 //   x = 1024 * 2.76/5 = 565   (0x0235)
 #define DC_HALF_REF  0x0235
@@ -41,9 +41,7 @@ extern uint16_t Back_EMF_Falling_4[4];
 
 #define PWM_10PCNT     ( PWM_100PCNT / 10 )
 #define PWM_20PCNT     ( PWM_100PCNT / 5 )
-#define PWM_25PCNT     ( PWM_100PCNT / 4 )
 #define PWM_50PCNT     ( PWM_100PCNT / 2 )
-
 
 #define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
 
@@ -52,7 +50,8 @@ extern uint16_t Back_EMF_Falling_4[4];
  */
 #define PWM_DC_RAMPUP  PWM_X_PCNT( 14 )
 
-#define PWM_DC_IDLE    PWM_X_PCNT( 11.6 )
+//#define PWM_DC_IDLE    PWM_X_PCNT( 11.6 )
+#define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -174,6 +173,10 @@ static BLDC_STATE_T BLDC_State;
 
 /* Private variables ---------------------------------------------------------*/
 
+static int Manual_Mode; // test flag to indicate if manual control override toggled
+
+static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
+
 /*
  * This table simply defines the "trapezoidal" waveform in 6-steps.
  * The underlying PWM management scheme would be introduced elsewheres.
@@ -194,8 +197,100 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
     { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_OUTP_HI }
 };
 
+/*
+ * INdexed by PWM duty cycle counts (i.e. 0-250)
+ */
+static const uint16_t OL_Timing[] =
+{
+    0x0000,	 // 00 0
+    0x0000,	 // 01 1
+    0x0000,	 // 02 2
+    0x0000,	 // 03 3
+    0x0000,	 // 04 4
+    0x0000,	 // 05 5
+    0x0000,	 // 06 6
+    0x0000,	 // 07 7
+    0x0000,	 // 08 8
+    0x0CC0,	 // 09 9   /////////////////////// ooozez to a halt
+    0x0BC0,	 // 0A 10    
+    0x09E0,	 // 0B 11
+    0x0900,	 // 0C 12 
+    0x0880,	 // 0D 13
+    0x0800,	 // 0E 14 
+    0x0780,	 // 0F 15  
+    0x0700,	 // 10 16
+    0x0670,	 // 11 17 
+    0x0640,	 // 12 18  // 660      680 632
+    0x05E1,	 // 13 19  // 600                /// 5e1
+    0x0560,	 // 14 20     
+    0x04F0,	 // 15 21
+    0x04C0,	 // 16 22
+    0x0490,	 // 17 23 
+    0x0460,	 // 18 24
+    0x0430,	 // 19 25 
+    0x03F0,	 // 1A 26
+    0x03E0,	 // 1B 27
+    0x03D0,	 // 1C 28
+    0x03C0,	 // 1D 29  // end of ramp                      /// 3C0
+    0x03AC,	 // 1E 30  //////////////////// ......         /// 3AC
+    0x037E,	 // 1F 31  // 38B 394 38c 390             3a8       /// 38b   37e
+    0x036E,	 // 20 32  // 378 36d ......? 370??   378      /// 36e
+    0x0350,	 // 21 33  // 34E 360 34F    358                    /// 34e
+    0x0330,	 // 22 34  // 343       // 333 .               /// 330  
+    0x0319,	 // 23 35  // 32F   32F                     /// 319
+    0x0302,	 // 24 36  // 31F   307 . .? 30F            /// 302
+    0x02F1,	 // 25 37  // 308  300?                 /// 2f1 
+    0x02E0,	 // 26 38  // 2ED 2F1  2d8      2f1     /// 2ed               /// 2e0
+    0x02C9,	 // 27 39  // 2E0 2cf                         /// 2cf 2c9
+    0x02B7,	 // 28 40  // 2b7 ...?  2C6                   ///   2b7
+    0x02b0,	 // 29 41  // 2B8 2b1    2b2 ...........      /// 2b0
+    0x0296,	 // 2A 42  // 2B0   29B                       /// 296
+    0x0288,	 // 2B 43  // 2A0 297?                        /// 288
+    0x0279,	 // 2C 44  // 288 281     27c ....            /// 279
+    0x0271,	 // 2D 45  // 280 27C                         /// 271
+    0x025E,	 // 2E 46  // 271    270 .                    /// 25E
+    0x0253,	 // 2F 47  // 25b        253  25a ..          /// 253
+    0x0245,	 // 30 48  //  250  247      252 .........    /// 245
+    0x023A,	 // 31 49  // 23e   23e                      /// 23A
+    0x022F,	 // 32 50  // 234                            /// 22F
+    0x0225,	 // 33 51  // 227     232 .............      /// 225
+    0x021A,	 // 34 52  // 220 21e                        /// 21a
+    0x0210,	 // 35 53  // 213                            /// 210
+    0x0205,	 // 36 54  // 211 213                        /// 205
+    0x01FC,	 // 37 55  // 202  201    1FE                /// 1FC
+    0x01F6,	 // 38 56  // 1F8                            /// 1f6 ????
+    0x01EA,	 // 39 57  // 1F2 1f1                        /// 1ea
+    0x01E2,	 // 3A 58  // 1e7   1e6   1e8                /// 1e2
+    0x01DA,	 // 3B 59  //  1E0                           /// 1da  ok   
+    0x01D7,	 // 3C 60  // 1d2    1d7   1d7                    ok  
+    0x01D2,	 // 3D 61  //                                      ok  
+    0x01C4,	 // 3E 62  // 1C8 1cb        // 1c4             ok
+    0x01BF,	 // 3F 63  //                           /// 1bf
+    0x01BA,	 // 40 64  // 1b8                       /// 1b7 
+    0x01B5,	 // 41 65  // 1b7                       /// 1b5
+    0x01A8,	 // 42 66  // 1Ac 1b5   1b4             /// 1A8
+    0x01A2,	 // 43 67  // 1A8                       /// 1A2
+    0x019C,	 // 44 68  // 1A2                       /// 19C
+    0x0197,	 // 45 69  // 19C 19b                   /// 197
+    0x0191,	 // 46 70  // 197   195                     /// 191
+    0x018C,	 // 47 71  // 196                           /// 18C
+    0x0187,	 // 48 72  // 18b 18c   18a                 /// 187
+    0x0181,	 // 49 73  // 183 187  189                  /// 181
+    0x017C,	 // 4A 74  // 1a2   181   17C
+    0x0179,	 // 4B 75  // 179           ???????????????
+    0x0178,	 // 4C 76                    NO /////////////////////
+    0x0177,	 // 4D 77
+    0x0176,	 // 4E 78
+    0x0175,	 // 4F 79
+    0x0174,	 // 50 80
+    0x0173,	 // 50 80
+    0x0172,	 // 50 80
+    0x0171,	 // 50 80
+    0x0170,	 // 50 80
+ //  
+// truncated ... needs more values more precision needed of commutation time period!
+};
 
-static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -486,7 +581,7 @@ uint16_t BLDC_PWMDC_Plus()
 {
     if (BLDC_OFF == BLDC_State)
     {
-//        BLDC_State = BLDC_RAMPUP;
+        BLDC_State = BLDC_RAMPUP;
 //        uart_print( "OFF->RAMP-\r\n");
     }
     else if (BLDC_ON == BLDC_State )
@@ -510,7 +605,6 @@ uint16_t BLDC_PWMDC_Minus()
     return global_uDC;
 }
 
-
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
@@ -524,6 +618,7 @@ void BLDC_Spd_dec()
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
     {
+        Manual_Mode = 1;
         BLDC_OL_comm_tm += 1; // slower
     }
 
@@ -548,6 +643,7 @@ void BLDC_Spd_inc()
 
     if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
     {
+        Manual_Mode = 1;
         BLDC_OL_comm_tm -= 1; // faster
     }
 }
@@ -570,6 +666,8 @@ void BLDC_Spd_inc()
  *                 step ... but the resolution will be these discrete steps
  *                 (of TIM1 reference)
  */
+static uint16_t   Table_value; //whats up w/ stupid compiler optimizing
+
 void BLDC_Update(void)
 {
     switch (BLDC_State)
@@ -582,6 +680,27 @@ void BLDC_Update(void)
 
     case BLDC_ON:
         // do ON stuff
+// grab the "speed" number from the table, determine (sign of) error and incr. +/- 1
+        if ( 0 == Manual_Mode   && global_uDC < 0x50) // tmp : limit of the taBle
+        {
+            int error, step = 0;
+            Table_value =  OL_Timing[ global_uDC ];
+// ol_timing =  OL_Timing[ global_uDC ]; // ??
+            error =  Table_value  - BLDC_OL_comm_tm;
+            if (error > 0)
+            {
+                step = 1;
+            }
+            else if (error < 0)
+            {
+                step = -1;
+            }
+
+            if (Table_value != 0) // assert
+            {
+                BLDC_OL_comm_tm += step; // incrementally adjust until error reduces to 0.
+            }
+        }
 
         break;
 
@@ -596,6 +715,7 @@ void BLDC_Update(void)
         else
         {
             BLDC_State = BLDC_ON;
+            Manual_Mode = 0;
             set_dutycycle( PWM_DC_IDLE );
 
             Log_Level = 16; // tmp debug
@@ -611,14 +731,13 @@ void BLDC_Update(void)
 /*
  * called from ISR
  *
-// This eastblishthe error-signal ... next sprint to implement the contorl feedback loop!
-// measures at 4 15-degree intervals - [1] and [2] ae the valid ones to itegrate
+// establish error-signal ...
+// measures at 4 15-degree intervals - [1] and [2] are the valid ones to "integrate"
 // Note at this low idle/open-loop speed there are only about 4 PWM @ 8k during
 // a 60-degree sector.
 // Pulses close to start/end of the secctor are problematic anyway as the ADC 
 // ISR ends up getting blocked by the TIM3 ISR ... the BLDC_Step() takes about
 // to 40us on case 3!
-
  */
 void BLDC_Step(void)
 {
@@ -665,12 +784,12 @@ void BLDC_Step(void)
             {
 // refresh the global that is dsplayed on terminal
 // memcpy (Back_EMF_15304560, Back_EMF_Falling_4, sizeof(uint16), 4);
-            Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
-            Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
-            Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
-            Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
+                Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
+                Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
+                Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
+                Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
 
-            Back_EMF_Falling_Int_PhX = back_EMF_int; // theoretically, nearing 0 when motor is in time!
+                Back_EMF_Falling_Int_PhX = back_EMF_int; // theoretically, nearing 0 when motor is in time!
             }
 
             bldc_step += 1;
