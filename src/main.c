@@ -327,7 +327,7 @@ void ADC1_setup(void)
 
 // configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
-              ADC1_CHANNEL_2,        // i.e. Ch 0, 1 and 2 are enabled
+              ADC1_CHANNEL_3,        // i.e. Ch 0, 1 and 2 are enabled
               ADC_DIVIDER,
               ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO ... not presently using any ex triggern
               DISABLE,               // ExtTriggerState
@@ -549,6 +549,8 @@ void clock_setup(void)
 
 // hack, temp
 
+static uint16_t UI_Speed;
+
 static uint16_t Line_Count = 0;
 
 extern uint16_t global_uDC;
@@ -609,17 +611,9 @@ void testUART(void)
     strcat(sbuf, cbuf);	
 #endif
 
-#if 0
-    strcat(sbuf, " A0=");
-    itoa(ADC1_GetBufferValue(0), cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " A1=");
-    itoa(ADC1_GetBufferValue(1), cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " A2=");
-    itoa(ADC1_GetBufferValue(2), cbuf, 16);
+#if 1
+    strcat(sbuf, " UI=");
+    itoa(UI_Speed, cbuf, 16);
     strcat(sbuf, cbuf);
 #endif
 
@@ -627,6 +621,9 @@ void testUART(void)
     UARTputs(sbuf);
 }
 
+
+
+void BLDC_PWMDC_Set(uint16_t dc);
 /*
  * Execution context is 'main()' so not to block ISR with ADC sampling.
  * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
@@ -634,10 +631,23 @@ void testUART(void)
  */
 void Periodic_task(void)
 {
+    static int manual_mode_start = 0;
+
     uint16_t duty_cycle = 0;
     char sbuf[16] = "DC=";
     char cbuf[8] = { 0, 0 };
     char key;
+
+
+//   svc a UI potentiometer
+    UI_Speed = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
+    UI_Speed /= 16; // use [ 0: 63 ]
+
+    if (0 == manual_mode_start )
+    {
+// was NOT started in dev/test mode, so go ahead and use "UI" (servo-pulse?) input
+        BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON 
+    }
 
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
@@ -660,6 +670,7 @@ void Periodic_task(void)
         if (key == '+')
         {
             disableInterrupts();
+            manual_mode_start = 1; // flag this op as a manual mode cycle
             duty_cycle = BLDC_PWMDC_Plus();
             enableInterrupts();
             UARTputs("+++");
@@ -670,6 +681,7 @@ void Periodic_task(void)
         else if (key == '-')
         {
             disableInterrupts();
+            manual_mode_start = 1; // flag this op as a manual mode cycle
             duty_cycle = BLDC_PWMDC_Minus();
             enableInterrupts();
             UARTputs("---");
@@ -678,9 +690,18 @@ void Periodic_task(void)
         else if (key == ' ')
         {
             disableInterrupts();
+            manual_mode_start = 0; // clear manual mode cycle flag
             BLDC_Stop();
             enableInterrupts();
             UARTputs("###");
+        }
+        else
+        {
+// anykey   turns on  motor "normal start") 
+            disableInterrupts();
+            duty_cycle = BLDC_PWMDC_Plus(); // TODO: motor on BLDC_Start()
+            enableInterrupts();
+            UARTputs("BLDC_START");
         }
 
         itoa(duty_cycle, cbuf, 16);

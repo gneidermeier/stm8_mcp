@@ -386,11 +386,12 @@ static uint16_t _sample(ADC1_Channel_TypeDef adc_channel)
  */
 uint16_t bemf_samp_start( void )
 {
-    const ADC1_Channel_TypeDef ADC1_Channel0 = ADC1_CHANNEL_0; // only phase A
+    const ADC1_Channel_TypeDef ADC1_ChannelX = ADC1_CHANNEL_3; // ADC1_CHANNEL_0; // only phase A
+
     uint16_t u16tmp;
 
     ADC1_ConversionConfig(
-        ADC1_CONVERSIONMODE_SINGLE, ADC1_Channel0, ADC1_ALIGN_RIGHT);
+        ADC1_CONVERSIONMODE_SINGLE, ADC1_ChannelX, ADC1_ALIGN_RIGHT);
 
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
     ADC1_Cmd(ENABLE);
@@ -619,6 +620,26 @@ uint16_t BLDC_PWMDC_Minus()
 }
 
 /*
+ * increment or decrement   motor speed  (experimental)
+ */
+void BLDC_PWMDC_Set(uint16_t dc)
+{
+//  assertions   ??????????
+    if (BLDC_ON == BLDC_State )
+    {
+        if ( global_uDC < dc )
+        {
+				// TODO:  rate-limit on this ... 
+            inc_dutycycle();
+        }
+        else if ( global_uDC > dc )
+        {
+            dec_dutycycle();
+        }
+    }
+}
+
+/*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_dec()
@@ -707,7 +728,7 @@ void BLDC_Update(void)
     case BLDC_ON:
         // do ON stuff
         Vsystem = Vbatt / 2 + Vsystem / 2; // sma
-#if 0
+#if 0  // .. Todo: needs to adjust threshold for in-ramp
         if ( fault_arming_time  > 0 )
         {
             fault_arming_time   -= 1;
@@ -740,6 +761,10 @@ void BLDC_Update(void)
         }
 
 // grab the "speed" number from the table, determine (sign of) error and incr. +/- 1
+/*
+basically theres a possiblity that at a high enough speed it could instead take
+the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step 
+*/
         if ( 0 == Manual_Mode   && global_uDC < 0x50) // tmp : limit of the taBle
         {
             int error, step = 0;
