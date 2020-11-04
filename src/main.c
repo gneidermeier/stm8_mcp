@@ -475,10 +475,8 @@ void TIM2_setup(void)
 void TIM4_setup(void)
 {
 //    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
-//    const uint8_t T4_Period = 255;    // Period = 2.048mS
-// set this for ~1mS to use in place of TIM1 as ramp timer
-//const uint8_t T4_Period = 128;    // Period = 1.02mS
     const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ... 
+//    const uint8_t T4_Period = 32; // double the rate (for logging) ???
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -556,6 +554,7 @@ static uint16_t Line_Count = 0;
 extern uint16_t global_uDC;
 extern uint16_t BLDC_OL_comm_tm;
 extern int Back_EMF_Falling_Int_PhX;
+extern uint16_t Vsystem;
 
 uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
 
@@ -564,7 +563,7 @@ uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-act
  */
 void testUART(void)
 {
-    char sbuf[128] ;                     // am i big enuff?
+    char sbuf[256] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
     sbuf[0] = 0;
@@ -584,6 +583,9 @@ void testUART(void)
     itoa( global_uDC,     cbuf, 16);
     strcat(sbuf, cbuf);
 
+    strcat(sbuf, " Vs=");
+    itoa( Vsystem,     cbuf, 16);
+    strcat(sbuf, cbuf);
 #if 1
     strcat(sbuf, " bFi=");
     itoa( Back_EMF_Falling_Int_PhX,     cbuf, 16);
@@ -619,21 +621,6 @@ void testUART(void)
     strcat(sbuf, " A2=");
     itoa(ADC1_GetBufferValue(2), cbuf, 16);
     strcat(sbuf, cbuf);
-#endif
-#if 0
-// A/D
-    for (loop = 0; loop <  ADC_N_CHANNELS ; loop++)
-    {
-        strcat(sbuf, " A");
-        cbuf[0] = 0x30 + loop;
-        cbuf[1] = 0;
-        strcat(sbuf, cbuf);
-        strcat(sbuf, "=");
-
-//itoa(AnalogInputs[loop], cbuf, 16);
-        itoa( ADC1_GetBufferValue( loop ), cbuf, 16);
-        strcat(sbuf, cbuf);
-    }
 #endif
 
     strcat(sbuf, "\r\n");
@@ -687,6 +674,14 @@ void Periodic_task(void)
             enableInterrupts();
             UARTputs("---");
         }
+//BLDC_Stop
+        else if (key == ' ')
+        {
+            disableInterrupts();
+            BLDC_Stop();
+            enableInterrupts();
+            UARTputs("###");
+        }
 
         itoa(duty_cycle, cbuf, 16);
         strcat(sbuf, cbuf);
@@ -729,6 +724,7 @@ main()
             enableInterrupts();
             // reset line couunter of the serial-port logger
             Line_Count = -1;
+//          testUART(); // call one time to get final data
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))

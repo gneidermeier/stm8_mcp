@@ -31,10 +31,13 @@ extern uint16_t Back_EMF_Falling_4[4];
 //  2.76v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
 //   x = 1024 * 2.76/5 = 565   (0x0235)
 #define DC_HALF_REF  0x0235
+#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
+
 
 #define GET_BACK_EMF_ADC( ) \
     ( _ADC_Global - DC_HALF_REF )
 
+#define GET_ADC() _ADC_Global // bah
 
 #define PWM_100PCNT    TIM2_PWM_PD
 #define PWM_0PCNT      0
@@ -92,6 +95,8 @@ extern uint16_t Back_EMF_Falling_4[4];
  */
 #define BLDC_ONE_COMM_STEP         TIM3_RATE_MODULUS  // each commutation step unit is 4x TIM3 periods
 #define BLDC_ONE_RAMP_UNIT          ( BLDC_ONE_COMM_STEP / 2 ) // should be a power of 2: COMM_STEP / 2 = 2
+// TIM3 (BLDC_Update() task rate needs reduced by /2 because the speed change
+// steps are still to quick even @ +/-(1)
 
 /* Private types -----------------------------------------------------------*/
 
@@ -167,6 +172,9 @@ int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine sign
 uint16_t BLDC_OL_comm_tm;   // could be private
 
 uint16_t global_uDC;
+
+uint16_t Vsystem;
+static uint16_t Vbatt;
 
 static BLDC_STATE_T BLDC_State;
 
@@ -672,19 +680,65 @@ void BLDC_Spd_inc()
  *                 (of TIM1 reference)
  */
 static uint16_t   Table_value; //whats up w/ stupid compiler optimizing
+static int vsys_fault_bucket;
 
 void BLDC_Update(void)
 {
+    const int FAULT_BUCKET_INI = 128;
+
+// if the voltage threshold is high enuff, the ramp delay time thingy not needed
+    const int RAMP_TIME = 1;   // fault arming delay time
+    static uint16_t fault_arming_time; // fault_arming_time  
+
     switch (BLDC_State)
     {
     default:
     case BLDC_OFF:
         // reset commutation timer and ramp-up counters ready for ramp-up
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
+
+        vsys_fault_bucket = FAULT_BUCKET_INI;
+
+        // delay to wait to stabillize at first DC setpoint post-ramp
+        fault_arming_time = RAMP_TIME;    /////// // reset the static ramp timer
+
         break;
 
     case BLDC_ON:
         // do ON stuff
+        Vsystem = Vbatt / 2 + Vsystem / 2; // sma
+#if 0
+        if ( fault_arming_time  > 0 )
+        {
+            fault_arming_time   -= 1;
+        }
+        else    // assert (Vbatt > VVV )
+#endif
+        {
+            // check system voltage ... is motor stalled?
+            if (Vsystem < V_SHUTDOWN_THR)
+            {
+                // voltage has sagged ... likely motor stall!
+                if ( vsys_fault_bucket  > 0)
+                {
+                    vsys_fault_bucket -= 1; //
+                }
+            }
+            else
+            {
+                if ( vsys_fault_bucket  < FAULT_BUCKET_INI )
+                {
+                    vsys_fault_bucket += 1; // refillin leaky bucket
+                }
+            }
+// finally, check if fault is set
+            if (0 == vsys_fault_bucket)
+            {
+                // 0 DC safely stops the motor, user must still press STOP to cycle the program.
+                set_dutycycle( PWM_0PCNT );
+            }
+        }
+
 // grab the "speed" number from the table, determine (sign of) error and incr. +/- 1
         if ( 0 == Manual_Mode   && global_uDC < 0x50) // tmp : limit of the taBle
         {
@@ -724,6 +778,9 @@ void BLDC_Update(void)
         else
         {
             BLDC_State = BLDC_ON;
+
+            Vsystem = Vbatt; // "pre-load" the avergae to avoid kicking out at end of ramp1
+
             Manual_Mode = 0;
             set_dutycycle( PWM_DC_IDLE );
 
@@ -799,6 +856,11 @@ void BLDC_Step(void)
                 Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
 
                 Back_EMF_Falling_Int_PhX = back_EMF_int; // theoretically, nearing 0 when motor is in time!
+            }
+            else  if (DC_OUTP_HI == prev_A)
+            {
+                // if phase was driven pwm, then this shouuld be a valid vbat sample
+                Vbatt = GET_ADC();
             }
 
             bldc_step += 1;
