@@ -631,10 +631,11 @@ void BLDC_PWMDC_Set(uint16_t dc);
  */
 void Periodic_task(void)
 {
+    static int Fault = 0;
     static int manual_mode_start = 0;
 
     uint16_t duty_cycle = 0;
-    char sbuf[16] = "DC=";
+    char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
     char key;
 
@@ -646,7 +647,12 @@ void Periodic_task(void)
     if (0 == manual_mode_start )
     {
 // was NOT started in dev/test mode, so go ahead and use "UI" (servo-pulse?) input
-        BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON 
+
+        if (0 == Fault){
+            BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON 
+        } else {
+            BLDC_PWMDC_Set(0);
+        }
     }
 
     /*
@@ -673,7 +679,7 @@ void Periodic_task(void)
             manual_mode_start = 1; // flag this op as a manual mode cycle
             duty_cycle = BLDC_PWMDC_Plus();
             enableInterrupts();
-            UARTputs("+++");
+            UARTputs("+++\r\n");
 
            Log_Level = 255;// enable continous/verbous log
 
@@ -684,27 +690,25 @@ void Periodic_task(void)
             manual_mode_start = 1; // flag this op as a manual mode cycle
             duty_cycle = BLDC_PWMDC_Minus();
             enableInterrupts();
-            UARTputs("---");
+            UARTputs("---\r\n");
         }
 //BLDC_Stop
         else if (key == ' ')
         {
+           Fault = 1; // hack
             disableInterrupts();
             manual_mode_start = 0; // clear manual mode cycle flag
             BLDC_Stop();
             enableInterrupts();
-            UARTputs("###");
+            UARTputs("###\r\n");
         }
-        else
+        else // anykey
         {
-// anykey   turns on  motor "normal start") 
-            disableInterrupts();
-            duty_cycle = BLDC_PWMDC_Plus(); // TODO: motor on BLDC_Start()
-            enableInterrupts();
-            UARTputs("BLDC_START");
+            Log_Level = 5; // show some info
+            Fault = 0;
         }
 
-        itoa(duty_cycle, cbuf, 16);
+        itoa(UI_Speed, cbuf, 16);
         strcat(sbuf, cbuf);
         strcat(sbuf, "\r\n");
         UARTputs(sbuf);

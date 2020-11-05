@@ -30,7 +30,7 @@ extern uint16_t Back_EMF_Falling_4[4];
 // 5.52 / 2 = 2.76v ........... 1/2 Vdc in proportion to the resister divider
 //  2.76v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
 //   x = 1024 * 2.76/5 = 565   (0x0235)
-#define DC_HALF_REF  0x0235
+#define DC_HALF_REF         0x01E0 // tmp ... using 1/2 of measured Vsys  
 #define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
 
 
@@ -564,8 +564,7 @@ extern uart_print( char * sbuf ); // tmp
  */
 void BLDC_Stop(void)
 {
-    if (BLDC_OFF != BLDC_State)
-    {
+// kill the driver signals
         PWM_PhA_Disable();
         PWM_PhA_HB_DISABLE(0);
 
@@ -575,6 +574,8 @@ void BLDC_Stop(void)
         PWM_PhC_Disable();
         PWM_PhC_HB_DISABLE(0);
 
+    if (BLDC_OFF != BLDC_State)
+    {
         Log_Level = 0;
         uart_print( "STOP\r\n");
 // tmp grab some test data ...
@@ -597,6 +598,7 @@ uint16_t BLDC_PWMDC_Plus()
     {
         uart_print( "OFF->RAMP-\r\n");
         BLDC_State = BLDC_RAMPUP;
+        return 0;
     }
     else if (BLDC_ON == BLDC_State )
     {
@@ -611,7 +613,13 @@ uint16_t BLDC_PWMDC_Plus()
  */
 uint16_t BLDC_PWMDC_Minus()
 {
-    if (BLDC_ON == BLDC_State)
+    if (BLDC_OFF == BLDC_State)
+    {
+        uart_print( "OFF->RAMP-\r\n");
+        BLDC_State = BLDC_RAMPUP;
+        return 0;
+    }
+    else if (BLDC_ON == BLDC_State)
     {
 // if (DC > PWM_20PCNT)
         dec_dutycycle();
@@ -620,21 +628,40 @@ uint16_t BLDC_PWMDC_Minus()
 }
 
 /*
- * increment or decrement   motor speed  (experimental)
+ * sets motor speed from commanded throttle/UI setting  (experimental)
  */
 void BLDC_PWMDC_Set(uint16_t dc)
 {
-//  assertions   ??????????
+        if (dc < 0x10)
+        {
+            BLDC_Stop();
+        }
+
+// if presently OFF, then capture the commanded throttle value
+    if (BLDC_OFF == BLDC_State)
+    {
+        // todo: must be off for X to (re)enable startup.
+
+        if ( dc > 10 )
+        {
+            BLDC_State = BLDC_RAMPUP;
+            uart_print( "THR ... OFF->RAMP-\r\n");
+        }
+    }
+
     if (BLDC_ON == BLDC_State )
     {
-        if ( global_uDC < dc )
+        if (dc > 0x1d)
         {
-				// TODO:  rate-limit on this ... 
-            inc_dutycycle();
-        }
-        else if ( global_uDC > dc )
-        {
-            dec_dutycycle();
+            if ( global_uDC < dc )
+            {
+                // TODO:  rate-limit on this ...
+                inc_dutycycle();
+            }
+            else if ( global_uDC > dc )
+            {
+                dec_dutycycle();
+            }
         }
     }
 }
@@ -817,7 +844,6 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 //  update the timer for the OL commutation switch time
     TIM3_setup(BLDC_OL_comm_tm);
 }
-
 
 /*
  * called from ISR
