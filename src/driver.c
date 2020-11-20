@@ -12,6 +12,7 @@
 
 // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
 #include <stm8s.h>
+#include <string.h>
 
 #include "parameter.h" // app defines
 #include "pwm_stm8s.h"
@@ -24,15 +25,16 @@ extern uint16_t Back_EMF_Falling_4[4];
 
 /* Private defines -----------------------------------------------------------*/
 
-// divider: 33k/22k
-//  22/(22+33)=0.4
-// 0.4 * 13.8v = 5.52 ... don't care that if Vdc 13.8v applied, ADCin clips 5v ADC vref!
-// 5.52 / 2 = 2.76v ........... 1/2 Vdc in proportion to the resister divider
-//  2.76v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
-//   x = 1024 * 2.76/5 = 565   (0x0235)
-#define DC_HALF_REF         0x01E0 // tmp ... using 1/2 of measured Vsys  
-#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
+// divider: 33k/18k
+//  18/(18+33)=0.35
+// 0.35 * 14.1v = 4.98
+// 4.98 / 2 = 2.48v ........... 1/2 Vdc in proportion to the resister divider
+//  2.48v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
+//   x = 1024 * 2.48/5 = 509   (0x01FD)
+#define DC_HALF_REF         0x01FD 
 
+//#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
+#define V_SHUTDOWN_THR      0x02c0
 
 #define GET_BACK_EMF_ADC( ) \
     ( _ADC_Global - DC_HALF_REF )
@@ -51,9 +53,8 @@ extern uint16_t Back_EMF_Falling_4[4];
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_RAMPUP  PWM_X_PCNT( 14 )
+#define PWM_DC_RAMPUP  PWM_X_PCNT( 14.0 )
 
-//#define PWM_DC_IDLE    PWM_X_PCNT( 11.6 )
 #define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
 
 /*
@@ -78,13 +79,12 @@ extern uint16_t Back_EMF_Falling_4[4];
 #define TIM3_RATE_MODULUS   4 // each commutation sector of 60-degrees spans 4x TIM3 periods
 
 
-#define BLDC_OL_TM_LO_SPD          (512 * 2 * TIM3_RATE_MODULUS) // start of ramp
+#define BLDC_OL_TM_LO_SPD       0x1000 // 4096d  // start of ramp
 
-//  1 / (3ms * (12/2) ) = motor freq.
-#define BLDC_OL_TM_HI_SPD       0x03C0 // in-time @ 11.6% 
+#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
-#define LUDICROUS_SPEED            (13.875f * 2 * TIM3_RATE_MODULUS) // note; won't be possible until D.C. and comm-time are sync'd i.e. closed-loop
+#define LUDICROUS_SPEED         0x006F // 111 
 
 #define BLDC_OL_TM_MANUAL_HI_LIM   LUDICROUS_SPEED
 
@@ -93,10 +93,8 @@ extern uint16_t Back_EMF_Falling_4[4];
  * period) decremented by fixed amount each control-loop timestep. Slope 
  * determined by experiment (conservative to avoid stalling the motor!) 
  */
-#define BLDC_ONE_COMM_STEP         TIM3_RATE_MODULUS  // each commutation step unit is 4x TIM3 periods
-#define BLDC_ONE_RAMP_UNIT          ( BLDC_ONE_COMM_STEP / 2 ) // should be a power of 2: COMM_STEP / 2 = 2
-// TIM3 (BLDC_Update() task rate needs reduced by /2 because the speed change
-// steps are still to quick even @ +/-(1)
+#define BLDC_ONE_RAMP_UNIT      2
+
 
 /* Private types -----------------------------------------------------------*/
 
@@ -207,9 +205,13 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 
 /*
  * INdexed by PWM duty cycle counts (i.e. 0-250)
+ *   y =  ( 4000 * EXP( -t/25 ) ) + 150
+ * 
  */
 static const uint16_t OL_Timing[] =
 {
+#if 0
+ // leave the old data
     0x0000,	 // 00 0
     0x0000,	 // 01 1
     0x0000,	 // 02 2
@@ -297,8 +299,13 @@ static const uint16_t OL_Timing[] =
     0x0170,	 // 50 80
  //  
 // truncated ... needs more values more precision needed of commutation time period!
+
+#else
+ #include "model.h" // hack   headers are horrible
+#endif
 };
 
+#define OL_TIMING_TBL_SIZE    ( sizeof(OL_Timing) / sizeof(uint16_t) )
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -792,7 +799,7 @@ void BLDC_Update(void)
 basically theres a possiblity that at a high enough speed it could instead take
 the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step 
 */
-        if ( 0 == Manual_Mode   && global_uDC < 0x50) // tmp : limit of the taBle
+        if ( 0 == Manual_Mode && global_uDC < OL_TIMING_TBL_SIZE )
         {
             int error, step = 0;
             Table_value =  OL_Timing[ global_uDC ];
@@ -821,7 +828,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
     case BLDC_RAMPUP:
 
-        set_dutycycle( PWM_DC_RAMPUP ) ;
+        set_dutycycle( PWM_DC_RAMPUP ); // shouldn't need to keep setting the ramp DC every iteration .. do it once at -transition into ramp state
 
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
@@ -862,16 +869,14 @@ void BLDC_Step(void)
 
     static uint8_t bldc_step_modul; // internal counter for sub-dividing the TIM3 period
 
-    static COMMUTATION_SECTOR_t bldc_step = 0;
-
-    // grab the state of previous sector (before advancing the 6-step sequence)
-    BLDC_PWM_STATE_t     prev_A = Commutation_Steps[ bldc_step ].phA;
-
-    int16_t back_EMF_int;
+    static COMMUTATION_SECTOR_t comm_step = 0;
 
 
     if (BLDC_OFF != BLDC_State )
     {
+        // grab the state of previous sector (before advancing the 6-step sequence)
+        BLDC_PWM_STATE_t  prev_A = Commutation_Steps[ comm_step ].phA;
+
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
 // Note if wanting all 3 phases would need to coordinate here to set the
@@ -891,38 +896,37 @@ void BLDC_Step(void)
         case 3:
             Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
 
-// should add the integral steps in each step case ;)
-            back_EMF_int = Back_EMF_15304560[1] + Back_EMF_15304560[2];
-
             if ( DC_OUTP_FLOAT_R == prev_A )
             {
             }
             else  if (DC_OUTP_FLOAT_F == prev_A )
             {
-// refresh the global that is dsplayed on terminal
-// memcpy (Back_EMF_15304560, Back_EMF_Falling_4, sizeof(uint16), 4);
-                Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
-                Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
-                Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
-                Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
-
-                Back_EMF_Falling_Int_PhX = back_EMF_int; // theoretically, nearing 0 when motor is in time!
+// if phase-A previous sector was floating-falling transition, then the measurements are qualified by copying from the temp array 
+                memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
+/*
+                Back_EMF_Falling_4[0] = Back_EMF_15304560[0]; // unused
+                Back_EMF_Falling_4[1] = Back_EMF_15304560[1]; // pre-ZCP
+                Back_EMF_Falling_4[2] = Back_EMF_15304560[2]; // post-ZCP
+                Back_EMF_Falling_4[3] = Back_EMF_15304560[3]; // unused
+*/
+// sum the pre-ZCP and post-ZCP measurements
+                Back_EMF_Falling_Int_PhX = 
+                       Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
             }
             else  if (DC_OUTP_HI == prev_A)
             {
-                // if phase was driven pwm, then this shouuld be a valid vbat sample
+                // if phase was driven pwm, then use the measurement as vbat
                 Vbatt = GET_ADC();
             }
 
-            bldc_step += 1;
-            bldc_step %= N_CSTEPS;
+            comm_switch( comm_step );
 
-            comm_switch( bldc_step );
+            comm_step = (comm_step + 1) % N_CSTEPS;
 
             break;
         }
 
-        bldc_step_modul += 1; // can be allowed to rollover as modulus is pwrOf2
+        bldc_step_modul += 1; // can allow rollover as modulus is power of 2
     }
     else
     {
