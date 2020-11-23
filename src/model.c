@@ -11,43 +11,32 @@
 clear;
 
 
-// how to do args for Tau, A, and x/y offsets ????
-TBLSZ=250
+// args for Tau, A, and x/y offsets ????
+TBLSZ=90 // 250
 TBLMAX = TBLSZ - 1
 
-A=920
-TAU=0.02
-Y_INT=0
-X_INT=0
-
-A=4000
-TAU=0.04  // 1/25
-Y_INT=150
-X_INT=40
-
-A=4000
-TAU=0.04  // 1/25
-Y_INT=200
-X_INT=50
 
 
-
-// dies at 58d, (timing is recessed)
-A=5200
-TAU=0.02  // 1/25
-Y_INT=200
-X_INT=50
+A=51000 // 
+TAU=0.011  // can'y go too small, the low speeds numbers are too high but is more straight
+Y_INT=-400 // negative y offset to make start numbers lower
+X_INT=310 // bigger x offset helps make start numbers lower
 
 
-A=5200
-TAU=0.025  // 1/25
-Y_INT=200
-X_INT=50
+// starts in time or slightly advanced and beomes recesses around $30 (48)
+A=72000 // 
+TAU=0.012  // can'y go too small, the low speeds numbers are too high but is more straight
+Y_INT=-400 // negative y offset to make start numbers lower
+X_INT=310 // bigger x offset helps make start numbers lower
 
-A=5200
-TAU=0.025  // 1/25
-Y_INT=200
-X_INT=50
+
+// starts in time or slightly advanced and beomes recesses around $30 (48)
+A=72000 // 
+TAU=0.012  // can'y go too small, the low speeds numbers are too high but is more straight
+Y_INT=-400 // negative y offset to make start numbers lower
+X_INT=310 // bigger x offset helps make start numbers lower
+
+
 
 
 
@@ -59,6 +48,15 @@ dtable(:,2)=[0:TBLMAX];
 
 // column 1 is the table value;
 dtable(:,1) =  Y_INT +  A * exp( -TAU *  ( X_INT + dtable(:,2) )   );
+
+
+//plot(   1 -  20 * dtable(:,2)  + 1400)
+dtable(:,1) = 1 -  14 * (   dtable(:,2)  +30 )  + 1750  // never advances
+dtable(:,1) = 1 -  14.00 * (   dtable(:,2)  +30 )  + 1780  //  eventually advances ($47)
+dtable(:,1) = 1 -  10.5 * (   dtable(:,2)  +55 )  + 1700  // dies at $50
+dtable(:,1) = 1 -  10.0 * (   dtable(:,2)  +60 )  + 1700  // dies at $52
+//dtable(:,1) = 1 -  9.8 * (   dtable(:,2)  +62 )  + 1700  // nfg
+
 
 
 //new table with 3 fields and 250 rows;
@@ -79,7 +77,7 @@ stable=string(itable);
 
 // create a column with the hex values
 // x(:,1)=[0:249]
-hexs = dec2hex([0:249]') ; // transposed the row of data 
+hexs = dec2hex([0:TBLMAX]') ; // transposed the row of data 
 stable = cat(2,stable,hexs);
 
 // create a column with the hex values
@@ -105,5 +103,5 @@ write_csv(itable, "dtable.out");
 
 // plot column 1 of the table;
 plot(dtable(:,1));
-plot(itable(:,1));
+//plot(itable(:,1));
 
