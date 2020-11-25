@@ -204,7 +204,7 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 };
 
 /*
- * INdexed by PWM duty cycle counts (i.e. 0-250)
+ * Indexed by PWM duty cycle counts (i.e. 0-250)
  *   y =  ( 4000 * EXP( -t/25 ) ) + 150
  * 
  */
@@ -593,7 +593,6 @@ void BLDC_Stop(void)
     }
 
     BLDC_State = BLDC_OFF;
-    set_dutycycle( PWM_0PCNT );
 }
 
 /*
@@ -757,6 +756,7 @@ void BLDC_Update(void)
         // delay to wait to stabillize at first DC setpoint post-ramp
         fault_arming_time = RAMP_TIME;    /////// // reset the static ramp timer
 
+        set_dutycycle( PWM_0PCNT );
         break;
 
     case BLDC_ON:
@@ -803,7 +803,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
         {
             int error, step = 0;
             Table_value =  OL_Timing[ global_uDC ];
-// ol_timing =  OL_Timing[ global_uDC ]; // ??
+
             error =  Table_value  - BLDC_OL_comm_tm;
             /*
              * the C-T increments between PWM steps are rather large as speeding up 
@@ -843,7 +843,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
             Manual_Mode = 0;
             set_dutycycle( PWM_DC_IDLE );
 
-            Log_Level = 16; // tmp debug
+//            Log_Level = 16; // tmp debug
         }
         break;
     }
