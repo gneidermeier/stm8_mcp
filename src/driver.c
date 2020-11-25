@@ -172,7 +172,6 @@ int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine sign
 
 
 
-uint16_t Vsystem;
 static uint16_t Vbatt;
 
 static BLDC_STATE_T BLDC_State;
@@ -181,8 +180,6 @@ static BLDC_STATE_T BLDC_State;
 /* Private variables ---------------------------------------------------------*/
 
 static int Manual_Mode; // test flag to indicate if manual control override toggled
-
-static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
 
 static uint16_t Back_EMF_15304560[4];
 
@@ -602,8 +599,38 @@ uint16_t get_commutation_period(void)
     return BLDC_OL_comm_tm;
 }
 
+BLDC_STATE_T get_bldc_state(void)
+{
+    return BLDC_State;
+}
+
+BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
+{
+    BLDC_State = newstate;
+}
+
+uint16_t get_vbatt(void)
+{
+    return Vbatt;
+}
+
+int get_op_mode(void)
+{
+    return Manual_Mode;
+}
+
+void set_op_mode(int mode)
+{
+    Manual_Mode = mode;
+}
 
 #if 1
+
+uint16_t Vsystem;
+
+static uint16_t   Table_value; //whats up w/ stupid compiler optimizing
+static int vsys_fault_bucket;
+
 /*
  * BLDC Update: 
  *  Called from ISR
@@ -621,8 +648,6 @@ uint16_t get_commutation_period(void)
  *                 step ... but the resolution will be these discrete steps
  *                 (of TIM1 reference)
  */
-static uint16_t   Table_value; //whats up w/ stupid compiler optimizing
-static int vsys_fault_bucket;
 
 void BLDC_Update(void)
 {
@@ -634,7 +659,7 @@ void BLDC_Update(void)
 
     uint16_t u16tmp;
 
-    switch (BLDC_State)
+    switch ( get_bldc_state() )
     {
     default:
     case BLDC_OFF:
@@ -651,7 +676,7 @@ void BLDC_Update(void)
 
     case BLDC_ON:
         // do ON stuff
-        Vsystem = Vbatt / 2 + Vsystem / 2; // sma
+        Vsystem = get_vbatt() / 2 + Vsystem / 2; // sma
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
         if ( fault_arming_time  > 0 )
         {
@@ -689,12 +714,14 @@ void BLDC_Update(void)
 basically theres a possiblity that at a high enough speed it could instead take
 the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step 
 */
-        if ( 0 == Manual_Mode )
+        if ( 0 == get_op_mode() )
         {
             int error, step = 0;
+            uint16_t u16ct = get_commutation_period();
+
             Table_value =  Get_OL_Timing( get_dutycycle() );
 
-            error =  Table_value  - BLDC_OL_comm_tm;
+            error = Table_value - u16ct;
             /*
              * the C-T increments between PWM steps are rather large as speeding up 
              * so it may be possible to comp. by reducing rate of this loop by /2
@@ -710,8 +737,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
             if (Table_value != 0) // assert
             {
-                u16tmp = get_commutation_period();
-                set_commutation_period( u16tmp + step );  // incrementally adjust until error reduces to 0.
+                set_commutation_period( u16ct + step );  // incrementally adjust until error reduces to 0.
             }
         }
 
@@ -723,17 +749,17 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
         u16tmp = get_commutation_period();
 
-        if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
+        if ( u16tmp > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
             set_commutation_period( u16tmp - BLDC_ONE_RAMP_UNIT );
         }
         else
         {
-            BLDC_State = BLDC_ON;
+            set_bldc_state( BLDC_ON );
 
-            Vsystem = Vbatt; // "pre-load" the avergae to avoid kicking out at end of ramp1
+            Vsystem = get_vbatt(); // "pre-load" the avergae to avoid kicking out at end of ramp1
 
-            Manual_Mode = 0;
+            set_op_mode( 0 ); // Manual Mode 
             set_dutycycle( PWM_DC_IDLE );
 
 //            Log_Level = 16; // tmp debug
@@ -742,7 +768,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
     }
 
 //  update the timer for the OL commutation switch time
-    TIM3_setup(BLDC_OL_comm_tm);
+    TIM3_setup( get_commutation_period() );
 }
 #endif
 
