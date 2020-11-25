@@ -85,13 +85,19 @@ stable = cat(2,stable,hexs);
 hexs = dec2hex( itable(:,1) ) ;
 stable = cat(2,stable,hexs);
 
-write_csv(stable, "dtable_s.out");
 
+//Filename = fullfile(TMPDIR,"data.txt");
+Filename = "dtable_s.out"; // let the output file be relative to PWD
 
+write_csv( stable, Filename );
 
+//
+// add some info to the file (identify the data set) ... have to do this manually for now.
+//
+fd = mopen( Filename, 'a' );
+mputl("// 10.0 * (   dtable(:,2)  +60 )  + 1700" , fd);
+mclose(fd);
 
-//save to csv;
-write_csv(itable, "dtable.out");
 
 
 // gneidermeier@FWA002506 ~/gneidermeier/project/bldc_project/um0834/stm8s-discovery_dev/Project
