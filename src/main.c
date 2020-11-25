@@ -16,7 +16,8 @@
 
 // app headers
 #include "system.h" // platform specific delarations
-#include "driver.h" 
+#include "driver.h"
+#include "pwm_stm8s.h"
 //#include "parameter.h"
 
 
@@ -554,8 +555,6 @@ static uint16_t UI_Speed;
 
 static uint16_t Line_Count = 0;
 
-extern uint16_t global_uDC;
-extern uint16_t BLDC_OL_comm_tm;
 extern int Back_EMF_Falling_Int_PhX;
 extern uint16_t Vsystem;
 
@@ -579,11 +578,11 @@ void testUART(void)
     strcat(sbuf, ")");
 
     strcat(sbuf, " CT=");
-    itoa(BLDC_OL_comm_tm, cbuf, 16);
+    itoa(get_commutation_period(), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " DC=");
-    itoa( global_uDC,     cbuf, 16);
+    itoa( get_dutycycle(),     cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " Vs=");

@@ -58,8 +58,7 @@ typedef enum /* THREE_PHASE_CHANNELS */
 
 
 /* Private variables ---------------------------------------------------------*/
-//static // tmp ... main()
-uint16_t global_uDC;
+static uint16_t global_uDC;
 
 
 /* Private function prototypes -----------------------------------------------*/

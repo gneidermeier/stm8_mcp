@@ -166,12 +166,10 @@ typedef enum
 /* Public variables  ---------------------------------------------------------*/
 
 uint16_t _ADC_Global;
-static uint16_t Back_EMF_15304560[4];
 
 int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine signed int happens to be ...
                               // todo: stms8.h has  typedef   signed long     int32_t; 
 
-uint16_t BLDC_OL_comm_tm;   // could be private
 
 
 uint16_t Vsystem;
@@ -185,6 +183,11 @@ static BLDC_STATE_T BLDC_State;
 static int Manual_Mode; // test flag to indicate if manual control override toggled
 
 static uint16_t Ramp_Step_Tm; // reduced x2 each time but can't start any slower
+
+static uint16_t Back_EMF_15304560[4];
+
+static uint16_t BLDC_OL_comm_tm;
+
 
 /*
  * This table simply defines the "trapezoidal" waveform in 6-steps.
@@ -583,6 +586,24 @@ void BLDC_Spd_inc()
 }
 
 
+/**
+  * @brief  .
+  * @par Parameters:
+  * None
+  * @retval void None
+  */
+void set_commutation_period(uint16_t u16pd)
+{
+    BLDC_OL_comm_tm = u16pd;
+}
+
+uint16_t get_commutation_period(void)
+{
+    return BLDC_OL_comm_tm;
+}
+
+
+#if 1
 /*
  * BLDC Update: 
  *  Called from ISR
@@ -611,12 +632,14 @@ void BLDC_Update(void)
     const int RAMP_TIME = 1;   // fault arming delay time
     static uint16_t fault_arming_time; // fault_arming_time  
 
+    uint16_t u16tmp;
+
     switch (BLDC_State)
     {
     default:
     case BLDC_OFF:
         // reset commutation timer and ramp-up counters ready for ramp-up
-        BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
+        set_commutation_period( BLDC_OL_TM_LO_SPD );
 
         vsys_fault_bucket = FAULT_BUCKET_INI;
 
@@ -687,7 +710,8 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
             if (Table_value != 0) // assert
             {
-                BLDC_OL_comm_tm += step; // incrementally adjust until error reduces to 0.
+                u16tmp = get_commutation_period();
+                set_commutation_period( u16tmp + step );  // incrementally adjust until error reduces to 0.
             }
         }
 
@@ -697,9 +721,11 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
         set_dutycycle( PWM_DC_RAMPUP ); // shouldn't need to keep setting the ramp DC every iteration .. do it once at -transition into ramp state
 
+        u16tmp = get_commutation_period();
+
         if (BLDC_OL_comm_tm > BLDC_OL_TM_HI_SPD) // state-transition trigger?
         {
-            BLDC_OL_comm_tm -= BLDC_ONE_RAMP_UNIT;
+            set_commutation_period( u16tmp - BLDC_ONE_RAMP_UNIT );
         }
         else
         {
@@ -718,6 +744,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 //  update the timer for the OL commutation switch time
     TIM3_setup(BLDC_OL_comm_tm);
 }
+#endif
 
 /*
  * called from ISR
