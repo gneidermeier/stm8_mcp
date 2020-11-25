@@ -12,31 +12,16 @@ clear;
 
 
 // args for Tau, A, and x/y offsets ????
-TBLSZ=90 // 250
-TBLMAX = TBLSZ - 1
+TBLSZ = 180; // needs to be 250 but the dec2hex clips if the data goes negative :)
+TBLMAX = TBLSZ - 1; // this constant is for generating indices colum e.g. [0:249]
 
 
-
-A=51000 // 
-TAU=0.011  // can'y go too small, the low speeds numbers are too high but is more straight
-Y_INT=-400 // negative y offset to make start numbers lower
-X_INT=310 // bigger x offset helps make start numbers lower
-
-
-// starts in time or slightly advanced and beomes recesses around $30 (48)
-A=72000 // 
-TAU=0.012  // can'y go too small, the low speeds numbers are too high but is more straight
-Y_INT=-400 // negative y offset to make start numbers lower
-X_INT=310 // bigger x offset helps make start numbers lower
-
-
-// starts in time or slightly advanced and beomes recesses around $30 (48)
-A=72000 // 
-TAU=0.012  // can'y go too small, the low speeds numbers are too high but is more straight
-Y_INT=-400 // negative y offset to make start numbers lower
-X_INT=310 // bigger x offset helps make start numbers lower
-
-
+// started with parameters from excel curve fit (A=922, TAU=50)
+// sync range [32-4E] MAX=56
+A = 1500; // brings the idle (@DC=32) slow/high enuff to sync 
+TAU = 50;  //
+Y_INT = 0; //
+X_INT = 0; //
 
 
 
@@ -47,16 +32,27 @@ dtable(TBLSZ,2)=0;
 dtable(:,2)=[0:TBLMAX];
 
 // column 1 is the table value;
-dtable(:,1) =  Y_INT +  A * exp( -TAU *  ( X_INT + dtable(:,2) )   );
+
+// between about 10-30%, an exponential decay function tracks better
+// (1)  A * e ^ -t/Tau
+dtable(:,1) =  Y_INT +  A * exp( -1 / TAU * ( X_INT + dtable(:,2) ) );
+
+// the response seems to become more linear past 30%, this segment works up to about 57%
+// (2)  Y = mx + b
+SR=75  // set starting row for linear segment [SR:TBLSZ]
+dtable(SR:TBLSZ,1) = ( 1 -  3 * ( dtable( SR:TBLSZ,2 )  + 0 )  + 565 )
+// plot( 1 -  3 * ( dtable( 1:TBLSZ,2 )  + 0 )  + 560, 'red' ) // use SR to offset on X-axis
+
+// wip develop data in the range of the ramp segment (may be able to slow down slightly from the default ramp-to speed)
+FR=30  // set ending row for linear segment [1:FR]
+//dtable(1:FR,1) = ( 1 -  20 * ( dtable( 1:FR,2 )  + 0 )  + 1420 ) // maybe
+//dtable(1:FR,1) = ( 1 -  70 * ( dtable( 1:FR,2 )  + 0 )  + 2900 )
+//dtable(1:FR,1) = ( 1 -  100 * ( dtable( 1:FR,2 )  + 0 )  + 3750 )
+// plot( 1 -  20 * ( dtable( 1:TBLSZ,2 )  + 0 )  + 0, 'r' ) 
 
 
-//plot(   1 -  20 * dtable(:,2)  + 1400)
-dtable(:,1) = 1 -  14 * (   dtable(:,2)  +30 )  + 1750  // never advances
-dtable(:,1) = 1 -  14.00 * (   dtable(:,2)  +30 )  + 1780  //  eventually advances ($47)
-dtable(:,1) = 1 -  10.5 * (   dtable(:,2)  +55 )  + 1700  // dies at $50
-dtable(:,1) = 1 -  10.0 * (   dtable(:,2)  +60 )  + 1700  // dies at $52
-//dtable(:,1) = 1 -  9.8 * (   dtable(:,2)  +62 )  + 1700  // nfg
-
+// plot line for comparison
+plot( 1 -  10 * ( dtable(:,2) + 60)  + 1700, 'cya.');
 
 
 //new table with 3 fields and 250 rows;
@@ -95,7 +91,10 @@ write_csv( stable, Filename );
 // add some info to the file (identify the data set) ... have to do this manually for now.
 //
 fd = mopen( Filename, 'a' );
+mputl("// [1:74]  f(x) = 1500 * e ^ -x/50" , fd);
+mputl("// [75:TBLSZ]  f(x) = 3x + 565" , fd);
 mputl("// 10.0 * (   dtable(:,2)  +60 )  + 1700" , fd);
+
 mclose(fd);
 
 
@@ -105,7 +104,7 @@ mclose(fd);
 // In Cygwin or git-bash shell, execute the following command line (relative to 
 // the CWD when Scilab did write_csv() the file):
 //
-//  cat ../../../DTABLE.OUT | sed 's/\r// ; s/,/,  \/\/ /' > stm8_mcp/inc/dtable.h
+//  cat dtable_s.out  | sed 's/,/, /g ; s/,/, \/\/  /' > inc/model.h
 
 // plot column 1 of the table;
 plot(dtable(:,1));
