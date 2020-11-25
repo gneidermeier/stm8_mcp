@@ -16,9 +16,6 @@
 #define DRIVER_H
 
 
-// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
-#include <stm8s.h>
-
 
 /*
  * defines

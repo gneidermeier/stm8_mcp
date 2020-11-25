@@ -15,15 +15,7 @@
 #ifndef MDATA_H
 #define MDATA_H
 
-// if building in Cosmic (embedded) environment let it use system headers 
-#ifdef _COSMIC_
-
-#else
- // in gcc or whatever, let it use the standard header file for uint types etc.
- #include <stdint.h>
-#endif
-
-//#include <parameter.h> //  TIM2_PWM_PD
+#include <system.h> // platform specific declarations
 
 /*
  * defines

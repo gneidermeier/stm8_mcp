@@ -15,8 +15,9 @@
 #include <stm8s.h>
 
 // app headers
+#include "system.h" // platform specific delarations
 #include "driver.h" 
-#include "parameter.h"
+//#include "parameter.h"
 
 
 /* Private defines -----------------------------------------------------------*/
