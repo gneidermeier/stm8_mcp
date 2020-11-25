@@ -36,9 +36,7 @@
 /*
  * prototypes
  */
-
-//extern const uint16_t OL_Timing[ PWM_100PCNT ] ;
-uint16_t Get_OL_Timing(uint16_t index);
+uint16_t Get_OL_Timing(uint16_t);
 
 
 #endif // MDATA_H

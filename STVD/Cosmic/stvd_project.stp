@@ -460,7 +460,7 @@ PathName=STM8_TouchSensing_Lib\src
 [Root.Source Files]
 ElemType=Folder
 PathName=Source Files
-Child=Root.Source Files...\..\src\driver.c
+Child=Root.Source Files...\..\src\bldc_sm.c
 Next=Root.Include Files
 Config.0=Root.Source Files.Config.0
 Config.1=Root.Source Files.Config.1
@@ -531,6 +531,11 @@ String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
 
+[Root.Source Files...\..\src\bldc_sm.c]
+ElemType=File
+PathName=..\..\src\bldc_sm.c
+Next=Root.Source Files...\..\src\driver.c
+
 [Root.Source Files...\..\src\driver.c]
 ElemType=File
 PathName=..\..\src\driver.c
@@ -563,7 +568,7 @@ PathName=..\..\src\stm8s_it.c
 [Root.Include Files]
 ElemType=Folder
 PathName=Include Files
-Child=Root.Include Files...\..\inc\driver.h
+Child=Root.Include Files...\..\inc\bldc_sm.h
 Config.0=Root.Include Files.Config.0
 Config.1=Root.Include Files.Config.1
 
@@ -633,6 +638,11 @@ String.4.0=
 String.5.0=
 String.6.0=2010,1,14,10,36,49
 
+[Root.Include Files...\..\inc\bldc_sm.h]
+ElemType=File
+PathName=..\..\inc\bldc_sm.h
+Next=Root.Include Files...\..\inc\driver.h
+
 [Root.Include Files...\..\inc\driver.h]
 ElemType=File
 PathName=..\..\inc\driver.h
@@ -656,3 +666,8 @@ Next=Root.Include Files...\..\inc\stm8s_it.h
 [Root.Include Files...\..\inc\stm8s_it.h]
 ElemType=File
 PathName=..\..\inc\stm8s_it.h
+Next=Root.Include Files...\..\inc\system.h
+
+[Root.Include Files...\..\inc\system.h]
+ElemType=File
+PathName=..\..\inc\system.h

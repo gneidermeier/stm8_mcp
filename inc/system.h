@@ -1,10 +1,10 @@
 /**
   ******************************************************************************
   * @file parameter.h
-  * @brief  
+  * @brief
   * @author
-  * @version 
-  * @date    
+  * @version
+  * @date
   ******************************************************************************
   *
   * Platform specific system definitions and includes.
@@ -15,8 +15,11 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
-#include <stm8s.h>
+// horrors of unit testing
+#ifndef UNIT_TEST
+  // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+  #include <stm8s.h>
+#endif // UNIT_TEST
 
 //#define CLOCK_16
 
@@ -24,7 +27,7 @@
 
 
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
-// 1/12000 = 0.000083 = 8.3 * 10^(-5) 
+// 1/12000 = 0.000083 = 8.3 * 10^(-5)
 
 // With TIM2 prescale value of 1, period TIM2 == period fMaster
 // @8Mhz, fMASTER period == 0.000000125 S
@@ -37,9 +40,9 @@
 //  0.000083 / 0.5 us  = 166.67 counts
 
 #ifdef PWM_8K
-  #define TIM2_PWM_PD    250   // 125uS 
+  #define TIM2_PWM_PD    250   // 125uS
 #else // 12kHz
-  #define TIM2_PWM_PD    166   //  83uS 
+  #define TIM2_PWM_PD    166   //  83uS
 #endif
 
 

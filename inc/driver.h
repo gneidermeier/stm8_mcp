@@ -15,7 +15,9 @@
 #ifndef DRIVER_H
 #define DRIVER_H
 
-#include "system.h"
+//#ifndef UNIT_TEST // is it broken?
+  #include "system.h"
+//#endif
 
 
 /*
@@ -62,6 +64,8 @@ BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
 
 int get_op_mode(void);
 void set_op_mode(int mode);
+
+uint16_t get_vbatt(void);
 
 
 #endif // DRIVER_H
