@@ -124,8 +124,15 @@ void PWM_PhA_Disable(void);
 void PWM_PhB_Disable(void);
 void PWM_PhC_Disable(void);
 
-void PWM_PhA_Enable(uint16_t dc);
-void PWM_PhB_Enable(uint16_t dc);
-void PWM_PhC_Enable(uint16_t dc);
+void PWM_PhA_Enable(void);
+void PWM_PhB_Enable(void);
+void PWM_PhC_Enable(void);
+
+void set_dutycycle(uint16_t);
+uint16_t get_dutycycle(void);
+
+void inc_dutycycle(void);
+void dec_dutycycle(void);
+
 
 #endif // PWM_STM_S_H

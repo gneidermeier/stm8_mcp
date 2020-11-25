@@ -58,14 +58,46 @@ typedef enum /* THREE_PHASE_CHANNELS */
 
 
 /* Private variables ---------------------------------------------------------*/
+//static // tmp ... main()
+uint16_t global_uDC;
 
 
 /* Private function prototypes -----------------------------------------------*/
 
-
-
 /* Private functions ---------------------------------------------------------*/
 
+/* Public functions ---------------------------------------------------------*/
+
+void set_dutycycle(uint16_t global_dutycycle)
+{
+    global_uDC = global_dutycycle;
+}
+
+uint16_t get_dutycycle(void)
+{
+    return global_uDC;
+}
+
+/*
+ * these functions don't do real range checking, they just assert against 
+ * integer rollover (which shouldn't happen anyway?)
+ * see BLDC_Spd_dec() etc.
+ */
+void inc_dutycycle(void)
+{
+    if (global_uDC < 0xFFFE)
+    {
+        global_uDC += 1;
+    }
+}
+
+void dec_dutycycle(void)
+{
+    if (global_uDC > 0)
+    {
+        global_uDC -= 1;
+    }
+}
 
 /*
  * simple wrappers for PWM management on STM8s
@@ -105,21 +137,21 @@ void PWM_PhC_Disable(void)
   */
 void PWM_PhA_Enable(uint16_t dc)
 {
-    TIM2_SetCompare1( dc );               // CH2
+    TIM2_SetCompare1( global_uDC );               // CH2
     TIM2_CCxCmd( TIM2_CHANNEL_1, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 void PWM_PhB_Enable(uint16_t dc)
 {
-    TIM2_SetCompare2( dc );               // CH3
+    TIM2_SetCompare2( global_uDC );               // CH3
     TIM2_CCxCmd( TIM2_CHANNEL_2, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 void PWM_PhC_Enable(uint16_t dc)
 {
-    TIM2_SetCompare3( dc );              // CH4
+    TIM2_SetCompare3( global_uDC );              // CH4
     TIM2_CCxCmd( TIM2_CHANNEL_3, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
@@ -153,23 +185,23 @@ void PWM_PhC_Disable(void)
   * None
   * @retval void None
   */
-void PWM_PhA_Enable(uint16_t dc)
+void PWM_PhA_Enable(void)
 {
-    TIM1_SetCompare2( dc );               // CH2
+    TIM1_SetCompare2( global_uDC );               // CH2
     TIM1_CCxCmd( TIM1_CHANNEL_2, ENABLE );
     TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
-void PWM_PhB_Enable(uint16_t dc)
+void PWM_PhB_Enable(void)
 {
-    TIM1_SetCompare3( dc );               // CH3
+    TIM1_SetCompare3( global_uDC );               // CH3
     TIM1_CCxCmd( TIM1_CHANNEL_3, ENABLE );
     TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
-void PWM_PhC_Enable(uint16_t dc)
+void PWM_PhC_Enable(void)
 {
-    TIM1_SetCompare4( dc );              // CH4
+    TIM1_SetCompare4( global_uDC );              // CH4
     TIM1_CCxCmd( TIM1_CHANNEL_4, ENABLE );
     TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }

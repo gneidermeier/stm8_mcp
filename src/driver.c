@@ -17,13 +17,15 @@
 #include "pwm_stm8s.h"
 #include "mdata.h" // motor timing curve
 
-
+/*
+ * wanton abuse of globals hall of fame
+ */
 extern void TIM3_setup(uint16_t u16period); // from main.c
 
 
 extern uint8_t Log_Level; // global log-level
 
-extern uint16_t Back_EMF_Falling_4[4];
+extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -171,7 +173,6 @@ int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine sign
 
 uint16_t BLDC_OL_comm_tm;   // could be private
 
-uint16_t global_uDC;
 
 uint16_t Vsystem;
 static uint16_t Vbatt;
@@ -209,38 +210,6 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-
-/**
-  * @brief  .
-  * @par Parameters:
-  * None
-  * @retval void None
-  */
-static void set_dutycycle(uint16_t global_dutycycle)
-{
-    global_uDC = global_dutycycle;
-}
-
-/*
- * these functions don't do real range checking, they just assert against 
- * integer rollover (which shouldn't happen anyway?)
- * see BLDC_Spd_dec() etc.
- */
-static void inc_dutycycle(void)
-{
-    if (global_uDC < 0xFFFE)
-    {
-        global_uDC += 1;
-    }
-}
-
-static void dec_dutycycle(void)
-{
-    if (global_uDC > 0)
-    {
-        global_uDC -= 1;
-    }
-}
 
 /*
  * crude
@@ -442,21 +411,21 @@ static void comm_switch (uint8_t bldc_step)
      */
     if (DC_OUTP_HI == state0)
     {
-        PWM_PhA_Enable( global_uDC );
+        PWM_PhA_Enable();
 //        GPIOC->ODR |=   (1<<5);  // set /SD A
         PWM_PhA_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state1)
     {
-        PWM_PhB_Enable( global_uDC );
+        PWM_PhB_Enable();
 //        GPIOC->ODR |=   (1<<7); // set  /SD B
         PWM_PhB_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state2)
     {
-        PWM_PhC_Enable( global_uDC );
+        PWM_PhC_Enable();
         GPIOG->ODR |=   (1<<1); // set /SD C
         PWM_PhC_HB_ENABLE(1);
     }
@@ -509,7 +478,7 @@ uint16_t BLDC_PWMDC_Plus()
 //if (DC < PWM_DC_RAMPUP)
         inc_dutycycle();
     }
-    return global_uDC;
+    return 0;
 }
 
 /*
@@ -528,7 +497,7 @@ uint16_t BLDC_PWMDC_Minus()
 // if (DC > PWM_20PCNT)
         dec_dutycycle();
     }
-    return global_uDC;
+    return 0;
 }
 
 /*
@@ -557,12 +526,12 @@ void BLDC_PWMDC_Set(uint16_t dc)
     {
         if (dc > 0x1d)
         {
-            if ( global_uDC < dc )
+            if ( get_dutycycle() < dc )
             {
                 // TODO:  rate-limit on this ...
                 inc_dutycycle();
             }
-            else if ( global_uDC > dc )
+            else if ( get_dutycycle() > dc )
             {
                 dec_dutycycle();
             }
@@ -606,7 +575,7 @@ void BLDC_Spd_inc()
         Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
     }
 
-    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM )
+    if (BLDC_ON == BLDC_State /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
     {
         Manual_Mode = 1;
         BLDC_OL_comm_tm -= 1; // faster
@@ -700,7 +669,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
         if ( 0 == Manual_Mode )
         {
             int error, step = 0;
-            Table_value =  Get_OL_Timing( global_uDC );
+            Table_value =  Get_OL_Timing( get_dutycycle() );
 
             error =  Table_value  - BLDC_OL_comm_tm;
             /*

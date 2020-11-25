@@ -634,7 +634,6 @@ void Periodic_task(void)
     static int Fault = 0;
     static int manual_mode_start = 0;
 
-    uint16_t duty_cycle = 0;
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
     char key;
@@ -677,7 +676,7 @@ void Periodic_task(void)
         {
             disableInterrupts();
             manual_mode_start = 1; // flag this op as a manual mode cycle
-            duty_cycle = BLDC_PWMDC_Plus();
+            BLDC_PWMDC_Plus();
             enableInterrupts();
             UARTputs("+++\r\n");
 
@@ -688,7 +687,7 @@ void Periodic_task(void)
         {
             disableInterrupts();
             manual_mode_start = 1; // flag this op as a manual mode cycle
-            duty_cycle = BLDC_PWMDC_Minus();
+            BLDC_PWMDC_Minus();
             enableInterrupts();
             UARTputs("---\r\n");
         }
