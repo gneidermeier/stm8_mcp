@@ -91,7 +91,6 @@ uint16_t Vsystem;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t   Table_value; //whats up w/ stupid compiler optimizing
 static int vsys_fault_bucket;
 
 
@@ -122,13 +121,18 @@ void BLDC_Update(void)
 {
     const int FAULT_BUCKET_INI = 128;
 
+    // some actions only done on state transitions (prev state must be updated at end of this function)
+    static BLDC_STATE_T prev_bldc_state = BLDC_OFF;
+
 // if the voltage threshold is high enuff, the ramp delay time thingy not needed
 //    const int RAMP_TIME = 1;   // fault arming delay time
 //    static uint16_t fault_arming_time; // fault_arming_time
 
     uint16_t u16tmp;
 
-    switch ( get_bldc_state() )
+    BLDC_STATE_T bldc_state = get_bldc_state();
+
+    switch ( bldc_state )
     {
     default:
     case BLDC_OFF:
@@ -188,9 +192,9 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
             int error, step = 0;
             uint16_t u16ct = get_commutation_period();
 
-            Table_value =  Get_OL_Timing( get_dutycycle() );
+            uint16_t table_value = Get_OL_Timing( get_dutycycle() );
 
-            error = Table_value - u16ct;
+            error = table_value - u16ct;
             /*
              * the C-T increments between PWM steps are rather large as speeding up
              * so it may be possible to comp. by reducing rate of this loop by /2
@@ -204,7 +208,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
                 step = -1;
             }
 
-            if (Table_value != 0) // assert
+            if (table_value != 0) // assert
             {
                 set_commutation_period( u16ct + step );  // incrementally adjust until error reduces to 0.
             }
@@ -214,7 +218,11 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
     case BLDC_RAMPUP:
 
-        set_dutycycle( PWM_DC_RAMPUP ); // shouldn't need to keep setting the ramp DC every iteration .. do it once at -transition into ramp state
+        if (BLDC_RAMPUP != prev_bldc_state)
+        {
+            // set the ramp DC upon transition into ramp state
+            set_dutycycle( PWM_DC_RAMPUP );
+        }
 
         u16tmp = get_commutation_period();
 
@@ -230,11 +238,11 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
             set_op_mode( 0 ); // Manual Mode
             set_dutycycle( PWM_DC_IDLE );
-
-//            Log_Level = 16; // tmp debug
         }
         break;
     }
+
+    prev_bldc_state = bldc_state ;
 
 //  update the timer for the OL commutation switch time
     TIM3_setup( get_commutation_period() );
