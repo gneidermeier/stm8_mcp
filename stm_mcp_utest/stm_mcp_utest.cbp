@@ -40,10 +40,17 @@
 		<Unit filename="../src/mdata.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="inc/putf.h" />
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="src/putf.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/stubs.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/test_bldc_sm/test_bldc_sm.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Extensions>
