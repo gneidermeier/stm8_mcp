@@ -38,9 +38,9 @@ extern void TIM3_setup(uint16_t u16period);
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_RAMPUP  PWM_X_PCNT( 14.0 )
-
 #define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
+
+#define PWM_DC_RAMPUP  PWM_DC_IDLE // PWM_X_PCNT( 14.0 )
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -226,12 +226,15 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
 
         u16tmp = get_commutation_period();
 
-        if ( u16tmp > BLDC_OL_TM_HI_SPD) // state-transition trigger?
+         // the target commutation period timing is extracted from the table
+        if ( u16tmp  > /* BLDC_OL_TM_HI_SPD */ 
+                       Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ) ) 
         {
             set_commutation_period( u16tmp - BLDC_ONE_RAMP_UNIT );
         }
         else
         {
+            // state-transition trigger
             set_bldc_state( BLDC_ON );
 
             Vsystem = get_vbatt(); // "pre-load" the avergae to avoid kicking out at end of ramp1
