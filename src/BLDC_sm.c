@@ -98,6 +98,37 @@ static int vsys_fault_bucket;
 
 /* Private functions ---------------------------------------------------------*/
 
+/**
+ * @brief     .
+ *   Simple ramping of commutation time period. At each iteration the
+ *   commutation time period is ramped to the target value stepped in increment
+ *   of +/- step depending of the sign of the error.
+ *
+ * @param   tgt_commutation_per  Target value to track.
+ * @param   step integer step    Increment of the ramp (the slope).
+ *
+ * @return  void
+ */
+void timing_ramp_control(uint16_t tgt_commutation_per, int step)
+{
+    uint16_t get_commutation_per = get_commutation_period();
+    int error = tgt_commutation_per - get_commutation_per;
+
+    // determine signage of error i.e. step increment
+    if (error < 0)
+    {
+        // negate the step parameter
+        step = 0 - step;
+    }
+    else
+    if (error > 0)
+    {
+    }
+
+    set_commutation_period( get_commutation_per + step );
+}
+
+/* Public functions ---------------------------------------------------------*/
 
 /*
  * BLDC Update:
@@ -116,7 +147,6 @@ static int vsys_fault_bucket;
  *                 step ... but the resolution will be these discrete steps
  *                 (of TIM1 reference)
  */
-
 void BLDC_Update(void)
 {
     const int FAULT_BUCKET_INI = 128;
@@ -182,38 +212,11 @@ void BLDC_Update(void)
             }
         }
 
-// grab the "speed" number from the table, determine (sign of) error and incr. +/- 1
-/*
-basically theres a possiblity that at a high enough speed it could instead take
-the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
-*/
         if ( 0 == get_op_mode() )
         {
-            int error, step = 0;
-            uint16_t u16ct = get_commutation_period();
-
-            uint16_t table_value = Get_OL_Timing( get_dutycycle() );
-
-            error = table_value - u16ct;
-            /*
-             * the C-T increments between PWM steps are rather large as speeding up
-             * so it may be possible to comp. by reducing rate of this loop by /2
-             */
-            if (error > 0)
-            {
-                step = 1;
-            }
-            else if (error < 0)
-            {
-                step = -1;
-            }
-
-            if (table_value != 0) // assert
-            {
-                set_commutation_period( u16ct + step );  // incrementally adjust until error reduces to 0.
-            }
+            const int step = 1;
+            timing_ramp_control( Get_OL_Timing( get_dutycycle() ), step );
         }
-
         break;
 
     case BLDC_RAMPUP:
@@ -227,10 +230,11 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
         u16tmp = get_commutation_period();
 
          // the target commutation period timing is extracted from the table
-        if ( u16tmp  > /* BLDC_OL_TM_HI_SPD */ 
-                       Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ) ) 
+        if ( u16tmp  > /* BLDC_OL_TM_HI_SPD */
+                       Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ) )
         {
-            set_commutation_period( u16tmp - BLDC_ONE_RAMP_UNIT );
+            const int step = BLDC_ONE_RAMP_UNIT;
+            set_commutation_period( u16tmp - step );
         }
         else
         {
@@ -240,7 +244,7 @@ the error of the +/- back-EMF sensed ZC   and use e * Kp to determine the step
             Vsystem = get_vbatt(); // "pre-load" the avergae to avoid kicking out at end of ramp1
 
             set_op_mode( 0 ); // Manual Mode
-            set_dutycycle( PWM_DC_IDLE );
+//            set_dutycycle( PWM_DC_IDLE );
         }
         break;
     }
