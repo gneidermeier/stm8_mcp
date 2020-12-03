@@ -28,13 +28,6 @@
 /*
  * types
  */
-// motor running-cycle state machine
-typedef enum
-{
-    BLDC_OFF,
-    BLDC_RAMPUP,
-    BLDC_ON
-} BLDC_STATE_T;
 
 
 /*
@@ -54,13 +47,8 @@ uint16_t BLDC_PWMDC_Minus(void);
 
 void BLDC_Stop(void);
 void BLDC_Step(void);
-void BLDC_Update(void);
 
-void set_commutation_period(uint16_t);
-uint16_t get_commutation_period(void);
 
-BLDC_STATE_T get_bldc_state(void);
-BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
 
 int get_op_mode(void);
 void set_op_mode(int mode);
