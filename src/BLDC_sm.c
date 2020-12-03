@@ -98,6 +98,8 @@ static BLDC_STATE_T BLDC_State;
 
 static uint16_t BLDC_OL_comm_tm;
 
+static uint16_t Commanded_Dutycycle; // PWM duty-cycle has to be ramped to this
+
 static int vsys_fault_bucket;
 
 
@@ -145,6 +147,120 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 }
 
 /* Public functions ---------------------------------------------------------*/
+
+void inc_dutycycle(void); // tmp
+void dec_dutycycle(void); // tmp
+
+extern uart_print( char * sbuf ); // tmp
+
+
+/*
+ * low-level stop: turns off all PWM
+ */
+void BLDC_Stop(void)
+{
+// kill the driver signals
+    Driver_Stop();
+
+    set_bldc_state( BLDC_OFF );
+
+    Log_Level = 0; // global log-level
+
+}
+
+/*
+ * increment set and return present motor speed value
+ */
+uint16_t BLDC_PWMDC_Plus()
+{
+    if ( BLDC_OFF == get_bldc_state() )
+    {
+//        uart_print( "OFF->RAMP-\r\n");
+        set_bldc_state(  BLDC_RAMPUP );
+        return 0;
+    }
+    else if (BLDC_ON == get_bldc_state() )
+    {
+//if (DC < PWM_DC_RAMPUP)
+        inc_dutycycle();
+    }
+    return 0;
+}
+
+/*
+ * decrement set and return present motor speed value
+ */
+uint16_t BLDC_PWMDC_Minus()
+{
+    if ( BLDC_OFF == get_bldc_state() )
+    {
+//        uart_print( "OFF->RAMP-\r\n");
+        set_bldc_state(  BLDC_RAMPUP );
+        return 0;
+    }
+    else if ( BLDC_ON == get_bldc_state() )
+    {
+// if (DC > PWM_20PCNT)
+        dec_dutycycle();
+    }
+    return 0;
+}
+
+/*
+ * sets motor speed from commanded throttle/UI setting  (experimental)
+ */
+void BLDC_PWMDC_Set(uint16_t dc)
+{
+    Commanded_Dutycycle = dc;
+}
+
+/*
+ * TEST DEV ONLY: manual adjustment of commutation cycle time)
+ */
+void BLDC_Spd_dec()
+{
+#if 1 // #ifdef DEBUG
+    if ( BLDC_OFF == get_bldc_state() )
+    {
+        set_bldc_state( BLDC_RAMPUP );
+//        uart_print( "OFF->RAMP-\r\n");
+    }
+
+    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm < 0xFFFF */)
+    {
+//        set_op_mode(1);
+        BLDC_OL_comm_tm += 1; // slower
+    }
+
+//    Log_Level = 255;// enable continous/verbous log
+#endif
+}
+
+/*
+ * TEST DEV ONLY: manual adjustment of commutation cycle time)
+ */
+void BLDC_Spd_inc()
+{
+#if 1 // #ifdef DEBUG
+//    Log_Level = 1; // default on INC button is just print one line
+
+    if ( BLDC_OFF == get_bldc_state() )
+    {
+        set_bldc_state( BLDC_RAMPUP );
+        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
+
+//        uart_print( "OFF->RAMP+\r\n");
+//        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
+    }
+
+    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
+    {
+//        set_op_mode(1);
+        BLDC_OL_comm_tm -= 1; // faster
+    }
+#endif
+}
+
 
 /**
   * @brief  .
@@ -254,7 +370,7 @@ void BLDC_Update(void)
             }
         }
 
-        if ( 0 == get_op_mode() )
+//        if ( 0 == get_op_mode() )
         {
             const int step = 1;
             timing_ramp_control( Get_OL_Timing( get_dutycycle() ), step );
@@ -279,8 +395,8 @@ void BLDC_Update(void)
 
             Vsystem = get_vbatt(); // "pre-load" the avergae to avoid kicking out at end of ramp1
 
-            set_op_mode( 0 ); // Manual Mode
-//            set_dutycycle( PWM_DC_IDLE );
+//            set_op_mode( 0 ); // Manual Mode
+//            BLDC_PWMDC_Set( PWM_DC_IDLE );
         }
         break;
     }

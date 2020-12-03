@@ -160,7 +160,7 @@ uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 static uint16_t Vbatt;
 
 
-static int Manual_Mode; // test flag to indicate if manual control override toggled
+//static int Manual_Mode; // test flag to indicate if manual control override toggled
 
 static uint16_t Back_EMF_15304560[4];
 
@@ -416,7 +416,7 @@ static void comm_switch (uint8_t bldc_step)
 /*
  * low-level stop: turns off all PWM
  */
-void BLDC_Stop(void)
+void Driver_Stop(void)
 {
 // kill the driver signals
         PWM_PhA_Disable();
@@ -427,132 +427,6 @@ void BLDC_Stop(void)
 
         PWM_PhC_Disable();
         PWM_PhC_HB_DISABLE(0);
-
-    set_bldc_state( BLDC_OFF );
-}
-
-/*
- * increment set and return present motor speed value
- */
-uint16_t BLDC_PWMDC_Plus()
-{
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-//        uart_print( "OFF->RAMP-\r\n");
-        set_bldc_state(  BLDC_RAMPUP );
-        return 0;
-    }
-    else if (BLDC_ON == get_bldc_state() )
-    {
-//if (DC < PWM_DC_RAMPUP)
-        inc_dutycycle();
-    }
-    return 0;
-}
-
-/*
- * decrement set and return present motor speed value
- */
-uint16_t BLDC_PWMDC_Minus()
-{
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-//        uart_print( "OFF->RAMP-\r\n");
-        set_bldc_state(  BLDC_RAMPUP );
-        return 0;
-    }
-    else if ( BLDC_ON == get_bldc_state() )
-    {
-// if (DC > PWM_20PCNT)
-        dec_dutycycle();
-    }
-    return 0;
-}
-
-/*
- * sets motor speed from commanded throttle/UI setting  (experimental)
- */
-void BLDC_PWMDC_Set(uint16_t dc)
-{
-        if (dc < 0x10)
-        {
-            BLDC_Stop();
-        }
-
-// if presently OFF, then capture the commanded throttle value
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        // todo: must be off for X to (re)enable startup.
-
-        if ( dc > 10 )
-        {
-            set_bldc_state( BLDC_RAMPUP );
-//            uart_print( "THR ... OFF->RAMP-\r\n");
-        }
-    }
-
-    if (BLDC_ON == get_bldc_state() )
-    {
-        if (dc > 0x1d)
-        {
-            if ( get_dutycycle() < dc )
-            {
-                // TODO:  rate-limit on this ...
-                inc_dutycycle();
-            }
-            else if ( get_dutycycle() > dc )
-            {
-                dec_dutycycle();
-            }
-        }
-    }
-}
-
-/*
- * TEST DEV ONLY: manual adjustment of commutation cycle time)
- */
-void BLDC_Spd_dec()
-{
-#if 0 // #ifdef DEBUG
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        set_bldc_state( BLDC_RAMPUP );
-//        uart_print( "OFF->RAMP-\r\n");
-    }
-
-    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm < 0xFFFF */)
-    {
-        Manual_Mode = 1;
-        BLDC_OL_comm_tm += 1; // slower
-    }
-
-//    Log_Level = 255;// enable continous/verbous log
-#endif
-}
-
-/*
- * TEST DEV ONLY: manual adjustment of commutation cycle time)
- */
-void BLDC_Spd_inc()
-{
-#if 0 // #ifdef DEBUG
-//    Log_Level = 1; // default on INC button is just print one line
-
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        set_bldc_state( BLDC_RAMPUP );
-        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
-
-//        uart_print( "OFF->RAMP+\r\n");
-//        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
-    }
-
-    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
-    {
-        Manual_Mode = 1;
-        BLDC_OL_comm_tm -= 1; // faster
-    }
-#endif
 }
 
 
@@ -569,6 +443,7 @@ uint16_t get_vbatt(void)
     return Vbatt;
 }
 
+#if 0
 int get_op_mode(void)
 {
     return Manual_Mode;
@@ -578,6 +453,7 @@ void set_op_mode(int mode)
 {
     Manual_Mode = mode;
 }
+#endif
 
 
 /*
