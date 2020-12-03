@@ -107,25 +107,34 @@ static int vsys_fault_bucket;
  * @param   tgt_commutation_per  Target value to track.
  * @param   step integer step    Increment of the ramp (the slope).
  *
- * @return  void
+ * @return  +1 if positive increment
+ *          -1 if negative increment
+ *          0 if control variable equal to target
  */
-void timing_ramp_control(uint16_t tgt_commutation_per, int step)
+int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 {
-    uint16_t get_commutation_per = get_commutation_period();
-    int error = tgt_commutation_per - get_commutation_per;
+    int error;
+    int ret = 0;
+    uint16_t u16 = get_commutation_period();
+
+    error = tgt_commutation_per - u16;
 
     // determine signage of error i.e. step increment
     if (error < 0)
     {
         // negate the step parameter
-        step = 0 - step;
+        u16 -= increment;
+        ret = -1;
     }
-    else
-    if (error > 0)
+    else if (error > 0)
     {
+        u16 += increment;
+        ret = 1;
     }
 
-    set_commutation_period( get_commutation_per + step );
+    set_commutation_period( u16 );
+
+    return ret;
 }
 
 /* Public functions ---------------------------------------------------------*/
@@ -158,7 +167,7 @@ void BLDC_Update(void)
 //    const int RAMP_TIME = 1;   // fault arming delay time
 //    static uint16_t fault_arming_time; // fault_arming_time
 
-    uint16_t u16tmp;
+    int itemp;
 
     BLDC_STATE_T bldc_state = get_bldc_state();
 
@@ -227,16 +236,10 @@ void BLDC_Update(void)
             set_dutycycle( PWM_DC_RAMPUP );
         }
 
-        u16tmp = get_commutation_period();
+        itemp = timing_ramp_control(
+            Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
 
-         // the target commutation period timing is extracted from the table
-        if ( u16tmp  > /* BLDC_OL_TM_HI_SPD */
-                       Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ) )
-        {
-            const int step = BLDC_ONE_RAMP_UNIT;
-            set_commutation_period( u16tmp - step );
-        }
-        else
+        if ( itemp >= 0 ) // ( comm_time < target )
         {
             // state-transition trigger
             set_bldc_state( BLDC_ON );
