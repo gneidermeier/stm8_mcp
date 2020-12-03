@@ -21,8 +21,16 @@
   #include <stm8s.h>
 #endif // UNIT_TEST
 
+
+/*
+ * (un)comment macro to set stm8 clock from 8Mhz or 16Mhz
+ */
 //#define CLOCK_16
 
+
+/*
+ * (un)comment macro to set PWM 8 Khz or ?
+ */
 #define PWM_8K
 
 

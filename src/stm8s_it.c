@@ -23,6 +23,7 @@
 #include "stm8s_it.h"
 #include "parameter.h" //  app defines
 #include "driver.h"
+#include "bldc_sm.h"
 
 
 // hack, temp

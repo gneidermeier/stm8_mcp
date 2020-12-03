@@ -17,6 +17,7 @@
 // app headers
 #include "system.h" // platform specific delarations
 #include "driver.h"
+#include "bldc_sm.h"
 #include "pwm_stm8s.h"
 //#include "parameter.h"
 
@@ -558,7 +559,7 @@ static uint16_t Line_Count = 0;
 extern int Back_EMF_Falling_Int_PhX;
 extern uint16_t Vsystem;
 
-uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
+extern uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
 
 /*
  * temp, todo better function
@@ -642,7 +643,7 @@ void Periodic_task(void)
 //   svc a UI potentiometer
     UI_Speed = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
     UI_Speed /= 16; // use [ 0: 63 ]
-
+#if 0
     if (0 == manual_mode_start )
     {
 // was NOT started in dev/test mode, so go ahead and use "UI" (servo-pulse?) input
@@ -653,7 +654,7 @@ void Periodic_task(void)
             BLDC_PWMDC_Set(0);
         }
     }
-
+#endif
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
      * simply designates number of reps ... spacing TBD? this task is now tied to
@@ -700,6 +701,12 @@ void Periodic_task(void)
             BLDC_Stop();
             enableInterrupts();
             UARTputs("###\r\n");
+        }
+        else if (key >= '0' && key <= '9' )
+        {
+            uint16_t nn = (unsigned int)key;
+            nn = (nn * 250) / 10; 
+            BLDC_PWMDC_Set(nn);
         }
         else // anykey
         {

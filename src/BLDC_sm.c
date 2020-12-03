@@ -18,8 +18,9 @@
 extern void set_dutycycle(uint16_t);
 extern uint16_t get_dutycycle(void);
 
-extern void TIM3_setup(uint16_t u16period);
+extern void TIM3_setup(uint16_t u16period); // from main.c
 
+extern uint8_t Log_Level; // global log-level
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -38,9 +39,12 @@ extern void TIM3_setup(uint16_t u16period);
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
+//#define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
+//#define PWM_DC_RAMPUP  PWM_DC_IDLE // PWM_X_PCNT( 14.0 )
 
-#define PWM_DC_RAMPUP  PWM_DC_IDLE // PWM_X_PCNT( 14.0 )
+#define PWM_DC_RAMPUP    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
+
+#define PWM_DC_IDLE      PWM_X_PCNT( PWM_DC_RAMPUP )
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -67,12 +71,11 @@ extern void TIM3_setup(uint16_t u16period);
 // actual motor commutation frequency.
 #define BLDC_OL_TM_LO_SPD       0x1000 // 4096d  // start of ramp
 
-#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
+//#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 #define LUDICROUS_SPEED         0x006F // 111
 
-//#define BLDC_OL_TM_MANUAL_HI_LIM   LUDICROUS_SPEED
 
 /*
  * Slope of what is basically a linear startup ramp, commutation time (i.e. TIM3)
@@ -90,6 +93,10 @@ uint16_t Vsystem;
 
 
 /* Private variables ---------------------------------------------------------*/
+
+static BLDC_STATE_T BLDC_State;
+
+static uint16_t BLDC_OL_comm_tm;
 
 static int vsys_fault_bucket;
 
@@ -138,6 +145,32 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 }
 
 /* Public functions ---------------------------------------------------------*/
+
+/**
+  * @brief  .
+  * @par Parameters:
+  * None
+  * @retval void None
+  */
+void set_commutation_period(uint16_t u16pd)
+{
+    BLDC_OL_comm_tm = u16pd;
+}
+
+uint16_t get_commutation_period(void)
+{
+    return BLDC_OL_comm_tm;
+}
+
+BLDC_STATE_T get_bldc_state(void)
+{
+    return BLDC_State;
+}
+
+BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
+{
+    BLDC_State = newstate;
+}
 
 /*
  * BLDC Update:

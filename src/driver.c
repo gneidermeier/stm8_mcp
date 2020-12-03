@@ -16,16 +16,12 @@
 
 #include "pwm_stm8s.h"
 #include "mdata.h" // motor timing curve
+#include "bldc_sm.h"
 
 /*
  * wanton abuse of globals hall of fame
  */
 extern void TIM3_setup(uint16_t u16period); // from main.c
-
-
-extern uint8_t Log_Level; // global log-level
-
-extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -92,12 +88,6 @@ extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 #define BLDC_OL_TM_MANUAL_HI_LIM   LUDICROUS_SPEED
 
-/*
- * Slope of what is basically a linear startup ramp, commutation time (i.e. TIM3)
- * period) decremented by fixed amount each control-loop timestep. Slope 
- * determined by experiment (conservative to avoid stalling the motor!) 
- */
-#define BLDC_ONE_RAMP_UNIT      2
 
 
 /* Private types -----------------------------------------------------------*/
@@ -154,13 +144,6 @@ typedef enum /* COMMUTATION_SECTOR */
 } COMMUTATION_SECTOR_t;
 
 
-// motor running-cycle state machine
-typedef enum
-{
-    BLDC_OFF,
-    BLDC_RAMPUP,
-    BLDC_ON
-} BLDC_STATE_T;
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -170,20 +153,17 @@ uint16_t _ADC_Global;
 int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine signed int happens to be ...
                               // todo: stms8.h has  typedef   signed long     int32_t; 
 
+uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
+/* Private variables ---------------------------------------------------------*/
 
 static uint16_t Vbatt;
 
-static BLDC_STATE_T BLDC_State;
-
-
-/* Private variables ---------------------------------------------------------*/
 
 static int Manual_Mode; // test flag to indicate if manual control override toggled
 
 static uint16_t Back_EMF_15304560[4];
 
-static uint16_t BLDC_OL_comm_tm;
 
 
 /*
@@ -432,9 +412,9 @@ static void comm_switch (uint8_t bldc_step)
 }
 
 
-extern uart_print( char * sbuf ); // tmp
+
 /*
- *
+ * low-level stop: turns off all PWM
  */
 void BLDC_Stop(void)
 {
@@ -448,18 +428,7 @@ void BLDC_Stop(void)
         PWM_PhC_Disable();
         PWM_PhC_HB_DISABLE(0);
 
-    if (BLDC_OFF != BLDC_State)
-    {
-        Log_Level = 0;
-        uart_print( "STOP\r\n");
-// tmp grab some test data ...
-        Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
-        Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
-        Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
-        Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
-    }
-
-    BLDC_State = BLDC_OFF;
+    set_bldc_state( BLDC_OFF );
 }
 
 /*
@@ -467,13 +436,13 @@ void BLDC_Stop(void)
  */
 uint16_t BLDC_PWMDC_Plus()
 {
-    if (BLDC_OFF == BLDC_State)
+    if ( BLDC_OFF == get_bldc_state() )
     {
-        uart_print( "OFF->RAMP-\r\n");
-        BLDC_State = BLDC_RAMPUP;
+//        uart_print( "OFF->RAMP-\r\n");
+        set_bldc_state(  BLDC_RAMPUP );
         return 0;
     }
-    else if (BLDC_ON == BLDC_State )
+    else if (BLDC_ON == get_bldc_state() )
     {
 //if (DC < PWM_DC_RAMPUP)
         inc_dutycycle();
@@ -486,13 +455,13 @@ uint16_t BLDC_PWMDC_Plus()
  */
 uint16_t BLDC_PWMDC_Minus()
 {
-    if (BLDC_OFF == BLDC_State)
+    if ( BLDC_OFF == get_bldc_state() )
     {
-        uart_print( "OFF->RAMP-\r\n");
-        BLDC_State = BLDC_RAMPUP;
+//        uart_print( "OFF->RAMP-\r\n");
+        set_bldc_state(  BLDC_RAMPUP );
         return 0;
     }
-    else if (BLDC_ON == BLDC_State)
+    else if ( BLDC_ON == get_bldc_state() )
     {
 // if (DC > PWM_20PCNT)
         dec_dutycycle();
@@ -511,18 +480,18 @@ void BLDC_PWMDC_Set(uint16_t dc)
         }
 
 // if presently OFF, then capture the commanded throttle value
-    if (BLDC_OFF == BLDC_State)
+    if ( BLDC_OFF == get_bldc_state() )
     {
         // todo: must be off for X to (re)enable startup.
 
         if ( dc > 10 )
         {
-            BLDC_State = BLDC_RAMPUP;
-            uart_print( "THR ... OFF->RAMP-\r\n");
+            set_bldc_state( BLDC_RAMPUP );
+//            uart_print( "THR ... OFF->RAMP-\r\n");
         }
     }
 
-    if (BLDC_ON == BLDC_State )
+    if (BLDC_ON == get_bldc_state() )
     {
         if (dc > 0x1d)
         {
@@ -544,19 +513,21 @@ void BLDC_PWMDC_Set(uint16_t dc)
  */
 void BLDC_Spd_dec()
 {
-    if (BLDC_OFF == BLDC_State)
+#if 0 // #ifdef DEBUG
+    if ( BLDC_OFF == get_bldc_state() )
     {
-        BLDC_State = BLDC_RAMPUP;
-        uart_print( "OFF->RAMP-\r\n");
+        set_bldc_state( BLDC_RAMPUP );
+//        uart_print( "OFF->RAMP-\r\n");
     }
 
-    if (BLDC_ON == BLDC_State  && BLDC_OL_comm_tm < 0xFFFF)
+    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm < 0xFFFF */)
     {
         Manual_Mode = 1;
         BLDC_OL_comm_tm += 1; // slower
     }
 
-    Log_Level = 255;// enable continous/verbous log
+//    Log_Level = 255;// enable continous/verbous log
+#endif
 }
 
 /*
@@ -564,22 +535,24 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-    Log_Level = 1; // default on INC button is just print one line
+#if 0 // #ifdef DEBUG
+//    Log_Level = 1; // default on INC button is just print one line
 
-    if (BLDC_OFF == BLDC_State)
+    if ( BLDC_OFF == get_bldc_state() )
     {
-        BLDC_State = BLDC_RAMPUP;
+        set_bldc_state( BLDC_RAMPUP );
         // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
 
-        uart_print( "OFF->RAMP+\r\n");
-        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
+//        uart_print( "OFF->RAMP+\r\n");
+//        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
     }
 
-    if (BLDC_ON == BLDC_State /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
+    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
     {
         Manual_Mode = 1;
         BLDC_OL_comm_tm -= 1; // faster
     }
+#endif
 }
 
 
@@ -589,25 +562,7 @@ void BLDC_Spd_inc()
   * None
   * @retval void None
   */
-void set_commutation_period(uint16_t u16pd)
-{
-    BLDC_OL_comm_tm = u16pd;
-}
 
-uint16_t get_commutation_period(void)
-{
-    return BLDC_OL_comm_tm;
-}
-
-BLDC_STATE_T get_bldc_state(void)
-{
-    return BLDC_State;
-}
-
-BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
-{
-    BLDC_State = newstate;
-}
 
 uint16_t get_vbatt(void)
 {
@@ -645,7 +600,7 @@ void BLDC_Step(void)
     static COMMUTATION_SECTOR_t comm_step = 0;
 
 
-    if (BLDC_OFF != BLDC_State )
+    if (BLDC_OFF != get_bldc_state() )
     {
         // grab the state of previous sector (before advancing the 6-step sequence)
         BLDC_PWM_STATE_t  prev_A = Commutation_Steps[ comm_step ].phA;
@@ -676,12 +631,6 @@ void BLDC_Step(void)
             {
 // if phase-A previous sector was floating-falling transition, then the measurements are qualified by copying from the temp array 
                 memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
-/*
-                Back_EMF_Falling_4[0] = Back_EMF_15304560[0]; // unused
-                Back_EMF_Falling_4[1] = Back_EMF_15304560[1]; // pre-ZCP
-                Back_EMF_Falling_4[2] = Back_EMF_15304560[2]; // post-ZCP
-                Back_EMF_Falling_4[3] = Back_EMF_15304560[3]; // unused
-*/
 // sum the pre-ZCP and post-ZCP measurements
                 Back_EMF_Falling_Int_PhX = 
                        Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
