@@ -192,6 +192,15 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 /* Private functions ---------------------------------------------------------*/
 
 /*
+ * public accessor for the fixed table
+ */
+BLDC_COMM_STEP_t Seq_Get_Step(int index)
+{
+    BLDC_COMM_STEP_t step =  Commutation_Steps[ index ];
+    return step;
+}
+
+/*
  * crude
  */
 static void delay(int time)
@@ -304,14 +313,17 @@ static void comm_switch (uint8_t bldc_step)
     BLDC_PWM_STATE_t state0, state1, state2;
 
     // grab the phases states of previous sector 
-    prev_A = Commutation_Steps[ prev_bldc_step ].phA;
-    prev_B = Commutation_Steps[ prev_bldc_step ].phB;
-    prev_C = Commutation_Steps[ prev_bldc_step ].phC;
-    prev_bldc_step = bldc_step;
+    BLDC_COMM_STEP_t curr_step = Seq_Get_Step( bldc_step );
+    BLDC_COMM_STEP_t prev_step = Seq_Get_Step( prev_bldc_step );
+    prev_A = prev_step.phA;
+    prev_B = prev_step.phB;
+    prev_C = prev_step.phC;
 
-    state0 = Commutation_Steps[ bldc_step ].phA;
-    state1 = Commutation_Steps[ bldc_step ].phB;
-    state2 = Commutation_Steps[ bldc_step ].phC;
+    prev_bldc_step = bldc_step; // latch the state of the next previous ;)
+
+    state0 = curr_step.phA;
+    state1 = curr_step.phB;
+    state2 = curr_step.phC;
 
     /*
      * Disable PWM of previous driving phase is finished (120 degrees). Note that
@@ -479,7 +491,9 @@ void BLDC_Step(void)
     if (BLDC_OFF != get_bldc_state() )
     {
         // grab the state of previous sector (before advancing the 6-step sequence)
-        BLDC_PWM_STATE_t  prev_A = Commutation_Steps[ comm_step ].phA;
+
+        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
+        BLDC_PWM_STATE_t prev_A = curr_step.phA;
 
         int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
