@@ -17,6 +17,7 @@
 #include "pwm_stm8s.h"
 #include "mdata.h" // motor timing curve
 #include "bldc_sm.h"
+ #include "sequence.h"
 
 /*
  * wanton abuse of globals hall of fame
@@ -92,18 +93,6 @@ extern void TIM3_setup(uint16_t u16period); // from main.c
 
 /* Private types -----------------------------------------------------------*/
 
-// enumerates the PWM state of each channel
-typedef enum DC_PWM_STATE
-{
-    DC_OUTP_OFF,
-    DC_OUTP_HI,
-    DC_OUTP_LO,
-    DC_OUTP_FLOAT_R,
-    DC_OUTP_FLOAT_F,
-    DC_NONE
-} BLDC_PWM_STATE_t;
-
-
 /*
  * bitfield mappings for sector (experiment, not presently used):
  *  :2 High drive
@@ -118,18 +107,6 @@ typedef uint8_t _SECTOR_PHASE_MAPPING_t ;
 // SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
 #define _SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ )
 // SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
-
-/*
- * One commutation step consists of the states of the 3 phases - condensed into 
- * a struct for easy param passing and aggregating into a table.
- */
-typedef struct /* COMM_STEP */
-{
-    BLDC_PWM_STATE_t phA;
-    BLDC_PWM_STATE_t phB;
-    BLDC_PWM_STATE_t phC;
-}
-BLDC_COMM_STEP_t;
 
 
 // commutation "sectors" (steps)
@@ -165,40 +142,9 @@ static uint16_t Vbatt;
 static uint16_t Back_EMF_15304560[4];
 
 
-
-/*
- * This table simply defines the "trapezoidal" waveform in 6-steps.
- * The underlying PWM management scheme would be introduced elsewheres.
- */
-static const BLDC_COMM_STEP_t Commutation_Steps[] =
-{
-// sector 0:
-    { DC_OUTP_HI,      DC_OUTP_LO,      DC_OUTP_FLOAT_F },
-// sector 1:
-    { DC_OUTP_HI,      DC_OUTP_FLOAT_R, DC_OUTP_LO },
-// sector 2:
-    { DC_OUTP_FLOAT_F,  DC_OUTP_HI,     DC_OUTP_LO },
-// sector 3:
-    { DC_OUTP_LO,       DC_OUTP_HI,     DC_OUTP_FLOAT_R },
-// sector 4:
-    { DC_OUTP_LO,       DC_OUTP_FLOAT_F, DC_OUTP_HI },
-// sector 5:
-    { DC_OUTP_FLOAT_R,  DC_OUTP_LO,      DC_OUTP_HI }
-};
-
-
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-
-/*
- * public accessor for the fixed table
- */
-BLDC_COMM_STEP_t Seq_Get_Step(int index)
-{
-    BLDC_COMM_STEP_t step =  Commutation_Steps[ index ];
-    return step;
-}
 
 /*
  * crude
