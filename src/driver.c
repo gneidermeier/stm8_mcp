@@ -331,6 +331,19 @@ uint16_t get_vbatt(void)
 
 
 /*
+ * BLDC Update: 
+ *  Called from ISR
+ */
+void Driver_Update(void)
+{
+    BLDC_Update();
+
+//  update the timer for the OL commutation switch time
+    TIM3_setup( get_commutation_period() );
+
+}
+
+/*
  * called from ISR
  *
 // establish error-signal ...
@@ -341,7 +354,7 @@ uint16_t get_vbatt(void)
 // ISR ends up getting blocked by the TIM3 ISR ... the BLDC_Step() takes about
 // to 40us on case 3!
  */
-void BLDC_Step(void)
+void Driver_Step(void)
 {
     const uint8_t N_CSTEPS = 6;
 

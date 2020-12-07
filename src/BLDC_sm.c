@@ -393,16 +393,13 @@ void BLDC_Update(void)
             // state-transition trigger
             set_bldc_state( BLDC_ON );
 
-            Vsystem = get_vbatt(); // "pre-load" the avergae to avoid kicking out at end of ramp1
-
-//            set_op_mode( 0 ); // Manual Mode
-//            BLDC_PWMDC_Set( PWM_DC_IDLE );
+            // set initial condition of filtered system voltage masurement
+            Vsystem = get_vbatt();
         }
         break;
     }
 
     prev_bldc_state = bldc_state ;
 
-//  update the timer for the OL commutation switch time
-    TIM3_setup( get_commutation_period() );
+//   the timer for the OL commutation switch time must be updated upon return (setup Timer 3)
 }

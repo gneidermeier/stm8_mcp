@@ -39,14 +39,12 @@
  * prototypes
  */
 
-
-void BLDC_Step(void);
-
+void Driver_Step(void);
+void Driver_Update(void);
 void Driver_Stop(void);
 
-
-//int get_op_mode(void);
-//void set_op_mode(int mode);
+void bemf_samp_start( void );
+void bemf_samp_get(void);
 
 uint16_t get_vbatt(void);
 

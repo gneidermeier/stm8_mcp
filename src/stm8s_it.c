@@ -23,14 +23,7 @@
 #include "stm8s_it.h"
 #include "parameter.h" //  app defines
 #include "driver.h"
-#include "bldc_sm.h"
 
-
-// hack, temp
-extern uint16_t  _ADC_Global;
-
-void bemf_samp_start( void );
-void bemf_samp_get(void);
 
 /** @addtogroup I2C_EEPROM
   * @{
@@ -314,7 +307,7 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 
     GPIOG->ODR |=  (1<<0); // set test pin
 
-    BLDC_Step();
+    Driver_Step();
 
     GPIOG->ODR &=  ~(1<<0); // clear test pin
 
@@ -494,7 +487,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     }
 #endif
 
-    BLDC_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context
+    Driver_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context
 
     TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
 
