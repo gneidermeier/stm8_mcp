@@ -305,14 +305,14 @@ static void comm_switch (COMMUTATION_SECTOR_t bldc_step)
 void Driver_Stop(void)
 {
 // kill the driver signals
-        PWM_PhA_Disable();
-        PWM_PhA_HB_DISABLE(0);
+    PWM_PhA_Disable();
+    PWM_PhA_HB_DISABLE(0);
 
-        PWM_PhB_Disable();
-        PWM_PhB_HB_DISABLE(0);
+    PWM_PhB_Disable();
+    PWM_PhB_HB_DISABLE(0);
 
-        PWM_PhC_Disable();
-        PWM_PhC_HB_DISABLE(0);
+    PWM_PhC_Disable();
+    PWM_PhC_HB_DISABLE(0);
 }
 
 
@@ -362,43 +362,38 @@ void Driver_Step(void)
 
     static COMMUTATION_SECTOR_t comm_step = 0;
 
-
-    if (BLDC_OFF != get_bldc_state() )
-    {
-        // grab the state of previous sector (before advancing the 6-step sequence)
-
-        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
-        BLDC_PWM_STATE_t prev_A = curr_step.phA;
-
-        int index = bldc_step_modul % TIM3_RATE_MODULUS;
+    int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
 // Note if wanting all 3 phases would need to coordinate here to set the
 // correct ADC channel to sample.
 
-        switch(index)
-        {
-        case 0:
-            Back_EMF_15304560[0] = GET_BACK_EMF_ADC( );
-            break;
-        case 1:
-            Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
-            break;
-        case 2:
-            Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
-            break;
-        case 3:
-            Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
+    switch(index)
+    {
+    case 0:
+        Back_EMF_15304560[0] = GET_BACK_EMF_ADC( );
+        break;
+    case 1:
+        Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
+        break;
+    case 2:
+        Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
+        break;
+    case 3:
+        Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
 
-            if ( DC_OUTP_FLOAT_R == prev_A )
+        memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
+
+        if (BLDC_OFF != get_bldc_state() )
+        {
+            // grab the state of previous sector (before advancing the 6-step sequence)
+            BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
+            BLDC_PWM_STATE_t prev_A = curr_step.phA;
+
+// experimental back-EMF sensing ... wip
+            if (DC_OUTP_FLOAT_F == prev_A )
             {
-            }
-            else  if (DC_OUTP_FLOAT_F == prev_A )
-            {
-// if phase-A previous sector was floating-falling transition, then the measurements are qualified by copying from the temp array 
-                memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
-// sum the pre-ZCP and post-ZCP measurements
-                Back_EMF_Falling_Int_PhX = 
-                       Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
+                // sum the pre-ZCP and post-ZCP measurements
+                Back_EMF_Falling_Int_PhX = Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
             }
             else  if (DC_OUTP_HI == prev_A)
             {
@@ -409,10 +404,9 @@ void Driver_Step(void)
             comm_switch( comm_step );
 
             comm_step = (comm_step + 1) % N_CSTEPS;
-
-            break;
         }
-
-        bldc_step_modul += 1; // can allow rollover as modulus is power of 2
+        break;
     }
+    bldc_step_modul += 1; // can allow rollover as modulus is power of 2
+
 }
