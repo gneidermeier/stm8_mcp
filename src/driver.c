@@ -12,12 +12,10 @@
 
 #include <string.h>
 
-//#include "parameter.h" // app defines
-
 #include "pwm_stm8s.h"
 #include "mdata.h" // motor timing curve
 #include "bldc_sm.h"
- #include "sequence.h"
+#include "sequence.h"
 
 /*
  * wanton abuse of globals hall of fame
@@ -93,22 +91,6 @@ extern void TIM3_setup(uint16_t u16period); // from main.c
 
 /* Private types -----------------------------------------------------------*/
 
-/*
- * bitfield mappings for sector (experiment, not presently used):
- *  :2 High drive
- *  :2 Low drive
- *  :2 Rising float transition
- *  :2 Falling float transition
- *  typedef uint_8 SECTOR_BITF_t
- */
-typedef uint8_t _SECTOR_PHASE_MAPPING_t ;
-// e.g.
-// BLDC_PHASE_t bar = PHASE_A;
-// SECTOR_PHASE_MAPPING_t foo = (SECTOR_PHASE_MAPPING_t) bar;
-#define _SECTOR( _H_ , _L_, _R_, _F_ ) ( _H_ << 6 | _L_ << 4 | _R_ << 2 | _F_ )
-// SECTOR_PHASE_MAPPING_t foo = SECTOR( _PHASE_A, _PHASE_B, _PHASE_NONE, _PHASE_C );
-
-
 // commutation "sectors" (steps)
 typedef enum /* COMMUTATION_SECTOR */
 {
@@ -145,46 +127,6 @@ static uint16_t Back_EMF_15304560[4];
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-
-/*
- * crude
- */
-static void delay(int time)
-{
-    int d;
-    for (d = 0 ; d < time; d++)
-    {
-        nop();
-    }
-}
-
-/*
- * back-EMF single-channel ADC start and polls on ADC1_FLAG_EOC end-of-conversion
- */
-static uint16_t _sample(ADC1_Channel_TypeDef adc_channel)
-{
-    uint16_t u16tmp;
-
-    ADC1_ConversionConfig(
-        ADC1_CONVERSIONMODE_SINGLE, adc_channel,  ADC1_ALIGN_RIGHT);
-
-// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
-    ADC1_Cmd(ENABLE);
-
-// ADON = 1 for the 2nd time => starts the ADC conversion of all channels in sequence
-    ADC1_StartConversion();
-
-// Wait until the conversion is done ... delay in an ISR .. blah
-
-    while ( ADC1_GetFlagStatus(ADC1_FLAG_EOC) == RESET /* 0 */ );
-//    delay(15); // check time on scope .. thia delay can probably avoid the while() ??!?
-
-    u16tmp = ADC1_GetBufferValue(adc_channel); // ADC1_GetConversionValue();
-
-    ADC1_ClearFlag(ADC1_FLAG_EOC);
-
-    return u16tmp;
-}
 
 /*
  * back-EMF single-channel start and let ISR to signal EOC
@@ -251,7 +193,7 @@ void bemf_samp_get(void)
   * This routine is getting excessively long (50us) and is quite possble to 
   * overrun the TIM1 time.for PWM pulse? That would add to jitter.
   */
-static void comm_switch (uint8_t bldc_step)
+static void comm_switch (COMMUTATION_SECTOR_t bldc_step)
 {
     static COMMUTATION_SECTOR_t prev_bldc_step = 0;
 
@@ -314,33 +256,22 @@ static void comm_switch (uint8_t bldc_step)
     if (DC_OUTP_LO == state0)
     {
 // let the Timer PWM channel remain disabled, PC2 is LO, /SD.A is ON
-//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
         PWM_PhA_OUTP_LO( 0 );
-//        GPIOC->ODR |=   (1<<5);  // set /SD A
         PWM_PhA_HB_ENABLE(1);
     }
     else if (DC_OUTP_LO == state1)
     {
 // let the Timer PWM channel remain disabled, PC3 is LO, /SD.B is ON
-//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
         PWM_PhB_OUTP_LO( 0 );
-//        GPIOC->ODR |=   (1<<7); // set  /SD B
         PWM_PhB_HB_ENABLE(1);
     }
     else if (DC_OUTP_LO == state2)
     {
 // let the Timer PWM channel remain disabled, PC4 is LO, /SD.C is ON
-//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
         PWM_PhC_OUTP_LO( 0 );
-//        GPIOG->ODR |=   (1<<1); // set /SD C
         PWM_PhC_HB_ENABLE(1);
     }
 
-/*
- * This delay waits for settling of flyback effect after the PWM transition - only needed for getting 
- * falling Back-EMF signal 
- */
-// delay( 10  );
 
     /*
      * reconfig and re-enable PWM of the driving channels. One driving channel is
@@ -350,21 +281,18 @@ static void comm_switch (uint8_t bldc_step)
     if (DC_OUTP_HI == state0)
     {
         PWM_PhA_Enable();
-//        GPIOC->ODR |=   (1<<5);  // set /SD A
         PWM_PhA_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state1)
     {
         PWM_PhB_Enable();
-//        GPIOC->ODR |=   (1<<7); // set  /SD B
         PWM_PhB_HB_ENABLE(1);
     }
 
     if (DC_OUTP_HI == state2)
     {
         PWM_PhC_Enable();
-        GPIOG->ODR |=   (1<<1); // set /SD C
         PWM_PhC_HB_ENABLE(1);
     }
 }
@@ -400,18 +328,6 @@ uint16_t get_vbatt(void)
 {
     return Vbatt;
 }
-
-#if 0
-int get_op_mode(void)
-{
-    return Manual_Mode;
-}
-
-void set_op_mode(int mode)
-{
-    Manual_Mode = mode;
-}
-#endif
 
 
 /*
@@ -485,14 +401,5 @@ void BLDC_Step(void)
         }
 
         bldc_step_modul += 1; // can allow rollover as modulus is power of 2
-    }
-    else
-    {
-        // motor drive output is not active
-        GPIOC->ODR &=  ~(1<<5); //  /SD A
-        GPIOC->ODR &=  ~(1<<7); //  /SD B
-        GPIOG->ODR &=  ~(1<<1); //  /SD C
-
-        TIM1_CtrlPWMOutputs(DISABLE);
     }
 }
