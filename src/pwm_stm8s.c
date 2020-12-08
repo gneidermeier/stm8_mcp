@@ -105,7 +105,6 @@ void dec_dutycycle(void)
  * depending upon device caps.
  */
 
-#if 1
 //           TIM2      CH 1   CH 2   CH 3
 /**
   * @brief  TIM1 PWM Disable
@@ -134,75 +133,24 @@ void PWM_PhC_Disable(void)
   * None
   * @retval void None
   */
-void PWM_PhA_Enable(uint16_t dc)
+void PWM_PhA_Enable(void)
 {
     TIM2_SetCompare1( global_uDC );               // CH2
     TIM2_CCxCmd( TIM2_CHANNEL_1, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
-void PWM_PhB_Enable(uint16_t dc)
+void PWM_PhB_Enable(void)
 {
     TIM2_SetCompare2( global_uDC );               // CH3
     TIM2_CCxCmd( TIM2_CHANNEL_2, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
-void PWM_PhC_Enable(uint16_t dc)
+void PWM_PhC_Enable(void)
 {
     TIM2_SetCompare3( global_uDC );              // CH4
     TIM2_CCxCmd( TIM2_CHANNEL_3, ENABLE );
 //    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
-#else
-//           TIM1      CH 2   CH 3   CH 4
-/**
-  * @brief  TIM1 PWM Disable
-  * @par Parameters:
-  * None
-  * @retval void None
-  */
-void PWM_PhA_Disable(void)
-{
-    TIM1_CCxCmd( TIM1_CHANNEL_2, DISABLE );
-}
-
-void PWM_PhB_Disable(void)
-{
-    TIM1_CCxCmd( TIM1_CHANNEL_3, DISABLE );
-}
-
-void PWM_PhC_Disable(void)
-{
-    TIM1_CCxCmd( TIM1_CHANNEL_4, DISABLE );
-}
-
-/**
-  * @brief  TIM1 PWM Enable and set duty-cycle
-  * @par Parameters:
-  * None
-  * @retval void None
-  */
-void PWM_PhA_Enable(void)
-{
-    TIM1_SetCompare2( global_uDC );               // CH2
-    TIM1_CCxCmd( TIM1_CHANNEL_2, ENABLE );
-    TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
-}
-
-void PWM_PhB_Enable(void)
-{
-    TIM1_SetCompare3( global_uDC );               // CH3
-    TIM1_CCxCmd( TIM1_CHANNEL_3, ENABLE );
-    TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
-}
-
-void PWM_PhC_Enable(void)
-{
-    TIM1_SetCompare4( global_uDC );              // CH4
-    TIM1_CCxCmd( TIM1_CHANNEL_4, ENABLE );
-    TIM1_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
-}
-
-#endif

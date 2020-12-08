@@ -17,7 +17,6 @@
 
 /* Public defines -----------------------------------------------------------*/
 
-#if 1
 /*
  * bleh yuk erg
  */
@@ -71,46 +70,6 @@
 #define PWM_PhC_HB_DISABLE( _ARG_ ) \
     GPIOA->ODR &=   ~(1<<5); // clr  /SD C
 
-
-#else
-
-// TIM1 PWM Chnnels ...legacy ... not maintained
-
-//        GPIOC->ODR &=  ~(1<<2);  // PC2 set LO
-
-//        GPIOC->ODR &=  ~(1<<3);  // PC3 set LO
-
-//        GPIOC->ODR &=  ~(1<<4);  // PC4 set LO
-
-/*
- * Half-bridge enables ... specific to certain pin 
- * as the device specific ... IR2104 is the /SD pin
- */
- // C5 C7 G1
-
-#define PWM_PhA_HB_ENABLE( _ARG_ ) \
-    GPIOC->ODR |=   (1<<5);  // set /SD A
-
-#define PWM_PhB_HB_ENABLE( _ARG_ ) \
-    GPIOC->ODR |=   (1<<7); // set  /SD B
-
-#define PWM_PhC_HB_ENABLE( _ARG_ ) \
-    GPIOG->ODR |=   (1<<1); // set  /SD C
-
-/*
- * Half-bridge dis-ables ... specific to certain pin 
- * as the device specific ... IR2104 is the /SD pin
- */
-#define PWM_PhA_HB_DISABLE( _ARG_ ) \
-    GPIOC->ODR &=   ~(1<<5);  // clr /SD A
-
-#define PWM_PhB_HB_DISABLE( _ARG_ ) \
-    GPIOC->ODR &=   ~(1<<7); // clr  /SD B
-
-#define PWM_PhC_HB_DISABLE( _ARG_ ) \
-    GPIOG->ODR &=   ~(1<<1); // clr  /SD C
-
-#endif                                           ////// TIM 1
 
 
 /* Public types -----------------------------------------------------------*/
