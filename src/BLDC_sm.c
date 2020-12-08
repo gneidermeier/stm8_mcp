@@ -12,7 +12,8 @@
 
 #include "bldc_sm.h"
 #include "mdata.h"
-#include "pwm_stm8s" // motor phase control
+#include "pwm_stm8s.h" // motor phase control
+#include "sequence.h"
 
 //extern uint8_t Log_Level; 
 #include "per_task.h"  // global log-level
