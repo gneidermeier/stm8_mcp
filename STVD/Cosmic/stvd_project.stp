@@ -554,6 +554,11 @@ Next=Root.Source Files...\..\src\mdata.c
 [Root.Source Files...\..\src\mdata.c]
 ElemType=File
 PathName=..\..\src\mdata.c
+Next=Root.Source Files...\..\src\per_task.c
+
+[Root.Source Files...\..\src\per_task.c]
+ElemType=File
+PathName=..\..\src\per_task.c
 Next=Root.Source Files...\..\src\pwm_stm8s.c
 
 [Root.Source Files...\..\src\pwm_stm8s.c]
@@ -671,6 +676,11 @@ Next=Root.Include Files...\..\inc\parameter.h
 [Root.Include Files...\..\inc\parameter.h]
 ElemType=File
 PathName=..\..\inc\parameter.h
+Next=Root.Include Files...\..\inc\per_task.h
+
+[Root.Include Files...\..\inc\per_task.h]
+ElemType=File
+PathName=..\..\inc\per_task.h
 Next=Root.Include Files...\..\inc\pwm_stm8s.h
 
 [Root.Include Files...\..\inc\pwm_stm8s.h]
