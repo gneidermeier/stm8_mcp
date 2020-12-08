@@ -116,10 +116,9 @@ uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 /* Private variables ---------------------------------------------------------*/
 
+/* Vbatt is in this module because the measurement has to be timed to the 
+ * PWM/commutation sequence */
 static uint16_t Vbatt;
-
-
-//static int Manual_Mode; // test flag to indicate if manual control override toggled
 
 static uint16_t Back_EMF_15304560[4];
 
@@ -135,11 +134,9 @@ static uint16_t Back_EMF_15304560[4];
  * Noted AN2658 "sampling time is not customizable and
  * depends on the ADC clock (3 ADC clocks)"
  */
-uint16_t bemf_samp_start( void )
+void bemf_samp_start( void )
 {
     const ADC1_Channel_TypeDef ADC1_ChannelX = ADC1_CHANNEL_3; // ADC1_CHANNEL_0; // only phase A
-
-    uint16_t u16tmp;
 
     ADC1_ConversionConfig(
         ADC1_CONVERSIONMODE_SINGLE, ADC1_ChannelX, ADC1_ALIGN_RIGHT);
@@ -149,8 +146,6 @@ uint16_t bemf_samp_start( void )
 
 // ADON = 1 for the 2nd time => starts the ADC conversion
     ADC1_StartConversion();
-
-    return u16tmp;
 }
 
 /*
