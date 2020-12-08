@@ -57,14 +57,10 @@
 
 void Driver_Step(void);
 void Driver_Update(void);
-void Driver_Stop(void);
-
 uint16_t Driver_Get_ADC(void);
 
 void bemf_samp_start( void );
 void bemf_samp_get(void);
-
-uint16_t get_vbatt(void);
 
 
 #endif // DRIVER_H

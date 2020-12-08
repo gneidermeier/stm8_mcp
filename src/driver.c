@@ -12,16 +12,9 @@
 
 #include <string.h>
 
-#include "pwm_stm8s.h"
+#include "mcu_stm8s.h"
 #include "bldc_sm.h"
 #include "sequence.h"
-
-#include "driver.h" // internal declarations
-
-/*
- * wanton abuse of globals hall of fame
- */
-extern void TIM3_setup(uint16_t u16period); // from main.c
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -118,21 +111,6 @@ uint16_t Driver_Get_ADC(void)
     return ADC_Global;
 }
 
-/*
- * low-level stop: turns off all PWM
- */
-void Driver_Stop(void)
-{
-// kill the driver signals
-    PWM_PhA_Disable();
-    PWM_PhA_HB_DISABLE(0);
-
-    PWM_PhB_Disable();
-    PWM_PhB_HB_DISABLE(0);
-
-    PWM_PhC_Disable();
-    PWM_PhC_HB_DISABLE(0);
-}
 
 
 /*

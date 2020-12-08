@@ -34,6 +34,8 @@
 // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
 #include <stm8s.h>
 
+#include "pwm_stm8s.h" // externalized macros used internally
+
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -66,6 +68,23 @@ static uint16_t global_uDC;
 /* Private functions ---------------------------------------------------------*/
 
 /* Public functions ---------------------------------------------------------*/
+
+/*
+ * low-level stop: turns off all PWM
+ */
+void All_phase_stop(void)
+{
+// kill the driver signals
+    PWM_PhA_Disable();
+    PWM_PhA_HB_DISABLE(0);
+
+    PWM_PhB_Disable();
+    PWM_PhB_HB_DISABLE(0);
+
+    PWM_PhC_Disable();
+    PWM_PhC_HB_DISABLE(0);
+}
+
 
 void set_dutycycle(uint16_t global_dutycycle)
 {

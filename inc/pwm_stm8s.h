@@ -79,6 +79,9 @@
 
 
 /* Public function prototypes -----------------------------------------------*/
+
+void All_phase_stop(void);
+
 void PWM_PhA_Disable(void);
 void PWM_PhB_Disable(void);
 void PWM_PhC_Disable(void);

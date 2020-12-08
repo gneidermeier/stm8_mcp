@@ -12,16 +12,10 @@
 
 #include "bldc_sm.h"
 #include "mdata.h"
-#include "driver.h" // Driver_Stop
-#include "sequence.h"
+#include "pwm_stm8s" // motor phase control
 
-//#include "pwm_stm8s.h" // ng .. pulls in stm8 specific crap
-extern void set_dutycycle(uint16_t);
-extern uint16_t get_dutycycle(void);
-
-extern void TIM3_setup(uint16_t u16period); // from main.c
-
-extern uint8_t Log_Level; // global log-level
+//extern uint8_t Log_Level; 
+#include "per_task.h"  // global log-level
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -90,6 +84,7 @@ extern uint8_t Log_Level; // global log-level
 
 /* Public variables  ---------------------------------------------------------*/
 
+//static  tmp
 uint16_t Vsystem;
 
 
@@ -149,19 +144,13 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 
 /* Public functions ---------------------------------------------------------*/
 
-void inc_dutycycle(void); // tmp
-void dec_dutycycle(void); // tmp
-
-extern uart_print( char * sbuf ); // tmp
-
-
 /*
  * low-level stop: turns off all PWM
  */
 void BLDC_Stop(void)
 {
 // kill the driver signals
-    Driver_Stop();
+    All_phase_stop();
 
     set_bldc_state( BLDC_OFF );
 
