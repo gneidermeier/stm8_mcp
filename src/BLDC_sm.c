@@ -12,7 +12,8 @@
 
 #include "bldc_sm.h"
 #include "mdata.h"
-#include "driver.h"
+#include "driver.h" // Driver_Stop
+#include "sequence.h"
 
 //#include "pwm_stm8s.h" // ng .. pulls in stm8 specific crap
 extern void set_dutycycle(uint16_t);
@@ -337,7 +338,7 @@ void BLDC_Update(void)
 
     case BLDC_ON:
         // do ON stuff
-        Vsystem = get_vbatt() / 2 + Vsystem / 2; // sma
+        Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
         if ( fault_arming_time  > 0 )
         {
@@ -394,7 +395,7 @@ void BLDC_Update(void)
             set_bldc_state( BLDC_ON );
 
             // set initial condition of filtered system voltage masurement
-            Vsystem = get_vbatt();
+            Vsystem = Seq_Get_Vbatt();
         }
         break;
     }
