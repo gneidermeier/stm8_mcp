@@ -544,6 +544,11 @@ Next=Root.Source Files...\..\src\main.c
 [Root.Source Files...\..\src\main.c]
 ElemType=File
 PathName=..\..\src\main.c
+Next=Root.Source Files...\..\src\mcu_stm8s.c
+
+[Root.Source Files...\..\src\mcu_stm8s.c]
+ElemType=File
+PathName=..\..\src\mcu_stm8s.c
 Next=Root.Source Files...\..\src\mdata.c
 
 [Root.Source Files...\..\src\mdata.c]
@@ -651,6 +656,11 @@ Next=Root.Include Files...\..\inc\driver.h
 [Root.Include Files...\..\inc\driver.h]
 ElemType=File
 PathName=..\..\inc\driver.h
+Next=Root.Include Files...\..\inc\mcu_stm8s.h
+
+[Root.Include Files...\..\inc\mcu_stm8s.h]
+ElemType=File
+PathName=..\..\inc\mcu_stm8s.h
 Next=Root.Include Files...\..\inc\mdata.h
 
 [Root.Include Files...\..\inc\mdata.h]
