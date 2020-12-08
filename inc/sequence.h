@@ -12,8 +12,8 @@
   * <h2><center>&copy; COPYRIGHT 2112 asdf</center></h2>
   ******************************************************************************
   */
-#ifndef CSWITCH_H
-#define CSWITCH_H
+#ifndef SEQUENCE_H
+#define SEQUENCE_H
 
 //#ifndef UNIT_TEST // is it broken?
   #include "system.h"
@@ -62,5 +62,6 @@ BLDC_COMM_STEP_t;
 
 BLDC_COMM_STEP_t Seq_Get_Step(int index);
 
+uint16_t Seq_Get_Vbatt(void);
 
-#endif // DRIVER_H
+#endif // SEQUENCE_H

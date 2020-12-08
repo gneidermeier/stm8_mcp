@@ -1,26 +1,24 @@
 /**
   ******************************************************************************
-  * @file driver.c
+  * @file sequence.c
   * @brief support functions for the BLDC motor control
   * @author Neidermeier
   * @version
-  * @date March-2020
+  * @date December-2020
   ******************************************************************************
   */
 
 /* Includes ------------------------------------------------------------------*/
 
-//#include <string.h>
-
-//#include "parameter.h" // app defines
-
 //#include "pwm_stm8s.h"
-//#include "driver.h"
+//#include "driver.h" // low level driver definitions
 //#include "bldc_sm.h"
 
-
-
 #include "sequence.h" // exported types referenced internally
+
+
+// tmp
+extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -39,6 +37,9 @@
 
 
 /* Private variables  ---------------------------------------------------------*/
+
+static uint16_t Vbatt;
+
 
 /*
  * This table simply defines the "trapezoidal" waveform in 6-steps.
@@ -76,5 +77,15 @@ BLDC_COMM_STEP_t Seq_Get_Step(int index)
 {
     BLDC_COMM_STEP_t step =  Commutation_Steps[ index ];
     return step;
+}
+
+/*
+ * public accessor for the system voltage measurement
+ * Vbatt is in this module because the measurement has to be timed to the 
+ * PWM/commutation sequence
+ */
+uint16_t Seq_Get_Vbatt(void)
+{
+    return Vbatt;
 }
 
