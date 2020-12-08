@@ -51,6 +51,17 @@ typedef struct /* COMM_STEP */
 }
 BLDC_COMM_STEP_t;
 
+
+// commutation "sectors" (steps)
+typedef enum /* COMMUTATION_SECTOR */
+{
+    SECTOR_1,
+    SECTOR_2,
+    SECTOR_3,
+    SECTOR_4,
+    SECTOR_5,
+    SECTOR_6
+} COMMUTATION_SECTOR_t;
 /*
  * variables
  */
@@ -63,5 +74,8 @@ BLDC_COMM_STEP_t;
 BLDC_COMM_STEP_t Seq_Get_Step(int index);
 
 uint16_t Seq_Get_Vbatt(void);
+
+void Sequence_Step(void);
+
 
 #endif // SEQUENCE_H

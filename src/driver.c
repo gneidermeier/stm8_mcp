@@ -89,19 +89,6 @@ extern void TIM3_setup(uint16_t u16period); // from main.c
 
 /* Private types -----------------------------------------------------------*/
 
-// commutation "sectors" (steps)
-typedef enum /* COMMUTATION_SECTOR */
-{
-    SECTOR_1,
-    SECTOR_2,
-    SECTOR_3,
-    SECTOR_4,
-    SECTOR_5,
-    SECTOR_6
-} COMMUTATION_SECTOR_t;
-
-
-
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -360,11 +347,7 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
-    const uint8_t N_CSTEPS = 6;
-
     static uint8_t bldc_step_modul; // internal counter for sub-dividing the TIM3 period
-
-    static COMMUTATION_SECTOR_t comm_step = 0;
 
     int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
@@ -387,30 +370,48 @@ void Driver_Step(void)
 
         memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
 
-        if (BLDC_OFF != get_bldc_state() )
-        {
-            // grab the state of previous sector (before advancing the 6-step sequence)
-            BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
-            BLDC_PWM_STATE_t prev_A = curr_step.phA;
+        Sequence_Step();
 
-// experimental back-EMF sensing ... wip
-            if (DC_OUTP_FLOAT_F == prev_A )
-            {
-                // sum the pre-ZCP and post-ZCP measurements
-                Back_EMF_Falling_Int_PhX = Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
-            }
-            else  if (DC_OUTP_HI == prev_A)
-            {
-                // if phase was driven pwm, then use the measurement as vbat
-                Vbatt = Driver_Get_ADC();
-            }
-
-            comm_switch( comm_step );
-
-            comm_step = (comm_step + 1) % N_CSTEPS;
-        }
         break;
     }
     bldc_step_modul += 1; // can allow rollover as modulus is power of 2
-
 }
+
+/*
+ * high-level handler for commutation-step sequence
+ */
+void Sequence_Step(void)
+{
+    const uint8_t N_CSTEPS = 6;
+
+    static COMMUTATION_SECTOR_t comm_step = 0;
+
+    if (BLDC_OFF != get_bldc_state() )
+    {
+        // grab the state of previous sector (before advancing the 6-step sequence)
+        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
+        BLDC_PWM_STATE_t prev_A = curr_step.phA;
+
+
+        if (DC_OUTP_FLOAT_F == prev_A )
+        {
+// if phase-A previous sector was floating-falling transition, then the measurements are qualified by copying from the temp array
+
+// sum the pre-ZCP and post-ZCP measurements
+            Back_EMF_Falling_Int_PhX =
+                Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
+        }
+
+        if (DC_OUTP_HI == prev_A)
+        {
+            // if phase was driven pwm, then use the measurement as vbat
+            Vbatt = Driver_Get_ADC();
+        }
+
+        comm_switch( comm_step );
+
+        comm_step = (comm_step + 1) % N_CSTEPS;
+    }
+}
+
+
