@@ -15,10 +15,26 @@
 #ifndef DRIVER_H
 #define DRIVER_H
 
-//#ifndef UNIT_TEST // is it broken?
-  #include "system.h"
-//#endif
+/* Includes ------------------------------------------------------------------*/
 
+#include "stm8s.h"
+
+
+/* Private defines -----------------------------------------------------------*/
+
+// divider: 33k/18k
+//  18/(18+33)=0.35
+// 0.35 * 14.1v = 4.98
+// 4.98 / 2 = 2.48v ........... 1/2 Vdc in proportion to the resister divider
+//  2.48v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
+//   x = 1024 * 2.48/5 = 509   (0x01FD)
+#define DC_HALF_REF         0x01FD
+
+//#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
+#define V_SHUTDOWN_THR      0x02c0
+
+
+/* Private types -----------------------------------------------------------*/
 
 /*
  * defines
@@ -42,6 +58,8 @@
 void Driver_Step(void);
 void Driver_Update(void);
 void Driver_Stop(void);
+
+uint16_t Driver_Get_ADC(void);
 
 void bemf_samp_start( void );
 void bemf_samp_get(void);

@@ -17,6 +17,8 @@
 #include "bldc_sm.h"
 #include "sequence.h"
 
+#include "driver.h" // internal declarations
+
 /*
  * wanton abuse of globals hall of fame
  */
@@ -33,13 +35,9 @@ extern void TIM3_setup(uint16_t u16period); // from main.c
 //   x = 1024 * 2.48/5 = 509   (0x01FD)
 #define DC_HALF_REF         0x01FD 
 
-//#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
-#define V_SHUTDOWN_THR      0x02c0
-
 #define GET_BACK_EMF_ADC( ) \
-    ( _ADC_Global - DC_HALF_REF )
+    ( ADC_Global - DC_HALF_REF )
 
-#define GET_ADC() _ADC_Global // bah
 
 #define PWM_0PCNT      0
 
@@ -107,14 +105,16 @@ typedef enum /* COMMUTATION_SECTOR */
 
 /* Public variables  ---------------------------------------------------------*/
 
-uint16_t _ADC_Global;
 
 int Back_EMF_Falling_Int_PhX; // take whatever the favored (widest) machine signed int happens to be ...
                               // todo: stms8.h has  typedef   signed long     int32_t; 
 
 uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
+
 /* Private variables ---------------------------------------------------------*/
+
+static uint16_t ADC_Global;
 
 /* Vbatt is in this module because the measurement has to be timed to the 
  * PWM/commutation sequence */
@@ -154,7 +154,16 @@ void bemf_samp_start( void )
  */
 void bemf_samp_get(void)
 {
-    _ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 ); // ADC1_GetConversionValue();
+    ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 ); // ADC1_GetConversionValue();
+}
+
+
+/*
+ * need to define an interface to the ADC sample/conversion service
+ */
+uint16_t Driver_Get_ADC(void)
+{
+    return ADC_Global;
 }
 
 
@@ -393,7 +402,7 @@ void Driver_Step(void)
             else  if (DC_OUTP_HI == prev_A)
             {
                 // if phase was driven pwm, then use the measurement as vbat
-                Vbatt = GET_ADC();
+                Vbatt = Driver_Get_ADC();
             }
 
             comm_switch( comm_step );
