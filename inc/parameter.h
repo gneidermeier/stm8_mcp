@@ -15,12 +15,11 @@
 #ifndef PARAMETER_H
 #define PARAMETER_H
 
+/*
+ * this header file is basically deprecated in the project
+ */
 #include "system.h" // platform specific declarations
 
-
-extern uint8_t TaskRdy;     // flag for background task to sync w/ timer refrence
-
-extern uint8_t Log_Level;   // global log-level
-
+#include "per_task.h" // Task Ready ... tmp .. stm8s_it.c should include this itself
 
 #endif // PARAMETER_H

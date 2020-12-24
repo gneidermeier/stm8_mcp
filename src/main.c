@@ -9,7 +9,6 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include <string.h>
 
 // app headers
 #include "mcu_stm8s.h"
@@ -26,7 +25,6 @@ main()
     MCU_Init();
 
     BLDC_Stop();
-    Log_Level = 0;
 
     enableInterrupts(); // interrupts are globally disabled by default
 

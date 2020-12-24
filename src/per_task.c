@@ -15,7 +15,6 @@
 #include "system.h" // platform specific delarations
 #include "mcu_stm8s.h"
 
-// what? no globals ... inconceivable
 #include "bldc_sm.h"
 #include "pwm_stm8s.h"
 
@@ -26,12 +25,15 @@
 /* Public variables  ---------------------------------------------------------*/
 
 //static tmp
-int TaskRdy;           // flag for timer interrupt for BG task timing
+uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
+                  // use 8-bit (atomic) so no concurrency concern
 
-uint8_t Log_Level;         // global log-level
 
 
 /* Private variables ---------------------------------------------------------*/
+
+static uint8_t Log_Level;
+
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -109,7 +111,7 @@ extern uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a 
 void testUART(void)
 {
     static uint16_t Line_Count = 0;
-	
+
     char sbuf[256] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
@@ -153,7 +155,7 @@ void testUART(void)
 
     strcat(sbuf, " 003=");
     itoa( Back_EMF_Falling_4[3],     cbuf, 16);
-    strcat(sbuf, cbuf);	
+    strcat(sbuf, cbuf);
 #endif
 
 #if 1
@@ -173,25 +175,25 @@ void testUART(void)
  */
 void Periodic_task(void)
 {
-    static int Fault = 0;
-    static int manual_mode_start = 0;
-
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
     char key;
 
-
+#if 0
 //   svc a UI potentiometer
     UI_Speed = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
     UI_Speed /= 16; // use [ 0: 63 ]
-#if 0
+
     if (0 == manual_mode_start )
     {
 // was NOT started in dev/test mode, so go ahead and use "UI" (servo-pulse?) input
 
-        if (0 == Fault){
-            BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON 
-        } else {
+        if (0 == Fault)
+        {
+            BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON
+        }
+        else
+        {
             BLDC_PWMDC_Set(0);
         }
     }
@@ -212,47 +214,40 @@ void Periodic_task(void)
         testUART();// tmp test
     }
 
-    if (SerialKeyPressed((char*)&key))
+    if (SerialKeyPressed(&key))
     {
-        if (key == '+')
+        if (key == ' ') // space character
         {
+            // disable/enable interrupts is done to protect against concurrent access from ISR
             disableInterrupts();
-            manual_mode_start = 1; // flag this op as a manual mode cycle
+            BLDC_Stop();
+            enableInterrupts();
+            UARTputs("###\r\n");
+
+            Log_Level = 0;
+        }
+        else if (key == '+')
+        {
+            // disable/enable interrupts is done to protect against concurrent access from ISR
+            disableInterrupts();
             BLDC_PWMDC_Plus();
             enableInterrupts();
             UARTputs("+++\r\n");
 
-           Log_Level = 255;// enable continous/verbous log
+            Log_Level = 255;// enable continous/verbous log
 
         }
         else if (key == '-')
         {
+            // disable/enable interrupts is done to protect against concurrent access from ISR
             disableInterrupts();
-            manual_mode_start = 1; // flag this op as a manual mode cycle
             BLDC_PWMDC_Minus();
             enableInterrupts();
             UARTputs("---\r\n");
         }
-//BLDC_Stop
-        else if (key == ' ')
-        {
-           Fault = 1; // hack
-            disableInterrupts();
-            manual_mode_start = 0; // clear manual mode cycle flag
-            BLDC_Stop();
-            enableInterrupts();
-            UARTputs("###\r\n");
-        }
-        else if (key >= '0' && key <= '9' )
-        {
-            uint16_t nn = (unsigned int)key;
-            nn = (nn * 250) / 10; 
-            BLDC_PWMDC_Set(nn);
-        }
         else // anykey
         {
             Log_Level = 5; // show some info
-            Fault = 0;
         }
 
         itoa(UI_Speed, cbuf, 16);
@@ -263,14 +258,13 @@ void Periodic_task(void)
 }
 
 /*
- * retrieve status of global flag set by ISR 
+ * retrieve status of global flag set by ISR
  */
- int Task_Ready(void)
- {
-	 if (0 != TaskRdy)
-	 {
-		 Periodic_task();
-	 }
-	  return TaskRdy;
- }
- 
+uint8_t Task_Ready(void)
+{
+    if (0 != TaskRdy)
+    {
+        Periodic_task();
+    }
+    return TaskRdy;
+}

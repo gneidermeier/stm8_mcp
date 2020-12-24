@@ -15,9 +15,6 @@
 #include "pwm_stm8s.h" // motor phase control
 #include "sequence.h"
 
-//extern uint8_t Log_Level; 
-#include "per_task.h"  // global log-level
-
 /* Private defines -----------------------------------------------------------*/
 
 //#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
@@ -154,9 +151,6 @@ void BLDC_Stop(void)
     All_phase_stop();
 
     set_bldc_state( BLDC_OFF );
-
-    Log_Level = 0; // global log-level
-
 }
 
 /*
@@ -166,11 +160,10 @@ uint16_t BLDC_PWMDC_Plus()
 {
     if ( BLDC_OFF == get_bldc_state() )
     {
-//        uart_print( "OFF->RAMP-\r\n");
-        set_bldc_state(  BLDC_RAMPUP );
+        set_bldc_state( BLDC_RAMPUP );
         return 0;
     }
-    else if (BLDC_ON == get_bldc_state() )
+    else if ( BLDC_ON == get_bldc_state() )
     {
 //if (DC < PWM_DC_RAMPUP)
         inc_dutycycle();
@@ -214,16 +207,12 @@ void BLDC_Spd_dec()
     if ( BLDC_OFF == get_bldc_state() )
     {
         set_bldc_state( BLDC_RAMPUP );
-//        uart_print( "OFF->RAMP-\r\n");
     }
 
     if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm < 0xFFFF */)
     {
-//        set_op_mode(1);
         BLDC_OL_comm_tm += 1; // slower
     }
-
-//    Log_Level = 255;// enable continous/verbous log
 #endif
 }
 
@@ -233,20 +222,13 @@ void BLDC_Spd_dec()
 void BLDC_Spd_inc()
 {
 #if 1 // #ifdef DEBUG
-//    Log_Level = 1; // default on INC button is just print one line
-
     if ( BLDC_OFF == get_bldc_state() )
     {
         set_bldc_state( BLDC_RAMPUP );
-        // BLDC_OL_comm_tm ... init in OFF state to _OL_TM_LO_SPD, don't touch!
-
-//        uart_print( "OFF->RAMP+\r\n");
-//        Log_Level = 0xFF; // log enuff output to span the startup (logger is slow, doesn't take that many)
     }
 
     if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
     {
-//        set_op_mode(1);
         BLDC_OL_comm_tm -= 1; // faster
     }
 #endif
