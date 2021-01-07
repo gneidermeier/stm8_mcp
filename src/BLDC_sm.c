@@ -165,8 +165,7 @@ uint16_t BLDC_PWMDC_Plus()
     }
     else if ( BLDC_ON == get_bldc_state() )
     {
-//if (DC < PWM_DC_RAMPUP)
-        inc_dutycycle();
+        Commanded_Dutycycle += 1;
     }
     return 0;
 }
@@ -184,8 +183,7 @@ uint16_t BLDC_PWMDC_Minus()
     }
     else if ( BLDC_ON == get_bldc_state() )
     {
-// if (DC > PWM_20PCNT)
-        dec_dutycycle();
+        Commanded_Dutycycle -= 1;
     }
     return 0;
 }
@@ -251,11 +249,12 @@ uint16_t get_commutation_period(void)
     return BLDC_OL_comm_tm;
 }
 
+// BLDC_get_state()
 BLDC_STATE_T get_bldc_state(void)
 {
     return BLDC_State;
 }
-
+// BLDC_set_state( state )
 BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
 {
     BLDC_State = newstate;
@@ -297,6 +296,9 @@ void BLDC_Update(void)
     {
     default:
     case BLDC_OFF:
+
+        Commanded_Dutycycle = 0;
+
         // reset commutation timer and ramp-up counters ready for ramp-up
         set_commutation_period( BLDC_OL_TM_LO_SPD );
 
@@ -355,11 +357,10 @@ void BLDC_Update(void)
 
     case BLDC_RAMPUP:
 
-        if (BLDC_RAMPUP != prev_bldc_state)
-        {
-            // set the ramp DC upon transition into ramp state
-            set_dutycycle( PWM_DC_RAMPUP );
-        }
+        Commanded_Dutycycle = PWM_DC_RAMPUP;
+
+        // set the ramp DC upon transition into ramp state ^H^H^H^H^H^H^H^H....
+        set_dutycycle( PWM_DC_RAMPUP );
 
         itemp = timing_ramp_control(
             Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
@@ -377,5 +378,5 @@ void BLDC_Update(void)
 
     prev_bldc_state = bldc_state ;
 
-//   the timer for the OL commutation switch time must be updated upon return (setup Timer 3)
+    set_dutycycle( Commanded_Dutycycle );
 }
