@@ -63,6 +63,8 @@ uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 /* Private variables ---------------------------------------------------------*/
 
+static uint16_t Vbatt;
+
 static uint16_t ADC_Global;
 
 static uint16_t Back_EMF_15304560[4];
@@ -104,6 +106,16 @@ void bemf_samp_get(void)
 
 
 /*
+ * public accessor for the system voltage measurement
+ * Vbatt is in this module because the measurement has to be timed to the 
+ * PWM/commutation sequence
+ */
+uint16_t Driver_Get_Vbatt(void)
+{
+    return Vbatt;
+}
+
+/*
  * need to define an interface to the ADC sample/conversion service
  */
 uint16_t Driver_Get_ADC(void)
@@ -141,6 +153,7 @@ void Driver_Step(void)
 {
     static uint8_t bldc_step_modul; // internal counter for sub-dividing the TIM3 period
 
+    uint16_t tmp16;
     int index = bldc_step_modul % TIM3_RATE_MODULUS;
 
 // Note if wanting all 3 phases would need to coordinate here to set the
@@ -161,6 +174,15 @@ void Driver_Step(void)
         Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
 
         memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
+
+//        if (DC_OUTP_HI == prev_A)
+// if sample is greater than 1/2 Vbat, then logically the phase was driven so use it as vbat
+        tmp16 = Driver_Get_ADC();
+        if (tmp16 > 0x0200)
+        {
+            // if phase was driven pwm, then use the measurement as vbat
+            Vbatt = Driver_Get_ADC();
+        }
 
         Sequence_Step();
 

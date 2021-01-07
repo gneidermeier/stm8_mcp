@@ -40,7 +40,6 @@ int Back_EMF_Falling_Int_PhX;
 
 /* Private variables  ---------------------------------------------------------*/
 
-static uint16_t Vbatt;
 
 
 /*
@@ -75,20 +74,12 @@ static const BLDC_COMM_STEP_t Commutation_Steps[] =
 /*
  * public accessor for the fixed table
  */
-BLDC_COMM_STEP_t Seq_Get_Step(int index)
+BLDC_COMM_STEP_t Seq_Get_Step( COMMUTATION_SECTOR_t sec )
 {
+    int index = (int) sec;
+
     BLDC_COMM_STEP_t step =  Commutation_Steps[ index ];
     return step;
-}
-
-/*
- * public accessor for the system voltage measurement
- * Vbatt is in this module because the measurement has to be timed to the 
- * PWM/commutation sequence
- */
-uint16_t Seq_Get_Vbatt(void)
-{
-    return Vbatt;
 }
 
 
@@ -234,6 +225,7 @@ void Sequence_Step(void)
 
     static COMMUTATION_SECTOR_t comm_step = 0;
 
+// motor freewheels when switch to off
     if (BLDC_OFF != get_bldc_state() )
     {
         // grab the state of previous sector (before advancing the 6-step sequence)
@@ -250,11 +242,6 @@ void Sequence_Step(void)
                 Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
         }
 
-        if (DC_OUTP_HI == prev_A)
-        {
-            // if phase was driven pwm, then use the measurement as vbat
-            Vbatt = Driver_Get_ADC();
-        }
 
         comm_switch( comm_step );
 

@@ -13,12 +13,12 @@
 #include "bldc_sm.h"
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
-#include "sequence.h"
+#include "driver.h"
 
 /* Private defines -----------------------------------------------------------*/
 
 //#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
-#define V_SHUTDOWN_THR      0x02c0
+#define V_SHUTDOWN_THR      0x0230 // tmp .. problems syncing the  phase    voltage measuremeht with PWM on-sector  ?
 
 
 #define PWM_0PCNT      0
@@ -310,7 +310,8 @@ void BLDC_Update(void)
 
     case BLDC_ON:
         // do ON stuff
-        Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
+        Vsystem = Driver_Get_Vbatt() / 2 + Vsystem / 2; // sma
+
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
         if ( fault_arming_time  > 0 )
         {
@@ -338,8 +339,10 @@ void BLDC_Update(void)
 // finally, check if fault is set
             if (0 == vsys_fault_bucket)
             {
+#if 1 // #if ENABLE_VLOW_FAULT
                 // 0 DC safely stops the motor, user must still press STOP to cycle the program.
                 set_dutycycle( PWM_0PCNT );
+#endif
             }
         }
 
@@ -367,7 +370,7 @@ void BLDC_Update(void)
             set_bldc_state( BLDC_ON );
 
             // set initial condition of filtered system voltage masurement
-            Vsystem = Seq_Get_Vbatt();
+            Vsystem = 0x0400;
         }
         break;
     }

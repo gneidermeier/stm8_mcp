@@ -30,8 +30,6 @@
 //   x = 1024 * 2.48/5 = 509   (0x01FD)
 #define DC_HALF_REF         0x01FD
 
-//#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
-#define V_SHUTDOWN_THR      0x02c0
 
 
 /* Private types -----------------------------------------------------------*/
@@ -58,6 +56,7 @@
 void Driver_Step(void);
 void Driver_Update(void);
 uint16_t Driver_Get_ADC(void);
+uint16_t Driver_Get_Vbatt(void);
 
 void bemf_samp_start( void );
 void bemf_samp_get(void);

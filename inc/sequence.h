@@ -71,9 +71,7 @@ typedef enum /* COMMUTATION_SECTOR */
  * prototypes
  */
 
-BLDC_COMM_STEP_t Seq_Get_Step(int index);
-
-uint16_t Seq_Get_Vbatt(void);
+BLDC_COMM_STEP_t Seq_Get_Step( COMMUTATION_SECTOR_t index );
 
 void Sequence_Step(void);
 
