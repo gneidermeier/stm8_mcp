@@ -11,6 +11,7 @@
 /* Includes ------------------------------------------------------------------*/
 
 #include "pwm_stm8s.h"
+#include "driver.h"
 
 #include "sequence.h" // exported types referenced internally
 
@@ -37,6 +38,8 @@ int Back_EMF_Falling_Int_PhX;
 
 
 /* Private variables  ---------------------------------------------------------*/
+
+static uint16_t Vbatt_;
 
 static COMMUTATION_SECTOR_t Sequence_step;
 
@@ -78,6 +81,16 @@ BLDC_COMM_STEP_t Seq_Get_Step( COMMUTATION_SECTOR_t sec )
 
     BLDC_COMM_STEP_t step =  Commutation_Steps[ index ];
     return step;
+}
+
+/*
+ * public accessor for the system voltage measurement
+ * Vbatt is in this module because the measurement has to be timed to the 
+ * PWM/commutation sequence
+ */
+uint16_t Seq_Get_Vbatt(void)
+{
+    return Vbatt_;
 }
 
 
@@ -234,7 +247,13 @@ void Sequence_Step(void)
             Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
     }
 
-    comm_switch( Sequence_step );
+    if (DC_OUTP_HI == prev_A)
+    {
+        // if phase was driven pwm, then use the measurement as vbat
+        Vbatt_ = Driver_Get_Vbatt();
+    }
 
     Sequence_step = (Sequence_step + 1) % N_CSTEPS;
+
+    comm_switch( Sequence_step );
 }
