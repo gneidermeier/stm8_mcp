@@ -40,7 +40,7 @@ int Back_EMF_Falling_Int_PhX;
 
 /* Private variables  ---------------------------------------------------------*/
 
-
+static COMMUTATION_SECTOR_t Sequence_step;
 
 /*
  * This table simply defines the "trapezoidal" waveform in 6-steps.
@@ -223,13 +223,11 @@ void Sequence_Step(void)
 {
     const uint8_t N_CSTEPS = 6;
 
-    static COMMUTATION_SECTOR_t comm_step = 0;
-
 // motor freewheels when switch to off
     if (BLDC_OFF != get_bldc_state() )
     {
         // grab the state of previous sector (before advancing the 6-step sequence)
-        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( comm_step );
+        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( Sequence_step );
         BLDC_PWM_STATE_t prev_A = curr_step.phA;
 
 
@@ -243,8 +241,8 @@ void Sequence_Step(void)
         }
 
 
-        comm_switch( comm_step );
+        comm_switch( Sequence_step );
 
-        comm_step = (comm_step + 1) % N_CSTEPS;
+        Sequence_step = (Sequence_step + 1) % N_CSTEPS;
     }
 }
