@@ -178,14 +178,9 @@ void Driver_Step(void)
 
         memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
 
-//        if (DC_OUTP_HI == prev_A)
-// if sample is greater than 1/2 Vbat, then logically the phase was driven so use it as vbat
-        tmp16 = Driver_Get_ADC();
-        if (tmp16 > 0x0200)
-        {
-            // if phase was driven pwm, then use the measurement as vbat
-            Vbatt = Driver_Get_ADC();
-        }
+// using sample at 60-degrees by convention ... the sequencer will have to further qualify 
+// the measurement (by determingin that the bldc state was "ON" and not off or floating
+        Vbatt  = Driver_Get_ADC();
 
 // motor freewheels when switch to off
         if (BLDC_OFF != get_bldc_state() )
