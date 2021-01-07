@@ -11,8 +11,6 @@
 /* Includes ------------------------------------------------------------------*/
 
 #include "pwm_stm8s.h"
-#include "driver.h" // low level driver definitions
-#include "bldc_sm.h"
 
 #include "sequence.h" // exported types referenced internally
 
@@ -35,7 +33,7 @@ extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 /* Public variables  ---------------------------------------------------------*/
 
-int Back_EMF_Falling_Int_PhX; 
+int Back_EMF_Falling_Int_PhX;
 
 
 /* Private variables  ---------------------------------------------------------*/
@@ -223,26 +221,20 @@ void Sequence_Step(void)
 {
     const uint8_t N_CSTEPS = 6;
 
-// motor freewheels when switch to off
-    if (BLDC_OFF != get_bldc_state() )
+    // grab the state of previous sector (before advancing the 6-step sequence)
+    BLDC_COMM_STEP_t curr_step = Seq_Get_Step( Sequence_step );
+    BLDC_PWM_STATE_t prev_A = curr_step.phA;
+
+    if (DC_OUTP_FLOAT_F == prev_A )
     {
-        // grab the state of previous sector (before advancing the 6-step sequence)
-        BLDC_COMM_STEP_t curr_step = Seq_Get_Step( Sequence_step );
-        BLDC_PWM_STATE_t prev_A = curr_step.phA;
-
-
-        if (DC_OUTP_FLOAT_F == prev_A )
-        {
 // if phase-A previous sector was floating-falling transition, then the measurements are qualified by copying from the temp array
 
 // sum the pre-ZCP and post-ZCP measurements
-            Back_EMF_Falling_Int_PhX =
-                Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
-        }
-
-
-        comm_switch( Sequence_step );
-
-        Sequence_step = (Sequence_step + 1) % N_CSTEPS;
+        Back_EMF_Falling_Int_PhX =
+            Back_EMF_Falling_4[1] + Back_EMF_Falling_4[2];
     }
+
+    comm_switch( Sequence_step );
+
+    Sequence_step = (Sequence_step + 1) % N_CSTEPS;
 }

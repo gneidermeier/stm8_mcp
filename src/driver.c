@@ -184,7 +184,11 @@ void Driver_Step(void)
             Vbatt = Driver_Get_ADC();
         }
 
-        Sequence_Step();
+// motor freewheels when switch to off
+        if (BLDC_OFF != get_bldc_state() )
+        {
+            Sequence_Step();
+        }
 
         break;
     }
