@@ -487,9 +487,7 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     }
 #endif
 
-    Driver_Update(); //  Task rate establishes ramp aggressiveness ........... this can be in ISR context
-
-    TaskRdy = TRUE;     // notify background process .. which should wait for the  TIM1 ... as below
+    Driver_Update();
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;

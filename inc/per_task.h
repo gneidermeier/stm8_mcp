@@ -24,15 +24,13 @@
 
 extern uint8_t Log_Level;         // global log-level
 
-// tmp ... needs accessed by ISR
-extern uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
 
 /* Private variables ---------------------------------------------------------*/
 
 
-/* Private function prototypes -----------------------------------------------*/
+/* Public function prototypes -----------------------------------------------*/
 
-/* Private functions ---------------------------------------------------------*/
+void Periodic_Task_Wake(void);
 
 uint8_t Task_Ready(void);
 

@@ -24,13 +24,13 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
-//static tmp
-uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
-                  // use 8-bit (atomic) so no concurrency concern
 
 
 
 /* Private variables ---------------------------------------------------------*/
+
+static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
+                  // use 8-bit (atomic) so no concurrency concern
 
 static uint8_t Log_Level;
 
@@ -267,4 +267,12 @@ uint8_t Task_Ready(void)
         Periodic_task();
     }
     return TaskRdy;
+}
+
+/*
+ * activate task ready flag (from ISR context)
+ */
+void Periodic_Task_Wake(void)
+{
+        TaskRdy = TRUE; // notify background process 
 }

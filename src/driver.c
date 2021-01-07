@@ -15,6 +15,7 @@
 #include "mcu_stm8s.h"
 #include "bldc_sm.h"
 #include "sequence.h"
+#include "per_task.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -132,6 +133,8 @@ uint16_t Driver_Get_ADC(void)
 void Driver_Update(void)
 {
     BLDC_Update();
+
+    Periodic_Task_Wake();
 
 //  update the timer for the OL commutation switch time
     TIM3_setup( get_commutation_period() );
