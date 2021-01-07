@@ -13,12 +13,12 @@
 #include "bldc_sm.h"
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
+#include "sequence.h"
 #include "driver.h"
 
 /* Private defines -----------------------------------------------------------*/
 
-//#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
-#define V_SHUTDOWN_THR      0x0230 // tmp .. problems syncing the  phase    voltage measuremeht with PWM on-sector  ?
+#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
 
 
 #define PWM_0PCNT      0
@@ -96,6 +96,8 @@ static uint16_t Commanded_Dutycycle; // PWM duty-cycle has to be ramped to this
 
 static int vsys_fault_bucket;
 
+static uint8_t Manual_Ovrd;
+
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -158,6 +160,9 @@ void BLDC_Stop(void)
  */
 uint16_t BLDC_PWMDC_Plus()
 {
+// let bldc timing logic regain control of commutattion time
+    Manual_Ovrd = 0;
+
     if ( BLDC_OFF == get_bldc_state() )
     {
         set_bldc_state( BLDC_RAMPUP );
@@ -175,6 +180,9 @@ uint16_t BLDC_PWMDC_Plus()
  */
 uint16_t BLDC_PWMDC_Minus()
 {
+// let bldc timing logic regain control of commutattion time
+    Manual_Ovrd = 0;
+
     if ( BLDC_OFF == get_bldc_state() )
     {
 //        uart_print( "OFF->RAMP-\r\n");
@@ -201,6 +209,8 @@ void BLDC_PWMDC_Set(uint16_t dc)
  */
 void BLDC_Spd_dec()
 {
+    Manual_Ovrd = 1;
+
 #if 1 // #ifdef DEBUG
     if ( BLDC_OFF == get_bldc_state() )
     {
@@ -219,6 +229,8 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
+    Manual_Ovrd = 1;
+
 #if 1 // #ifdef DEBUG
     if ( BLDC_OFF == get_bldc_state() )
     {
@@ -307,12 +319,12 @@ void BLDC_Update(void)
         // delay to wait to stabillize at first DC setpoint post-ramp
 //        fault_arming_time = RAMP_TIME;    /////// // reset the static ramp timer
 
-        set_dutycycle( PWM_0PCNT );
         break;
 
     case BLDC_ON:
         // do ON stuff
-        Vsystem = Driver_Get_Vbatt() / 2 + Vsystem / 2; // sma
+
+        Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
 
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
         if ( fault_arming_time  > 0 )
@@ -342,13 +354,14 @@ void BLDC_Update(void)
             if (0 == vsys_fault_bucket)
             {
 #if 1 // #if ENABLE_VLOW_FAULT
-                // 0 DC safely stops the motor, user must still press STOP to cycle the program.
-                set_dutycycle( PWM_0PCNT );
+                // 0 DC safely stops the motor, user must still press STOP to re-arm the program.
+// kill the driver signals but does not change the state from OFF .. (needs to be error state)
+                Commanded_Dutycycle = PWM_0PCNT;
 #endif
             }
         }
 
-//        if ( 0 == get_op_mode() )
+        if ( 0 == Manual_Ovrd )
         {
             const int step = 1;
             timing_ramp_control( Get_OL_Timing( get_dutycycle() ), step );
@@ -358,9 +371,6 @@ void BLDC_Update(void)
     case BLDC_RAMPUP:
 
         Commanded_Dutycycle = PWM_DC_RAMPUP;
-
-        // set the ramp DC upon transition into ramp state ^H^H^H^H^H^H^H^H....
-        set_dutycycle( PWM_DC_RAMPUP );
 
         itemp = timing_ramp_control(
             Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
