@@ -218,20 +218,16 @@ void Periodic_task(void)
     {
         if (key == ' ') // space character
         {
-            // disable/enable interrupts is done to protect against concurrent access from ISR
-            disableInterrupts();
             BLDC_Stop();
-            enableInterrupts();
+
             UARTputs("###\r\n");
 
             Log_Level = 0;
         }
         else if (key == '+')
         {
-            // disable/enable interrupts is done to protect against concurrent access from ISR
-            disableInterrupts();
             BLDC_PWMDC_Plus();
-            enableInterrupts();
+
             UARTputs("+++\r\n");
 
             Log_Level = 255;// enable continous/verbous log
@@ -239,10 +235,8 @@ void Periodic_task(void)
         }
         else if (key == '-')
         {
-            // disable/enable interrupts is done to protect against concurrent access from ISR
-            disableInterrupts();
             BLDC_PWMDC_Minus();
-            enableInterrupts();
+
             UARTputs("---\r\n");
         }
         else // anykey
@@ -264,6 +258,7 @@ uint8_t Task_Ready(void)
 {
     if (0 != TaskRdy)
     {
+        TaskRdy = FALSE;
         Periodic_task();
     }
     return TaskRdy;
@@ -274,5 +269,5 @@ uint8_t Task_Ready(void)
  */
 void Periodic_Task_Wake(void)
 {
-        TaskRdy = TRUE; // notify background process 
+    TaskRdy = TRUE; // notify background process 
 }
