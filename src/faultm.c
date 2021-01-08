@@ -17,7 +17,7 @@
 
 #define V_SHUTDOWN_THR      0x0368 // experimentally determined!
 
-#define  FAULT_BUCKET_INI  128
+#define  FAULT_BUCKET_INI  64 // 16
 
 
 /* Private types -----------------------------------------------------------*/

@@ -297,6 +297,7 @@ void BLDC_Update(void)
         break;
 
     case BLDC_ON:
+////
         // finally, check if fault is set
         if ( 1 == Faultm_update() )
         {
@@ -305,6 +306,7 @@ void BLDC_Update(void)
 // kill the driver signals but does not change the state from OFF .. (needs to be error state)
             Commanded_Dutycycle = PWM_0PCNT;
 #endif
+////
         }
 
         if ( 0 == Manual_Ovrd )
@@ -326,6 +328,11 @@ void BLDC_Update(void)
             // state-transition trigger
             set_bldc_state( BLDC_ON );
         }
+        break;
+
+    case BLDC_FAULT:
+        Commanded_Dutycycle = PWM_0PCNT;
+
         break;
     }
 

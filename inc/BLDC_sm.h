@@ -26,6 +26,7 @@
  */
 typedef enum
 {
+    BLDC_FAULT,
     BLDC_OFF,
     BLDC_RAMPUP,
     BLDC_ON
