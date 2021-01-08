@@ -141,13 +141,15 @@ void BLDC_Stop(void)
 
     set_bldc_state( BLDC_OFF );
 
+    Commanded_Dutycycle = 0;
+
     Faultm_init();
 }
 
 /*
  * increment set and return present motor speed value
  */
-uint16_t BLDC_PWMDC_Plus()
+void BLDC_PWMDC_Plus()
 {
 // let bldc timing logic regain control of commutattion time
     Manual_Ovrd = 0;
@@ -155,34 +157,25 @@ uint16_t BLDC_PWMDC_Plus()
     if ( BLDC_OFF == get_bldc_state() )
     {
         set_bldc_state( BLDC_RAMPUP );
-        return 0;
     }
     else if ( BLDC_ON == get_bldc_state() )
     {
         Commanded_Dutycycle += 1;
     }
-    return 0;
 }
 
 /*
  * decrement set and return present motor speed value
  */
-uint16_t BLDC_PWMDC_Minus()
+void BLDC_PWMDC_Minus()
 {
 // let bldc timing logic regain control of commutattion time
     Manual_Ovrd = 0;
 
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-//        uart_print( "OFF->RAMP-\r\n");
-        set_bldc_state(  BLDC_RAMPUP );
-        return 0;
-    }
-    else if ( BLDC_ON == get_bldc_state() )
+    if (Commanded_Dutycycle > 0)
     {
         Commanded_Dutycycle -= 1;
     }
-    return 0;
 }
 
 /*
@@ -200,17 +193,7 @@ void BLDC_Spd_dec()
 {
     Manual_Ovrd = 1;
 
-#if 1 // #ifdef DEBUG
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        set_bldc_state( BLDC_RAMPUP );
-    }
-
-    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm < 0xFFFF */)
-    {
-        BLDC_OL_comm_tm += 1; // slower
-    }
-#endif
+    BLDC_OL_comm_tm += 1; // slower
 }
 
 /*
@@ -220,17 +203,7 @@ void BLDC_Spd_inc()
 {
     Manual_Ovrd = 1;
 
-#if 1 // #ifdef DEBUG
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        set_bldc_state( BLDC_RAMPUP );
-    }
-
-    if (BLDC_ON == get_bldc_state() /* && BLDC_OL_comm_tm > BLDC_OL_TM_MANUAL_HI_LIM */ )
-    {
-        BLDC_OL_comm_tm -= 1; // faster
-    }
-#endif
+    BLDC_OL_comm_tm -= 1; // faster
 }
 
 
@@ -289,15 +262,17 @@ void BLDC_Update(void)
     default:
     case BLDC_OFF:
 
-        Commanded_Dutycycle = 0;
-
+        if (Commanded_Dutycycle > 0)
+        {
+            set_bldc_state( BLDC_RAMPUP );
+        }
         // reset commutation timer and ramp-up counters ready for ramp-up
         set_commutation_period( BLDC_OL_TM_LO_SPD );
 
         break;
 
     case BLDC_ON:
-////
+#if 1 // 
         // finally, check if fault is set
         if ( 1 == Faultm_update() )
         {
@@ -306,8 +281,8 @@ void BLDC_Update(void)
 // kill the driver signals but does not change the state from OFF .. (needs to be error state)
             Commanded_Dutycycle = PWM_0PCNT;
 #endif
-////
         }
+#endif
 
         if ( 0 == Manual_Ovrd )
         {
