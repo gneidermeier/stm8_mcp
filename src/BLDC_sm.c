@@ -154,11 +154,7 @@ void BLDC_PWMDC_Plus()
 // let bldc timing logic regain control of commutattion time
     Manual_Ovrd = 0;
 
-    if ( BLDC_OFF == get_bldc_state() )
-    {
-        set_bldc_state( BLDC_RAMPUP );
-    }
-    else if ( BLDC_ON == get_bldc_state() )
+    if (Commanded_Dutycycle < 0xFFFF) // prevent integer rollover
     {
         Commanded_Dutycycle += 1;
     }
@@ -262,8 +258,11 @@ void BLDC_Update(void)
     default:
     case BLDC_OFF:
 
-        if (Commanded_Dutycycle > 0)
+        if (Commanded_Dutycycle > 0) // allows startup state-transition when '+' key pressed
         {
+            // assert the ramp-up state DC
+            Commanded_Dutycycle = PWM_DC_RAMPUP;
+
             set_bldc_state( BLDC_RAMPUP );
         }
         // reset commutation timer and ramp-up counters ready for ramp-up
@@ -292,8 +291,6 @@ void BLDC_Update(void)
         break;
 
     case BLDC_RAMPUP:
-
-        Commanded_Dutycycle = PWM_DC_RAMPUP;
 
         itemp = timing_ramp_control(
                     Get_OL_Timing( get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
