@@ -278,7 +278,7 @@ void BLDC_Update(void)
 #if 1 // #if ENABLE_VLOW_FAULT
 // 0 DC safely stops the motor, user must still press STOP to re-arm the program.
 // kill the driver signals but does not change the state from OFF .. (needs to be error state)
-            Commanded_Dutycycle = PWM_0PCNT;
+            set_bldc_state( BLDC_FAULT );
 #endif
         }
 #endif
