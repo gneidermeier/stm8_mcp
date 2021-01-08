@@ -13,13 +13,9 @@
 #include "bldc_sm.h"
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
-#include "sequence.h"
-#include "driver.h"
+#include "faultm.h"
 
 /* Private defines -----------------------------------------------------------*/
-
-#define V_SHUTDOWN_THR      0x0368 // experimental  ...startup stalls are still possible!
-
 
 #define PWM_0PCNT      0
 
@@ -32,9 +28,6 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-//#define PWM_DC_IDLE    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
-//#define PWM_DC_RAMPUP  PWM_DC_IDLE // PWM_X_PCNT( 14.0 )
-
 #define PWM_DC_RAMPUP    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
 
 #define PWM_DC_IDLE      PWM_X_PCNT( PWM_DC_RAMPUP )
@@ -82,10 +75,6 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
-//static  tmp
-uint16_t Vsystem;
-
-
 /* Private variables ---------------------------------------------------------*/
 
 static BLDC_STATE_T BLDC_State;
@@ -93,8 +82,6 @@ static BLDC_STATE_T BLDC_State;
 static uint16_t BLDC_OL_comm_tm;
 
 static uint16_t Commanded_Dutycycle; // PWM duty-cycle has to be ramped to this
-
-static int vsys_fault_bucket;
 
 static uint8_t Manual_Ovrd;
 
@@ -153,6 +140,8 @@ void BLDC_Stop(void)
     All_phase_stop();
 
     set_bldc_state( BLDC_OFF );
+
+    Faultm_init();
 }
 
 /*
@@ -291,15 +280,6 @@ BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
  */
 void BLDC_Update(void)
 {
-    const int FAULT_BUCKET_INI = 128;
-
-    // some actions only done on state transitions (prev state must be updated at end of this function)
-    static BLDC_STATE_T prev_bldc_state = BLDC_OFF;
-
-// if the voltage threshold is high enuff, the ramp delay time thingy not needed
-//    const int RAMP_TIME = 1;   // fault arming delay time
-//    static uint16_t fault_arming_time; // fault_arming_time
-
     int itemp;
 
     BLDC_STATE_T bldc_state = get_bldc_state();
@@ -314,51 +294,17 @@ void BLDC_Update(void)
         // reset commutation timer and ramp-up counters ready for ramp-up
         set_commutation_period( BLDC_OL_TM_LO_SPD );
 
-        vsys_fault_bucket = FAULT_BUCKET_INI;
-
-        // delay to wait to stabillize at first DC setpoint post-ramp
-//        fault_arming_time = RAMP_TIME;    /////// // reset the static ramp timer
-
         break;
 
     case BLDC_ON:
-        // do ON stuff
-
-        Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
-
-#if 0  // .. Todo: needs to adjust threshold for in-ramp
-        if ( fault_arming_time  > 0 )
+        // finally, check if fault is set
+        if ( 1 == Faultm_update() )
         {
-            fault_arming_time   -= 1;
-        }
-        else    // assert (Vbatt > VVV )
-#endif
-        {
-            // check system voltage ... is motor stalled?
-            if (Vsystem < V_SHUTDOWN_THR)
-            {
-                // voltage has sagged ... likely motor stall!
-                if ( vsys_fault_bucket  > 0)
-                {
-                    vsys_fault_bucket -= 1; //
-                }
-            }
-            else
-            {
-                if ( vsys_fault_bucket  < FAULT_BUCKET_INI )
-                {
-                    vsys_fault_bucket += 1; // refillin leaky bucket
-                }
-            }
-// finally, check if fault is set
-            if (0 == vsys_fault_bucket)
-            {
 #if 1 // #if ENABLE_VLOW_FAULT
-                // 0 DC safely stops the motor, user must still press STOP to re-arm the program.
+// 0 DC safely stops the motor, user must still press STOP to re-arm the program.
 // kill the driver signals but does not change the state from OFF .. (needs to be error state)
-                Commanded_Dutycycle = PWM_0PCNT;
+            Commanded_Dutycycle = PWM_0PCNT;
 #endif
-            }
         }
 
         if ( 0 == Manual_Ovrd )
@@ -373,20 +319,15 @@ void BLDC_Update(void)
         Commanded_Dutycycle = PWM_DC_RAMPUP;
 
         itemp = timing_ramp_control(
-            Get_OL_Timing( /* PWM_DC_RAMPUP */ get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
+                    Get_OL_Timing( get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
 
         if ( itemp >= 0 ) // ( comm_time < target )
         {
             // state-transition trigger
             set_bldc_state( BLDC_ON );
-
-            // set initial condition of filtered system voltage masurement
-            Vsystem = 0x0400;
         }
         break;
     }
-
-    prev_bldc_state = bldc_state ;
 
     set_dutycycle( Commanded_Dutycycle );
 }
