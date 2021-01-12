@@ -186,8 +186,12 @@ void Driver_Step(void)
         break;
     case 3:
         Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
-
-        memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
+// unrolling this memcpy saves about 20uS !
+//        memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
+        Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
+        Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
+        Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
+        Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
 
         break;
     }
