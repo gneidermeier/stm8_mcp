@@ -224,34 +224,6 @@ uint16_t Seq_Get_Vbatt(void)
 //        NOP (C)
 }
 
-static void comm_switch (COMMUTATION_SECTOR_t bldc_step)
-{
-    BLDC_COMM_STEP_t curr_step = Seq_Get_Step( bldc_step );
-
-    // switch or if/else make any difference?
-    switch(bldc_step)
-    {
-    case 0:
-        sector_0();
-        break;
-    case 1:
-        sector_1();
-        break;
-    case 2:
-        sector_2();
-        break;
-    case 3:
-        sector_3();
-        break;
-    case 4:
-        sector_4();
-        break;
-    case 5:
-        sector_5();
-        break;
-    }
-}
-
 /*
  * high-level handler for commutation-step sequence
  */
@@ -259,15 +231,32 @@ void Sequence_Step(void)
 {
     const uint8_t N_CSTEPS = 6;
 
-    // grab the state of previous sector (before advancing the 6-step sequence)
-    BLDC_COMM_STEP_t curr_step = Seq_Get_Step( Sequence_step );
-    BLDC_PWM_STATE_t prev_A = curr_step.phA;
-
     Sequence_step = (Sequence_step + 1) % N_CSTEPS;
 
 // motor freewheels when switch to off
     if (BLDC_OFF != get_bldc_state() )
     {
-        comm_switch( Sequence_step );
+        // switch or if/else doesn't seem to make any difference
+        switch(Sequence_step)
+        {
+        case 0:
+            sector_0();
+            break;
+        case 1:
+            sector_1();
+            break;
+        case 2:
+            sector_2();
+            break;
+        case 3:
+            sector_3();
+            break;
+        case 4:
+            sector_4();
+            break;
+        case 5:
+            sector_5();
+            break;
+        }
     }
 }
