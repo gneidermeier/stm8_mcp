@@ -132,7 +132,8 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 /* Public functions ---------------------------------------------------------*/
 
 /*
- * low-level stop: turns off all PWM
+ *    System reset / re-arm function (has to be called both at program startup
+ *    as well as following a fault condition state.
  */
 void BLDC_Stop(void)
 {
@@ -144,6 +145,13 @@ void BLDC_Stop(void)
     Commanded_Dutycycle = 0;
 
     Faultm_init();
+
+// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
+// (even tho the function seeemed by look of the terminal to be running .. )
+// the commutation period (TIM3) apparantly has to be set to something (not 0) 
+// or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
+
+    set_commutation_period( LUDICROUS_SPEED );
 }
 
 /*
@@ -264,9 +272,9 @@ void BLDC_Update(void)
             Commanded_Dutycycle = PWM_DC_RAMPUP;
 
             set_bldc_state( BLDC_RAMPUP );
+
+            set_commutation_period( BLDC_OL_TM_LO_SPD );
         }
-        // reset commutation timer and ramp-up counters ready for ramp-up
-        set_commutation_period( BLDC_OL_TM_LO_SPD );
 
         break;
 
