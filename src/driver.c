@@ -161,32 +161,33 @@ void Driver_Step(void)
 
 // Note if wanting all 3 phases would need to coordinate here to set the
 // correct ADC channel to sample.
+// Distribute the work done in the ISR by partitioning  
+//  sequence_step, memcpy,  get_ADC into  separate sub-steps
+// Logically the call to Sequence_Step() occurs following the memcpy()
 
     switch(index)
     {
     case 0:
+// does the step first (using Back_EMF from memcpy in prev. step)
+        Sequence_Step();
+
         Back_EMF_15304560[0] = GET_BACK_EMF_ADC( );
         break;
     case 1:
         Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
         break;
     case 2:
+// the sequencer will have to further qualify the ADC measurement (by 
+// determining that the bldc state was "ON" and not off or floating
+
+        Vbatt  = Driver_Get_ADC();
+
         Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
         break;
     case 3:
         Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
 
         memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
-
-// using sample at 60-degrees by convention ... the sequencer will have to further qualify 
-// the measurement (by determingin that the bldc state was "ON" and not off or floating
-        Vbatt  = Driver_Get_ADC();
-
-// motor freewheels when switch to off
-        if (BLDC_OFF != get_bldc_state() )
-        {
-            Sequence_Step();
-        }
 
         break;
     }

@@ -12,7 +12,7 @@
 
 #include "pwm_stm8s.h"
 #include "driver.h"
-
+#include "bldc_sm.h"
 #include "sequence.h" // exported types referenced internally
 
 
@@ -255,5 +255,9 @@ void Sequence_Step(void)
 
     Sequence_step = (Sequence_step + 1) % N_CSTEPS;
 
-    comm_switch( Sequence_step );
+// motor freewheels when switch to off
+    if (BLDC_OFF != get_bldc_state() ) /////  
+    {
+        comm_switch( Sequence_step );
+    }
 }
