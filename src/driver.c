@@ -64,8 +64,6 @@ uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t Vbatt;
-
 static uint16_t ADC_Global;
 
 static uint16_t Back_EMF_15304560[4];
@@ -108,15 +106,6 @@ void bemf_samp_get(void)
 
 /*
  * public accessor for the system voltage measurement
- * Vbatt is in this module because the measurement has to be timed to the 
- * PWM/commutation sequence
- */
-uint16_t Driver_Get_Vbatt(void)
-{
-    return Vbatt;
-}
-
-/*
  * need to define an interface to the ADC sample/conversion service
  */
 uint16_t Driver_Get_ADC(void)
@@ -177,11 +166,6 @@ void Driver_Step(void)
         Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
         break;
     case 2:
-// the sequencer will have to further qualify the ADC measurement (by 
-// determining that the bldc state was "ON" and not off or floating
-
-        Vbatt  = Driver_Get_ADC();
-
         Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
         break;
     case 3:

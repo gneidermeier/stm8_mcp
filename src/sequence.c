@@ -23,8 +23,6 @@ extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 /* Private defines -----------------------------------------------------------*/
 
 
-
-
 /* Private types -----------------------------------------------------------*/
 
 
@@ -159,7 +157,7 @@ uint16_t Seq_Get_Vbatt(void)
 @inline static void sector_2(void)
 {
     // Phase A was driven pwm, so use the ADC measurement as vbat
-    Vbatt_ = Driver_Get_Vbatt();
+    Vbatt_ = Driver_Get_ADC(); 
 
 //    { DC_OUTP_FLOAT_F,  DC_OUTP_HI,       DC_OUTP_LO,
 //PWM OFF: A
