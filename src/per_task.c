@@ -17,6 +17,7 @@
 
 #include "bldc_sm.h"
 #include "pwm_stm8s.h"
+#include "faultm.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -30,7 +31,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
-                  // use 8-bit (atomic) so no concurrency concern
 
 static uint8_t Log_Level;
 
@@ -178,6 +178,19 @@ void Periodic_task(void)
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
     char key;
+
+    BLDC_STATE_T bldc_state = get_bldc_state();
+
+    // only do low-voltage/stalled diagnostic in ON (not ramp) state for now
+    if (BLDC_ON == bldc_state )
+    {
+        if ( FAULT_SET == Faultm_update() )
+        {
+#if 1 // #if ENABLE_VLOW_FAULT
+            set_bldc_state( BLDC_FAULT );
+#endif
+        }
+    }
 
 #if 0
 //   svc a UI potentiometer

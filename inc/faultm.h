@@ -18,8 +18,15 @@
 #endif
 
 /*
+ *
+ */
+#define FAULT_SET    1
+#define FAULT_CLEAR  0
+
+/*
  * types
  */
+typedef int FAULT_STATUS_t;
 
 /*
  * prototypes
@@ -27,7 +34,7 @@
 
 void Faultm_init(void);
 
-int Faultm_update(void);
+FAULT_STATUS_t Faultm_update(void);
 
 
 #endif // BLDC_H

@@ -279,17 +279,6 @@ void BLDC_Update(void)
         break;
 
     case BLDC_ON:
-#if 1 // 
-        // finally, check if fault is set
-        if ( 1 == Faultm_update() )
-        {
-#if 1 // #if ENABLE_VLOW_FAULT
-// 0 DC safely stops the motor, user must still press STOP to re-arm the program.
-// kill the driver signals but does not change the state from OFF .. (needs to be error state)
-            set_bldc_state( BLDC_FAULT );
-#endif
-        }
-#endif
 
         if ( 0 == Manual_Ovrd )
         {

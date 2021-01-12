@@ -9,15 +9,20 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include "faultm.h"  // needed to use fault_t typedef internally 
 
 #include "sequence.h"
 
 
 /* Private defines -----------------------------------------------------------*/
 
+/*
+ * threshold and bucket establish the sensitivity of the fault action.
+ * the bucket value is a counter related to the update rate of the function.
+ */
 #define V_SHUTDOWN_THR      0x0368 // experimentally determined!
 
-#define  FAULT_BUCKET_INI  64 // 16
+#define  FAULT_BUCKET_INI  (64 / 4)  // 16 ... todo: why exactly does this value change from 64 to 16?
 
 
 /* Private types -----------------------------------------------------------*/
@@ -49,7 +54,7 @@ void Faultm_init(void)
 
 /*
  */
-int Faultm_update(void)
+FAULT_STATUS_t Faultm_update(void)
 {
 // if the voltage threshold is high enuff, the ramp delay time thingy not needed
 //    const int RAMP_TIME = 1;   // fault arming delay time
@@ -58,7 +63,6 @@ int Faultm_update(void)
 // update system voltage but this could be done in Seq_Get_Vsystem()?
     Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
 
-//#if 0
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
     if ( fault_arming_time  > 0 )
     {
@@ -86,11 +90,7 @@ int Faultm_update(void)
 // finally, check if fault is set
         if (0 == vsys_fault_bucket)
         {
-#if 1 // #if ENABLE_VLOW_FAULT
-            // 0 DC safely stops the motor, user must still press STOP to re-arm the program.
-// kill the driver signals but does not change the state from OFF .. (needs to be error state)
-            return 1;//                Commanded_Dutycycle = PWM_0PCNT;
-#endif
+            return FAULT_SET;
         }
     }
     return 0;
