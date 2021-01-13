@@ -100,7 +100,9 @@ char GetKey(void)
 
 static uint16_t UI_Speed;
 
-extern int Back_EMF_Falling_Int_PhX;
+extern int Back_EMF_Falling_PhX;
+extern int Back_EMF_Riseing_PhX;
+
 extern uint16_t Vsystem;
 
 extern uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
@@ -137,7 +139,11 @@ void testUART(void)
     strcat(sbuf, cbuf);
 #if 1
     strcat(sbuf, " bFi=");
-    itoa( Back_EMF_Falling_Int_PhX,     cbuf, 16);
+    itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " bFi=");
+    itoa( Back_EMF_Falling_PhX,     cbuf, 16);
     strcat(sbuf, cbuf);
 
 // tmep ... log the test back-EMF falling-float transition
