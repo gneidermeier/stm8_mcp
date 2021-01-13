@@ -18,6 +18,14 @@
 /* Public defines -----------------------------------------------------------*/
 
 /*
+ * re-purpose the TIM2 channel enumeration but disguise it
+ */
+#define  BL_PHASE_A  TIM2_CHANNEL_1
+#define  BL_PHASE_B  TIM2_CHANNEL_2
+#define  BL_PHASE_C  TIM2_CHANNEL_3
+
+
+/*
  * bleh yuk erg
  */
 // PD4 set LO 
@@ -75,6 +83,12 @@
 /* Public types -----------------------------------------------------------*/
 
 
+/*
+ * re-purpose the TIM2 channel enumeration but disguise it
+ */
+typedef  TIM2_Channel_TypeDef PWM_Channel_Typedef ; 
+
+
 /* Public variables  ---------------------------------------------------------*/
 
 
@@ -92,9 +106,6 @@ void PWM_PhC_Enable(void);
 
 void set_dutycycle(uint16_t);
 uint16_t get_dutycycle(void);
-
-void inc_dutycycle(void);
-void dec_dutycycle(void);
 
 
 #endif // PWM_STM_S_H

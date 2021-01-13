@@ -1,28 +1,27 @@
 /**
   ******************************************************************************
   * @file pwm_stm8s.c
-  * @brief BLDC motor control - PWM, STM8s specific 
-  *   TIM2 is being used despide TIM1 being the capable motor control features,
-  *   but PC1 PC2 PC3 pins are taken up by some cap touch feature demo unless 
-  *   modify board and remove solder beidges.
+  * @brief BLDC motor control - PWM, STM8s specific
+  *   TIM2 is being used despite TIM1 being the capable motor control features,
+  *   but PC1 PC2 PC3 pins are taken up by  cap touch demo on the STM8-Discovery board
   *
   * Comments:
   *   Using the STM8 Peripheral Library, the diffrence between using TIM1 and TIM2
-  *   API becomes practically a matter of '/TIM1/TIM2/s' i.e. search and replace. 
+  *   API becomes practically a matter of '/TIM1/TIM2/s' i.e. search and replace.
   *   One difference, there is no TIM1_BKR register so only 'TIM1CtrlPWMOutpus()'
-  *   TIMx may not have the other motor drive capabilities that are not being using anyway.	
+  *   TIMx may not have the other motor drive capabilities that are not being using anyway.
   *
-  *   For some time, the nature of timing back-EMF to the flyback interval was 
-  *   not understood wrt to the various device swithcing steps, so the 
+  *   For some time, the nature of timing back-EMF to the flyback interval was
+  *   not understood wrt to the various device switching steps, so the
   *   commutation switching logic may be excessively chopped up.
-  * 	
-  *	  For a while now I have been noticing that the output PWM CH pins would 
+  *
+  *	  For a while now I have been noticing that the output PWM CH pins would
   *   sometimes seem to float/decay when transition to floating 60-degree sector.
   *   As an extra step, one could assertively set those GPIOs direction/state to
-  *   output off/low. However, once I also realized that the state of the pin isn't 
+  *   output off/low. However, once I also realized that the state of the pin isn't
   *   so critical as is the asserting the /SD of the IR2104 device, which is what
-  *   actually makes the phase voltage float. 
-  *	
+  *   actually makes the phase voltage float.
+  *
   * @author Neidermeier
   * @version
   * @date Sept-2020
@@ -45,7 +44,7 @@
 
 
 /*
- * 3 electrical phases 
+ * 3 electrical phases
  */
 typedef enum /* THREE_PHASE_CHANNELS */
 {
@@ -96,26 +95,6 @@ uint16_t get_dutycycle(void)
     return global_uDC;
 }
 
-/*
- * these functions don't do real range checking, they just assert against 
- * integer rollover (which shouldn't happen anyway?)
- * see BLDC_Spd_dec() etc.
- */
-void inc_dutycycle(void)
-{
-    if (global_uDC < 0xFFFE)
-    {
-        global_uDC += 1;
-    }
-}
-
-void dec_dutycycle(void)
-{
-    if (global_uDC > 0)
-    {
-        global_uDC -= 1;
-    }
-}
 
 /*
  * simple wrappers for PWM management on STM8s
@@ -154,22 +133,18 @@ void PWM_PhC_Disable(void)
   */
 void PWM_PhA_Enable(void)
 {
-    TIM2_SetCompare1( global_uDC );               // CH2
+    TIM2_SetCompare1( global_uDC );
     TIM2_CCxCmd( TIM2_CHANNEL_1, ENABLE );
-//    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 void PWM_PhB_Enable(void)
 {
-    TIM2_SetCompare2( global_uDC );               // CH3
+    TIM2_SetCompare2( global_uDC );
     TIM2_CCxCmd( TIM2_CHANNEL_2, ENABLE );
-//    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
 
 void PWM_PhC_Enable(void)
 {
-    TIM2_SetCompare3( global_uDC );              // CH4
+    TIM2_SetCompare3( global_uDC );
     TIM2_CCxCmd( TIM2_CHANNEL_3, ENABLE );
-//    TIM2_CtrlPWMOutputs(ENABLE);  // apparently this is required after re-config PWM
 }
-
