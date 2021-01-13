@@ -26,7 +26,7 @@
 // 4.98 / 2 = 2.48v ........... 1/2 Vdc in proportion to the resister divider
 //  2.48v/5v =  x counts / 1024 ocunts so 1/2 Vdc is equivalent to x counts ...
 //   x = 1024 * 2.48/5 = 509   (0x01FD)
-#define DC_HALF_REF         0x01FD 
+#define DC_HALF_REF         0 // 0x01FD 
 
 #define GET_BACK_EMF_ADC( ) \
     ( ADC_Global - DC_HALF_REF )
@@ -143,10 +143,13 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
-    static uint8_t bldc_step_modul; // internal counter for sub-dividing the TIM3 period
+    static uint8_t index = 0;
 
-    uint16_t tmp16;
-    int index = bldc_step_modul % TIM3_RATE_MODULUS;
+// Since the modulus being used (4) is a power of 2, then a bitwise & can be used
+// instead of a MOD (%) to save a few instructions, which is actually significant 
+// as this is a very high frequency ISR!
+//    index = (index + 1) % TIM3_RATE_MODULUS; 
+    index = (index + 1) & (TIM3_RATE_MODULUS - 1) /* 0x03 */;
 
 // Note if wanting all 3 phases would need to coordinate here to set the
 // correct ADC channel to sample.
@@ -179,5 +182,4 @@ void Driver_Step(void)
 
         break;
     }
-    bldc_step_modul += 1; // can allow rollover as modulus is power of 2
 }
