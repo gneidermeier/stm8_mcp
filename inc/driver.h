@@ -58,7 +58,8 @@ void Driver_Update(void);
 uint16_t Driver_Get_ADC(void);
 uint16_t Driver_Get_Vbatt(void);
 
-void bemf_samp_start( void );
+uint16_t Driver_Get_Back_EMF_Avg(void);
+
 void bemf_samp_get(void);
 
 

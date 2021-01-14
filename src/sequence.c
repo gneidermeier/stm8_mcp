@@ -15,10 +15,6 @@
 #include "bldc_sm.h"
 
 
-// tmp
-extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
-
-
 /* Private defines -----------------------------------------------------------*/
 
 
@@ -71,22 +67,6 @@ static const step_ptr_t step_ptr_table[] =
 
 
 /*
- * these macros should possibly be implemented as inlined functions
- */
-#define RISING_B_EMF( _U16_SMA_ ) ( ( \
-    Back_EMF_Falling_4[0] + \
-    Back_EMF_Falling_4[1] + \
-    Back_EMF_Falling_4[2] + \
-    Back_EMF_Falling_4[3] ) >> 2 ) ;
-
-#define FALLING_B_EMF( _U16_SMA_ ) ( ( \
-    Back_EMF_Falling_4[0] + \
-    Back_EMF_Falling_4[1] + \
-    Back_EMF_Falling_4[2] + \
-    Back_EMF_Falling_4[3] ) >> 2 ) ;
-
-
-/*
  * public accessor for the system voltage measurement
  * Vbatt is in this module because the measurement has to be timed to the
  * PWM/commutation sequence
@@ -136,7 +116,8 @@ static void sector_0(void)
 //    { DC_OUTP_HI,       DC_OUTP_LO,       DC_OUTP_FLOAT_F,
 
 // previously phase-A was floating-rising transition
-    Back_EMF_Riseing_PhX = RISING_B_EMF( Back_EMF_Riseing_PhX );
+    Back_EMF_Riseing_PhX = 
+        ( Back_EMF_Riseing_PhX + Driver_Get_Back_EMF_Avg() ) >> 1 ;
 
 //PWM OFF: C
     PWM_PhC_Disable();
@@ -187,7 +168,8 @@ static void sector_2(void)
 static void sector_3(void)
 {
 // previously phase-A was floating-falling transition
-    Back_EMF_Falling_PhX = FALLING_B_EMF( Back_EMF_Falling_PhX );
+    Back_EMF_Falling_PhX = 
+       ( Back_EMF_Falling_PhX + Driver_Get_Back_EMF_Avg() ) >> 1;
 
 //    { DC_OUTP_LO,       DC_OUTP_HI,       DC_OUTP_FLOAT_R,
 

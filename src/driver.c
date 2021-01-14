@@ -59,14 +59,12 @@
 
 /* Public variables  ---------------------------------------------------------*/
 
-uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
-
 
 /* Private variables ---------------------------------------------------------*/
 
 static uint16_t ADC_Global;
 
-static uint16_t Back_EMF_15304560[4];
+static uint16_t Back_EMF_fbuf[4]; // 4 samples per commutation period
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,6 +78,20 @@ static uint16_t Back_EMF_15304560[4];
 void bemf_samp_get(void)
 {
     ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 ); // ADC1_GetConversionValue();
+}
+
+/*
+ * average the 4 back-EMF samples from the back-EMF frame buffer
+ */
+uint16_t Driver_Get_Back_EMF_Avg(void)
+{
+    uint16_t u16tmp =
+      ( Back_EMF_fbuf[0] + \
+        Back_EMF_fbuf[1] + \
+        Back_EMF_fbuf[2] + \
+        Back_EMF_fbuf[3] ) >> 2 ; // divide by 4
+
+    return u16tmp;
 }
 
 /*
@@ -120,6 +132,10 @@ void Driver_Update(void)
  
 void Driver_Step(void)
 {
+    // adc at each 15-degree sector is double-buffered to ensure integrity 
+    // across samples set of 1 motor frame
+    static uint16_t adc_15304560[4];
+
     static uint8_t index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used
@@ -138,30 +154,30 @@ void Driver_Step(void)
 // does the step first (using Back_EMF from memcpy in prev. step)
         Sequence_Step();
 
-        Back_EMF_15304560[0] = GET_BACK_EMF_ADC( );
+        adc_15304560[0] = GET_BACK_EMF_ADC( );
         break;
     case 1:
-        Back_EMF_15304560[1] = GET_BACK_EMF_ADC( );
+        adc_15304560[1] = GET_BACK_EMF_ADC( );
         break;
     case 2:
-        Back_EMF_15304560[2] = GET_BACK_EMF_ADC( );
+        adc_15304560[2] = GET_BACK_EMF_ADC( );
         break;
     case 3:
-        Back_EMF_15304560[3] = GET_BACK_EMF_ADC( );
+        adc_15304560[3] = GET_BACK_EMF_ADC( );
 // unrolling this memcpy saves about 20uS !
 //        memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
-        Back_EMF_Falling_4[0] = Back_EMF_15304560[0];
-        Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
-        Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
-        Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
+        Back_EMF_fbuf[0] = adc_15304560[0];
+        Back_EMF_fbuf[1] = adc_15304560[1];
+        Back_EMF_fbuf[2] = adc_15304560[2];
+        Back_EMF_fbuf[3] = adc_15304560[3];
 
 // reset the accumulation buffer ... reset value is 1/2 because there may be 
 // less than 4 PWM cycles occuring. Instead of trying to sort it out, just let 
-// any elements that dont get stored to be added into the average with no effect.
-        Back_EMF_15304560[0] = // MID_ADC;
-          Back_EMF_15304560[1] = // MID_ADC;
-          Back_EMF_15304560[2] = // MID_ADC;
-          Back_EMF_15304560[3] = MID_ADC;
+// any elements that dont get refreshed to be added into the average with no effect.
+        adc_15304560[0] = // MID_ADC;
+          adc_15304560[1] = // MID_ADC;
+          adc_15304560[2] = // MID_ADC;
+          adc_15304560[3] = MID_ADC;
 
         break;
     }
