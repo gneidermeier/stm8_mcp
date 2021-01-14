@@ -20,9 +20,9 @@
  * threshold and bucket establish the sensitivity of the fault action.
  * the bucket value is a counter related to the update rate of the function.
  */
-#define V_SHUTDOWN_THR      0x0368 // experimentally determined!
+#define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
-#define  FAULT_BUCKET_INI  (64 / 4)  // 16 ... todo: why exactly does this value change from 64 to 16?
+#define  FAULT_BUCKET_INI  32 // this macro should be derived from the faultm update rate somehow 
 
 
 /* Private types -----------------------------------------------------------*/
@@ -60,8 +60,8 @@ FAULT_STATUS_t Faultm_update(void)
 //    const int RAMP_TIME = 1;   // fault arming delay time
 //    static uint16_t fault_arming_time; // fault_arming_time
 
-// update system voltage but this could be done in Seq_Get_Vsystem()?
-    Vsystem = Seq_Get_Vbatt() / 2 + Vsystem / 2; // sma
+// update system voltage 
+    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
 #if 0  // .. Todo: needs to adjust threshold for in-ramp
     if ( fault_arming_time  > 0 )
