@@ -105,7 +105,6 @@ extern int Back_EMF_Riseing_PhX;
 
 extern uint16_t Vsystem;
 
-extern uint16_t Back_EMF_Falling_4[4]; // driver writes to the global - it is a bad-actor
 
 /*
  * temp, todo better function
@@ -137,32 +136,6 @@ void testUART(void)
     strcat(sbuf, " Vs=");
     itoa( Vsystem,     cbuf, 16);
     strcat(sbuf, cbuf);
-#if 1
-    strcat(sbuf, " bFi=");
-    itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " bFi=");
-    itoa( Back_EMF_Falling_PhX,     cbuf, 16);
-    strcat(sbuf, cbuf);
-
-// tmep ... log the test back-EMF falling-float transition
-    strcat(sbuf, " 000=");
-    itoa( Back_EMF_Falling_4[0],     cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " 001=");
-    itoa( Back_EMF_Falling_4[1],     cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " 002=");
-    itoa( Back_EMF_Falling_4[2],     cbuf, 16);
-    strcat(sbuf, cbuf);
-
-    strcat(sbuf, " 003=");
-    itoa( Back_EMF_Falling_4[3],     cbuf, 16);
-    strcat(sbuf, cbuf);
-#endif
 
 #if 1
     strcat(sbuf, " UI=");
@@ -235,6 +208,8 @@ void Periodic_task(void)
 
     if (SerialKeyPressed(&key))
     {
+        Log_Level = 1; // show some info
+
         if (key == ' ') // space character
         {
             BLDC_Stop();
@@ -249,8 +224,7 @@ void Periodic_task(void)
 
             UARTputs("+++\r\n");
 
-            Log_Level = 255;// enable continous/verbous log
-
+            Log_Level = 20; // ahow some more info
         }
         else if (key == '-')
         {
@@ -260,7 +234,7 @@ void Periodic_task(void)
         }
         else // anykey
         {
-            Log_Level = 5; // show some info
+            Log_Level = 255;// enable continous/verbous log
         }
 
         itoa(UI_Speed, cbuf, 16);
