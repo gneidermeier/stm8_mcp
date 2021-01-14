@@ -28,7 +28,7 @@ extern uint16_t Back_EMF_Falling_4[4]; // 4 samples per commutation period
 /* Private types -----------------------------------------------------------*/
 
 /*
- * Each commutation step sequence is implemented as a simple function - 
+ * Each commutation step sequence is implemented as a simple function -
  * aggregating the function pointers into a table.
  */
 typedef void (*step_ptr_t)( void /* int */ );
@@ -52,7 +52,8 @@ uint16_t Back_EMF_Riseing_PhX;
 /* Private variables  ---------------------------------------------------------*/
 
 static uint16_t Vbatt_;
-static const step_ptr_t step_ptr_table[] =
+
+static const step_ptr_t step_ptr_table[] =
 {
     sector_0,
     sector_1,
@@ -67,6 +68,23 @@ static uint16_t Vbatt_;
 
 
 /* Public functions ---------------------------------------------------------*/
+
+
+/*
+ * these macros should possibly be implemented as inlined functions
+ */
+#define RISING_B_EMF( _U16_SMA_ ) ( ( \
+    Back_EMF_Falling_4[0] + \
+    Back_EMF_Falling_4[1] + \
+    Back_EMF_Falling_4[2] + \
+    Back_EMF_Falling_4[3] ) >> 2 ) ;
+
+#define FALLING_B_EMF( _U16_SMA_ ) ( ( \
+    Back_EMF_Falling_4[0] + \
+    Back_EMF_Falling_4[1] + \
+    Back_EMF_Falling_4[2] + \
+    Back_EMF_Falling_4[3] ) >> 2 ) ;
+
 
 /*
  * public accessor for the system voltage measurement
@@ -117,8 +135,8 @@ static void sector_0(void)
 {
 //    { DC_OUTP_HI,       DC_OUTP_LO,       DC_OUTP_FLOAT_F,
 
-// previously phase-A was floating-rising transition, so 3/4 may be the ideal measurements
-    Back_EMF_Riseing_PhX = Back_EMF_Falling_4[3];
+// previously phase-A was floating-rising transition
+    Back_EMF_Riseing_PhX = RISING_B_EMF( Back_EMF_Riseing_PhX );
 
 //PWM OFF: C
     PWM_PhC_Disable();
@@ -168,8 +186,8 @@ static void sector_2(void)
 
 static void sector_3(void)
 {
-// previously phase-A was floating-falling transition, so 0/4 or 1/4 may be the ideal measurements
-    Back_EMF_Falling_PhX = Back_EMF_Falling_4[1];
+// previously phase-A was floating-falling transition
+    Back_EMF_Falling_PhX = FALLING_B_EMF( Back_EMF_Falling_PhX );
 
 //    { DC_OUTP_LO,       DC_OUTP_HI,       DC_OUTP_FLOAT_R,
 
@@ -220,7 +238,7 @@ static void sector_5(void)
  */
 void Sequence_Step(void)
 {
-    // note this sizeof and divide done in preprocessor - verified in the assembly 
+    // note this sizeof and divide done in preprocessor - verified in the assembly
     const uint8_t N_CSTEPS = sizeof(step_ptr_table) / sizeof(step_ptr_t);
 
     static uint8_t Sequence_step;
@@ -228,8 +246,15 @@ void Sequence_Step(void)
     Sequence_step = (Sequence_step + 1) % N_CSTEPS;
 
 // motor freewheels when switch to off
-    if (BLDC_OFF != get_bldc_state() )
+    if (BLDC_OFF == get_bldc_state() )
     {
+        // stopped ... make things be initialized for the next startup ...
+        Back_EMF_Riseing_PhX = 0;
+        Back_EMF_Falling_PhX = 0;
+    }
+    else
+    {
+        // let'er rip!
         step_ptr_table[Sequence_step]();
     }
 }
