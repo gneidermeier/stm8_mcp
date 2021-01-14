@@ -137,21 +137,8 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
  */
 void BLDC_Stop(void)
 {
-// kill the driver signals
-    All_phase_stop();
+    set_bldc_state( BLDC_RESET );
 
-    set_bldc_state( BLDC_OFF );
-
-    Commanded_Dutycycle = 0;
-
-    Faultm_init();
-
-// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
-// (even tho the function seeemed by look of the terminal to be running .. )
-// the commutation period (TIM3) apparantly has to be set to something (not 0) 
-// or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
-
-    set_commutation_period( LUDICROUS_SPEED );
 }
 
 /*
@@ -185,9 +172,9 @@ void BLDC_PWMDC_Minus()
 /*
  * sets motor speed from commanded throttle/UI setting  (experimental)
  */
-void BLDC_PWMDC_Set(uint16_t dc)
+void BLDC_PWMDC_Set(uint8_t dc)
 {
-    Commanded_Dutycycle = dc;
+    Commanded_Dutycycle = ( dc << 8 );
 }
 
 /*
@@ -261,6 +248,8 @@ void BLDC_Update(void)
 
     BLDC_STATE_T bldc_state = get_bldc_state();
 
+    uint16_t PWM_Dutycycle = 0;
+
     switch ( bldc_state )
     {
     default:
@@ -268,7 +257,7 @@ void BLDC_Update(void)
 
         if (Commanded_Dutycycle > 0) // allows startup state-transition when '+' key pressed
         {
-            // assert the ramp-up state DC
+            // initial value of DC
             Commanded_Dutycycle = PWM_DC_RAMPUP;
 
             set_bldc_state( BLDC_RAMPUP );
@@ -279,7 +268,7 @@ void BLDC_Update(void)
         break;
 
     case BLDC_ON:
-
+        PWM_Dutycycle = Commanded_Dutycycle;
         if ( 0 == Manual_Ovrd )
         {
             const int step = 1;
@@ -288,6 +277,7 @@ void BLDC_Update(void)
         break;
 
     case BLDC_RAMPUP:
+        PWM_Dutycycle = PWM_DC_RAMPUP;
 
         itemp = timing_ramp_control(
                     Get_OL_Timing( get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
@@ -296,14 +286,31 @@ void BLDC_Update(void)
         {
             // state-transition trigger
             set_bldc_state( BLDC_ON );
+
+            // initial value of DC
+// Commanded_Dutycycle = PWM_DC_RAMPUP;
         }
         break;
 
-    case BLDC_FAULT:
+    case BLDC_RESET:
+        // kill the driver signals
+        All_phase_stop();
         Commanded_Dutycycle = PWM_0PCNT;
+        Faultm_init();
 
+// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
+// (even tho the function seeemed by look of the terminal to be running .. )
+// the commutation period (TIM3) apparantly has to be set to something (not 0)
+// or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
+
+        set_commutation_period( LUDICROUS_SPEED );
+
+        set_bldc_state( BLDC_OFF );
+        break;
+
+    case BLDC_FAULT:
         break;
     }
 
-    set_dutycycle( Commanded_Dutycycle );
+    set_dutycycle( PWM_Dutycycle );
 }

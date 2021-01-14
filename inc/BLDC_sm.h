@@ -27,6 +27,7 @@
 typedef enum
 {
     BLDC_FAULT,
+    BLDC_RESET,
     BLDC_OFF,
     BLDC_RAMPUP,
     BLDC_ON
@@ -49,7 +50,7 @@ void BLDC_Spd_dec(void);// should go away
 void BLDC_PWMDC_Plus(void);
 void BLDC_PWMDC_Minus(void);
 
-void BLDC_PWMDC_Set(uint16_t dc);
+void BLDC_PWMDC_Set(uint8_t dc);
 
 void BLDC_Stop(void);
 
