@@ -261,9 +261,8 @@ void ADC1_setup(void)
 
     ADC1_DeInit();
 
-// configured range of A/D input pins: CH0, CH1, CH2 to use as b-EMF sensors
     ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
-              ADC1_CHANNEL_3,        // i.e. Ch 0, 1 and 2 are enabled
+              ADC1_CHANNEL_3,        // i.e. Ch 0, 1, 2, and 3 are enabled
               ADC_DIVIDER,
               ADC1_EXTTRIG_TIM,      //  ADC1_EXTTRIG_GPIO ... not presently using any ex triggern
               DISABLE,               // ExtTriggerState
@@ -272,14 +271,6 @@ void ADC1_setup(void)
               DISABLE);              // SchmittTriggerState
 
     ADC1_ITConfig(ADC1_IT_EOCIE, ENABLE); // grab the sample in the ISR
-
-    /*
-    A single conversion is performed for each channel starting with AIN0 and the data is stored
-    in the data buffer registers ADC_DBxR.
-    */
-    ADC1_ConversionConfig(ADC1_CONVERSIONMODE_CONTINUOUS,
-                          ((ADC1_Channel_TypeDef)(ADC1_CHANNEL_0 | ADC1_CHANNEL_1 | ADC1_CHANNEL_2)),
-                          ADC1_ALIGN_RIGHT);
 
 //ADC1_DataBufferCmd(ENABLE);
     ADC1_ScanModeCmd(ENABLE); // Scan mode from channel 0 to n (as defined in ADC1_Init)

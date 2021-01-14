@@ -74,27 +74,6 @@ static uint16_t Back_EMF_15304560[4];
 /* Private functions ---------------------------------------------------------*/
 
 /*
- * back-EMF single-channel start and let ISR to signal EOC
- * Only doing phase A right now if that will suffice.
- *
- * Noted AN2658 "sampling time is not customizable and
- * depends on the ADC clock (3 ADC clocks)"
- */
-void bemf_samp_start( void )
-{
-    const ADC1_Channel_TypeDef ADC1_ChannelX = ADC1_CHANNEL_3; // ADC1_CHANNEL_0; // only phase A
-
-    ADC1_ConversionConfig(
-        ADC1_CONVERSIONMODE_SINGLE, ADC1_ChannelX, ADC1_ALIGN_RIGHT);
-
-// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
-    ADC1_Cmd(ENABLE);
-
-// ADON = 1 for the 2nd time => starts the ADC conversion
-    ADC1_StartConversion();
-}
-
-/*
  * back-EMF single-channel get sample - only CH 0
  * Called from ADC1 ISR
  */
@@ -102,7 +81,6 @@ void bemf_samp_get(void)
 {
     ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 ); // ADC1_GetConversionValue();
 }
-
 
 /*
  * public accessor for the system voltage measurement
@@ -112,8 +90,6 @@ uint16_t Driver_Get_ADC(void)
 {
     return ADC_Global;
 }
-
-
 
 /*
  * BLDC Update: 
@@ -127,7 +103,6 @@ void Driver_Update(void)
 
 //  update the timer for the OL commutation switch time
     TIM3_setup( get_commutation_period() );
-
 }
 
 /*
@@ -141,6 +116,8 @@ void Driver_Update(void)
 // ISR ends up getting blocked by the TIM3 ISR ... the BLDC_Step() takes about
 // to 40us on case 3!
  */
+#define MID_ADC 0x0200 // half vref?
+ 
 void Driver_Step(void)
 {
     static uint8_t index = 0;
@@ -151,8 +128,6 @@ void Driver_Step(void)
 //    index = (index + 1) % TIM3_RATE_MODULUS; 
     index = (index + 1) & (TIM3_RATE_MODULUS - 1) /* 0x03 */;
 
-// Note if wanting all 3 phases would need to coordinate here to set the
-// correct ADC channel to sample.
 // Distribute the work done in the ISR by partitioning  
 //  sequence_step, memcpy,  get_ADC into  separate sub-steps
 // Logically the call to Sequence_Step() occurs following the memcpy()
@@ -179,6 +154,14 @@ void Driver_Step(void)
         Back_EMF_Falling_4[1] = Back_EMF_15304560[1];
         Back_EMF_Falling_4[2] = Back_EMF_15304560[2];
         Back_EMF_Falling_4[3] = Back_EMF_15304560[3];
+
+// reset the accumulation buffer ... reset value is 1/2 because there may be 
+// less than 4 PWM cycles occuring. Instead of trying to sort it out, just let 
+// any elements that dont get stored to be added into the average with no effect.
+        Back_EMF_15304560[0] = // MID_ADC;
+          Back_EMF_15304560[1] = // MID_ADC;
+          Back_EMF_15304560[2] = // MID_ADC;
+          Back_EMF_15304560[3] = MID_ADC;
 
         break;
     }

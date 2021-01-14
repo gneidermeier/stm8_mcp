@@ -215,9 +215,9 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-    // must reset the tmer interrupt flag
-    TIM1->SR1 &= ~TIM1_SR1_UIF;
-//TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
+  /* In order to detect unexpected events during development,
+     it is recommended to set a breakpoint on the following instruction.
+  */
 }
 
 /**
@@ -267,7 +267,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
-#if 1 // tmp test
+#if 0 // tmp test
     static uint8_t toggle;
     if (toggle ^= 1){
         GPIOD->ODR |= (1 << LED);
@@ -276,7 +276,19 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 #endif
 
-    bemf_samp_start();
+GPIOD->ODR |= (1 << LED);
+
+
+// 4 channels are sampled (single-mode conversion) - ADC End Of Conversion 
+// interrupt is enabled in the one-time ADC peripheral setup in MCU_init()
+
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+    ADC1_Cmd(ENABLE);
+
+// ADON = 1 for the 2nd time => starts the ADC conversion
+    ADC1_StartConversion();
+
+GPIOD->ODR &= ~(1 << LED);
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
@@ -303,8 +315,14 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
 INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-    static uint8_t toggle = 0;
-
+#if 0 // tmp test
+    static uint8_t toggle;
+    if (toggle ^= 1){
+        GPIOG->ODR |=  (1<<0); // set test pin
+    } else {
+        GPIOG->ODR &=  ~(1<<0); // clear test pin
+    }
+#endif
     GPIOG->ODR |=  (1<<0); // set test pin
 
     Driver_Step();
@@ -440,7 +458,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   */
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
 {
-#if 1 // tmp test
+#if 0 // tmp test
     static uint8_t toggle;
     if (toggle ^= 1){
         GPIOC->ODR |= (1 << 4);
@@ -449,7 +467,11 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
     }
 #endif
 
+GPIOC->ODR |= (1 << 4);
+
     bemf_samp_get();
+
+GPIOC->ODR &= ~(1 << 4);
 
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
@@ -487,7 +509,11 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     }
 #endif
 
+//    GPIOD->ODR |=  (1<<LED); // set test pin
+
     Driver_Update();
+
+//    GPIOD->ODR &=  ~(1<<LED); // clear test pin
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
