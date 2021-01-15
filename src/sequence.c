@@ -225,16 +225,13 @@ void Sequence_Step(void)
 
     static uint8_t Sequence_step;
 
+    BLDC_STATE_T bldc_state = get_bldc_state();
+
     Sequence_step = (Sequence_step + 1) % N_CSTEPS;
 
-// motor freewheels when switch to off
-    if (BLDC_OFF == get_bldc_state() )
-    {
-        // stopped ... make things be initialized for the next startup ...
-        Back_EMF_Riseing_PhX = 0;
-        Back_EMF_Falling_PhX = 0;
-    }
-    else
+// intentionally letting motor windmill (i.e. not braking) when switched off 
+// normally  
+    if (BLDC_ON == bldc_state || BLDC_RAMPUP == bldc_state )
     {
         // let'er rip!
         step_ptr_table[Sequence_step]();
