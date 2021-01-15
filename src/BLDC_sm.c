@@ -17,6 +17,11 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+
+
+//#define  TEST_UI_PWM
+
+
 #define PWM_0PCNT      0
 
 #define PWM_10PCNT     ( PWM_100PCNT / 10 )
@@ -81,7 +86,8 @@ static BLDC_STATE_T BLDC_State;
 
 static uint16_t BLDC_OL_comm_tm;
 
-static uint16_t Commanded_Dutycycle; // PWM duty-cycle has to be ramped to this
+static uint16_t Commanded_Dutycycle;
+static uint16_t UI_speed;
 
 static uint8_t Manual_Ovrd;
 
@@ -138,7 +144,6 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 void BLDC_Stop(void)
 {
     set_bldc_state( BLDC_RESET );
-
 }
 
 /*
@@ -148,11 +153,12 @@ void BLDC_PWMDC_Plus()
 {
 // let bldc timing logic regain control of commutattion time
     Manual_Ovrd = 0;
-
+#ifndef TEST_UI_PWM
     if (Commanded_Dutycycle < 0xFFFF) // prevent integer rollover
     {
         Commanded_Dutycycle += 1;
     }
+#endif
 }
 
 /*
@@ -162,11 +168,12 @@ void BLDC_PWMDC_Minus()
 {
 // let bldc timing logic regain control of commutattion time
     Manual_Ovrd = 0;
-
+#ifndef TEST_UI_PWM
     if (Commanded_Dutycycle > 0)
     {
         Commanded_Dutycycle -= 1;
     }
+#endif
 }
 
 /*
@@ -174,7 +181,15 @@ void BLDC_PWMDC_Minus()
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    Commanded_Dutycycle = ( dc << 8 );
+    //  dc scale [0:255] is close enough to PWM range [0:250]
+    // but note ui_speed is u16 ... would argue that cast is not really needed
+    // as the implicit  promotion of the rvalue should be well understood and
+    // evident  according to  the rules of C.
+
+    if (BLDC_FAULT != get_bldc_state() )
+    {
+        UI_speed = (uint16_t) dc;
+    }
 }
 
 /*
@@ -244,18 +259,18 @@ BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
  */
 void BLDC_Update(void)
 {
+    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
+
     int itemp;
 
     BLDC_STATE_T bldc_state = get_bldc_state();
-
-    uint16_t PWM_Dutycycle = 0;
 
     switch ( bldc_state )
     {
     default:
     case BLDC_OFF:
-
-        if (Commanded_Dutycycle > 0) // allows startup state-transition when '+' key pressed
+        // allow motor to start when throttle has been raised
+        if (UI_speed > _RampupDC_ )
         {
             // initial value of DC
             Commanded_Dutycycle = PWM_DC_RAMPUP;
@@ -268,7 +283,9 @@ void BLDC_Update(void)
         break;
 
     case BLDC_ON:
-        PWM_Dutycycle = Commanded_Dutycycle;
+#ifdef TEST_UI_PWM
+        Commanded_Dutycycle = UI_speed;
+#endif
         if ( 0 == Manual_Ovrd )
         {
             const int step = 1;
@@ -277,8 +294,6 @@ void BLDC_Update(void)
         break;
 
     case BLDC_RAMPUP:
-        PWM_Dutycycle = PWM_DC_RAMPUP;
-
         itemp = timing_ramp_control(
                     Get_OL_Timing( get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
 
@@ -286,31 +301,39 @@ void BLDC_Update(void)
         {
             // state-transition trigger
             set_bldc_state( BLDC_ON );
-
-            // initial value of DC
-// Commanded_Dutycycle = PWM_DC_RAMPUP;
         }
         break;
 
     case BLDC_RESET:
+
+// have to clear the local UI_speed since that is the transition OFF->RAMP condition
+        UI_speed = 0;
         // kill the driver signals
         All_phase_stop();
         Commanded_Dutycycle = PWM_0PCNT;
+
         Faultm_init();
 
 // was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
-
         set_commutation_period( LUDICROUS_SPEED );
 
         set_bldc_state( BLDC_OFF );
         break;
 
     case BLDC_FAULT:
+
+// have to clear the local UI_speed since that is the transition OFF->RAMP condition
+        UI_speed = 0;
+
+        // kill the driver signals
+        All_phase_stop();
+        Commanded_Dutycycle = PWM_0PCNT;
+
         break;
     }
 
-    set_dutycycle( PWM_Dutycycle );
+    set_dutycycle( Commanded_Dutycycle );
 }

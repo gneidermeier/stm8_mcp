@@ -22,13 +22,28 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+//#include <stdint.h> ... no .. compile error
+#ifndef INT8_MIN 
+  #define INT8_MIN S8_MIN
+#endif
 
-/* Public variables  ---------------------------------------------------------*/
+#ifndef INT8_MAX
+  #define INT8_MAX S8_MAX 
+#endif
+
+
+#define TRIM_DEFAULT 28 // close to the minimum ramp DC
+
+/* Public variables  ---------------------------------------------------------*/
 
 
 
 
 /* Private variables ---------------------------------------------------------*/
+
+static uint16_t Analog_slider; // input var for 10-bit ADC conversions
+static uint8_t UI_Speed;       // speed setting in 8-bits
+static int8_t Digital_trim_switch; // trim switches have + and - extents
 
 static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
 
@@ -98,8 +113,6 @@ char GetKey(void)
 
 // hack, temp
 
-static uint16_t UI_Speed;
-
 extern int Back_EMF_Falling_PhX;
 extern int Back_EMF_Riseing_PhX;
 
@@ -156,40 +169,41 @@ void Periodic_task(void)
 {
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
+    int16_t tmp_sint16;
     char key;
 
     BLDC_STATE_T bldc_state = get_bldc_state();
 
-    // only do low-voltage/stalled diagnostic in ON (not ramp) state for now
+    // only do low-voltage/stalled diagnostic in ON state for now ... should it keep track
+    // of the fault state or poll it?
     if (BLDC_ON == bldc_state )
     {
         if ( FAULT_SET == Faultm_update() )
         {
 #if 1 // #if ENABLE_VLOW_FAULT
-            set_bldc_state( BLDC_FAULT );
+            set_bldc_state( BLDC_FAULT ); // eerrggg you are violating the state machine 
 #endif
         }
     }
 
-#if 0
 //   svc a UI potentiometer
-    UI_Speed = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
-    UI_Speed /= 16; // use [ 0: 63 ]
+    Analog_slider = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
+    Analog_slider /= 4; // [ 0: 1023 ] -> [ 0: 255 ]
 
-    if (0 == manual_mode_start )
+ Analog_slider  = 0; // tmp ... zero it out
+
+// careful with expression containing signed int ... ui_speed is defaulted 
+// to 0 and only assign from temp sum if positive.
+    UI_Speed = 0;
+    tmp_sint16 = Analog_slider + Digital_trim_switch;
+
+    if (tmp_sint16 > 0)
     {
-// was NOT started in dev/test mode, so go ahead and use "UI" (servo-pulse?) input
+        UI_Speed = Analog_slider + Digital_trim_switch;
+    }  
 
-        if (0 == Fault)
-        {
-            BLDC_PWMDC_Set(UI_Speed); // note only does anything if BLDC_ON
-        }
-        else
-        {
-            BLDC_PWMDC_Set(0);
-        }
-    }
-#endif
+    BLDC_PWMDC_Set(UI_Speed);
+
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
      * simply designates number of reps ... spacing TBD? this task is now tied to
@@ -217,10 +231,16 @@ void Periodic_task(void)
             UARTputs("###\r\n");
 
             Log_Level = 0;
+// reset the simulated trim swtich between system runs
+            Digital_trim_switch = TRIM_DEFAULT;
         }
         else if (key == '+')
         {
-            BLDC_PWMDC_Plus();
+            if (Digital_trim_switch < INT8_MAX)
+            {
+                Digital_trim_switch += 1;
+            }
+            BLDC_PWMDC_Plus();          ///// todo: go away
 
             UARTputs("+++\r\n");
 
@@ -228,7 +248,11 @@ void Periodic_task(void)
         }
         else if (key == '-')
         {
-            BLDC_PWMDC_Minus();
+            if (Digital_trim_switch > INT8_MIN)
+            {
+                Digital_trim_switch -= 1;
+            }
+            BLDC_PWMDC_Minus();             ///// todo: go away
 
             UARTputs("---\r\n");
         }
@@ -262,5 +286,5 @@ uint8_t Task_Ready(void)
  */
 void Periodic_Task_Wake(void)
 {
-    TaskRdy = TRUE; // notify background process 
+    TaskRdy = TRUE; // notify background process
 }
