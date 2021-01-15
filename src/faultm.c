@@ -22,7 +22,7 @@
  */
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
-#define  FAULT_BUCKET_INI  32 // this macro should be derived from the faultm update rate somehow 
+#define  FAULT_BUCKET_INI  64 // this macro should be derived from the faultm update rate somehow 
 
 
 /* Private types -----------------------------------------------------------*/
