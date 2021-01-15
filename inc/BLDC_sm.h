@@ -44,11 +44,8 @@ BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
 void set_commutation_period(uint16_t);
 uint16_t get_commutation_period(void);
 
-void BLDC_Spd_inc(void); // should go away
-void BLDC_Spd_dec(void);// should go away
-
-void BLDC_PWMDC_Plus(void);
-void BLDC_PWMDC_Minus(void);
+void BLDC_Spd_inc(void);
+void BLDC_Spd_dec(void);
 
 void BLDC_PWMDC_Set(uint8_t dc);
 
