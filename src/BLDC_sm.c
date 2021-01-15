@@ -17,11 +17,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-
-
-//#define  TEST_UI_PWM
-
-
 #define PWM_0PCNT      0
 
 #define PWM_10PCNT     ( PWM_100PCNT / 10 )
@@ -135,6 +130,20 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
     return ret;
 }
 
+/*
+ * common sub for stopping and fault states
+ */
+static void haltensie(void)
+{
+// have to clear the local UI_speed since that is the transition OFF->RAMP condition
+        UI_speed = 0;
+
+        // kill the driver signals
+        All_phase_stop();
+        Commanded_Dutycycle = PWM_0PCNT;
+}
+
+
 /* Public functions ---------------------------------------------------------*/
 
 /*
@@ -146,35 +155,6 @@ void BLDC_Stop(void)
     set_bldc_state( BLDC_RESET );
 }
 
-/*
- * increment set and return present motor speed value
- */
-void BLDC_PWMDC_Plus()
-{
-// let bldc timing logic regain control of commutattion time
-    Manual_Ovrd = 0;
-#ifndef TEST_UI_PWM
-    if (Commanded_Dutycycle < 0xFFFF) // prevent integer rollover
-    {
-        Commanded_Dutycycle += 1;
-    }
-#endif
-}
-
-/*
- * decrement set and return present motor speed value
- */
-void BLDC_PWMDC_Minus()
-{
-// let bldc timing logic regain control of commutattion time
-    Manual_Ovrd = 0;
-#ifndef TEST_UI_PWM
-    if (Commanded_Dutycycle > 0)
-    {
-        Commanded_Dutycycle -= 1;
-    }
-#endif
-}
 
 /*
  * sets motor speed from commanded throttle/UI setting  (experimental)
@@ -197,7 +177,7 @@ void BLDC_PWMDC_Set(uint8_t dc)
  */
 void BLDC_Spd_dec()
 {
-    Manual_Ovrd = 1;
+    Manual_Ovrd = TRUE;
 
     BLDC_OL_comm_tm += 1; // slower
 }
@@ -207,7 +187,7 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-    Manual_Ovrd = 1;
+    Manual_Ovrd = TRUE;
 
     BLDC_OL_comm_tm -= 1; // faster
 }
@@ -244,18 +224,6 @@ BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
  * BLDC Update:
  *  Called from ISR
  *  Handle the BLDC state:
- *      Off: nothing
- *      Rampup: get BLDC up to sync speed to est. comm. sync.
- *              Once the HI OL speed (frequency) is reached, then the idle speed
- *              must be established, i.e. controlling PWM DC to ? to achieve 2500RPM
- *              To do this closed loop, will need to internally time between the
- *              A/D or comparator input interrupts and adjust DC using e.g. Proportional
- *              control. When idle speed is reached, can transition to user control i.e. ON State
- *      On:  definition of ON state - user control (button inputs) has been enabled
- *              1) ideally, does nothing - BLDC_Step triggered by A/D comparator event
- *              2) less ideal, has to check A/D or comp. result and do the comm.
- *                 step ... but the resolution will be these discrete steps
- *                 (of TIM1 reference)
  */
 void BLDC_Update(void)
 {
@@ -283,13 +251,18 @@ void BLDC_Update(void)
         break;
 
     case BLDC_ON:
-#ifdef TEST_UI_PWM
-        Commanded_Dutycycle = UI_speed;
-#endif
-        if ( 0 == Manual_Ovrd )
+        // if UI_speed is changing, then release manual commutation button mode
+        if (Commanded_Dutycycle != UI_speed)
+        {
+            Manual_Ovrd = FALSE;
+        }
+
+        if ( FALSE == Manual_Ovrd )
         {
             const int step = 1;
             timing_ramp_control( Get_OL_Timing( get_dutycycle() ), step );
+
+            Commanded_Dutycycle = UI_speed;
         }
         break;
 
@@ -306,12 +279,7 @@ void BLDC_Update(void)
 
     case BLDC_RESET:
 
-// have to clear the local UI_speed since that is the transition OFF->RAMP condition
-        UI_speed = 0;
-        // kill the driver signals
-        All_phase_stop();
-        Commanded_Dutycycle = PWM_0PCNT;
-
+        haltensie();
         Faultm_init();
 
 // was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
@@ -325,12 +293,7 @@ void BLDC_Update(void)
 
     case BLDC_FAULT:
 
-// have to clear the local UI_speed since that is the transition OFF->RAMP condition
-        UI_speed = 0;
-
-        // kill the driver signals
-        All_phase_stop();
-        Commanded_Dutycycle = PWM_0PCNT;
+        haltensie();
 
         break;
     }

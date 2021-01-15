@@ -118,6 +118,8 @@ extern int Back_EMF_Riseing_PhX;
 
 extern uint16_t Vsystem;
 
+// tmp
+uint16_t adc_tmp16;
 
 /*
  * temp, todo better function
@@ -150,11 +152,21 @@ void testUART(void)
     itoa( Vsystem,     cbuf, 16);
     strcat(sbuf, cbuf);
 
-#if 1
+    strcat(sbuf, " bFi=");
+    itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " bFi=");
+    itoa( Back_EMF_Falling_PhX,     cbuf, 16);
+    strcat(sbuf, cbuf);
+
     strcat(sbuf, " UI=");
     itoa(UI_Speed, cbuf, 16);
     strcat(sbuf, cbuf);
-#endif
+
+    strcat(sbuf, " AS=");
+    itoa(Analog_slider, cbuf, 16); // adc_tmp16
+    strcat(sbuf, cbuf);
 
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
@@ -183,23 +195,29 @@ void Periodic_task(void)
 #if 1 // #if ENABLE_VLOW_FAULT
             set_bldc_state( BLDC_FAULT ); // eerrggg you are violating the state machine 
 #endif
+// 			set_fault(voltage_fault)
         }
     }
 
 //   svc a UI potentiometer
-    Analog_slider = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
-    Analog_slider /= 4; // [ 0: 1023 ] -> [ 0: 255 ]
+    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
+    Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 
- Analog_slider  = 0; // tmp ... zero it out
+//    if ( ( BLDC_POR == bldc_state || BLDC_RESET == bldc_state  ) &&  0 != Analog_slider)
+//    {
+//			// powered on with stick up ..... set a fault and stubbornly refuse to geo 
+//			set_fault(control_stick_high)
+//		}
 
 // careful with expression containing signed int ... ui_speed is defaulted 
 // to 0 and only assign from temp sum if positive.
     UI_Speed = 0;
-    tmp_sint16 = Analog_slider + Digital_trim_switch;
+    tmp_sint16 = Digital_trim_switch;
+//    tmp_sint16 += Analog_slider;
 
     if (tmp_sint16 > 0)
     {
-        UI_Speed = Analog_slider + Digital_trim_switch;
+        UI_Speed = tmp_sint16;
     }  
 
     BLDC_PWMDC_Set(UI_Speed);
@@ -240,10 +258,7 @@ void Periodic_task(void)
             {
                 Digital_trim_switch += 1;
             }
-            BLDC_PWMDC_Plus();          ///// todo: go away
-
             UARTputs("+++\r\n");
-
             Log_Level = 20; // ahow some more info
         }
         else if (key == '-')
@@ -252,8 +267,6 @@ void Periodic_task(void)
             {
                 Digital_trim_switch -= 1;
             }
-            BLDC_PWMDC_Minus();             ///// todo: go away
-
             UARTputs("---\r\n");
         }
         else // anykey
