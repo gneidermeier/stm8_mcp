@@ -23,20 +23,19 @@
 /* Private defines -----------------------------------------------------------*/
 
 //#include <stdint.h> ... no .. compile error
-#ifndef INT8_MIN 
-  #define INT8_MIN S8_MIN
+#ifndef INT8_MIN
+#define INT8_MIN  S8_MIN
 #endif
 
 #ifndef INT8_MAX
-  #define INT8_MAX S8_MAX 
+#define INT8_MAX  S8_MAX
 #endif
 
 
 #define TRIM_DEFAULT 28 // close to the minimum ramp DC
 
-/* Public variables  ---------------------------------------------------------*/
 
-
+/* Public variables  ---------------------------------------------------------*/
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -193,33 +192,31 @@ void Periodic_task(void)
         if ( FAULT_SET == Faultm_update() )
         {
 #if 1 // #if ENABLE_VLOW_FAULT
-            set_bldc_state( BLDC_FAULT ); // eerrggg you are violating the state machine 
+            set_bldc_state( BLDC_FAULT ); // eerrggg you are violating the state machine
 #endif
 // 			set_fault(voltage_fault)
         }
     }
 
 //   svc a UI potentiometer
-    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ADC1_GetConversionValue();
+    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
     Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 
-//    if ( ( BLDC_POR == bldc_state || BLDC_RESET == bldc_state  ) &&  0 != Analog_slider)
-//    {
-//			// powered on with stick up ..... set a fault and stubbornly refuse to geo 
-//			set_fault(control_stick_high)
-//		}
-
-// careful with expression containing signed int ... ui_speed is defaulted 
-// to 0 and only assign from temp sum if positive.
+// careful with expression containing signed int ... ui_speed is defaulted
+// to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
     UI_Speed = 0;
     tmp_sint16 = Digital_trim_switch;
-//    tmp_sint16 += Analog_slider;
+    tmp_sint16 += Analog_slider;
 
     if (tmp_sint16 > 0)
     {
+        // clip to INT8 MAX S8
+        if (tmp_sint16 > U8_MAX)
+        {
+            tmp_sint16 = U8_MAX;
+        }
         UI_Speed = tmp_sint16;
-    }  
-
+    }
     BLDC_PWMDC_Set(UI_Speed);
 
     /*
@@ -259,7 +256,7 @@ void Periodic_task(void)
                 Digital_trim_switch += 1;
             }
             UARTputs("+++\r\n");
-            Log_Level = 20; // ahow some more info
+            Log_Level = 255; // ahow some more info
         }
         else if (key == '-')
         {
