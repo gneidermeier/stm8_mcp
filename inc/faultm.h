@@ -17,24 +17,33 @@
 #include <stdint.h> // was supposed to go thru sytsem.h :(
 #endif
 
-/*
- *
- */
-#define FAULT_SET    1
-#define FAULT_CLEAR  0
 
 /*
  * types
  */
-typedef int FAULT_STATUS_t;
+
+// condition asserted to the fault status logic ... essentially boolean
+typedef char faultm_assert_t; 
+
+typedef enum
+{
+    VOLTAGE_NG = 0,
+    THROTTLE_HI = 1,
+    FAULT_ID_NR
+} faultm_ID_t;
+
+//#define NR_DEFINED_FAULTS  ( FAULT_ID_NR - 1 )
+
+typedef uint8_t fault_status_reg_t; // fault status bitmap
+
 
 /*
  * prototypes
  */
 
 void Faultm_init(void);
+void Faultm_setf(faultm_ID_t faultm_ID, faultm_assert_t tcondition);
+fault_status_reg_t Faultm_get_status(void);
 
-FAULT_STATUS_t Faultm_update(void);
 
-
-#endif // BLDC_H
+#endif // FAULTM_H

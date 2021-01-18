@@ -89,6 +89,10 @@ static uint8_t Manual_Ovrd;
 
 /* Private function prototypes -----------------------------------------------*/
 
+// only the state-machine is allowed to modify the state variable 
+BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
+
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -136,11 +140,11 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
 static void haltensie(void)
 {
 // have to clear the local UI_speed since that is the transition OFF->RAMP condition
-        UI_speed = 0;
+    UI_speed = 0;
 
-        // kill the driver signals
-        All_phase_stop();
-        Commanded_Dutycycle = PWM_0PCNT;
+    // kill the driver signals
+    All_phase_stop();
+    Commanded_Dutycycle = PWM_0PCNT;
 }
 
 
@@ -233,6 +237,12 @@ void BLDC_Update(void)
 
     BLDC_STATE_T bldc_state = get_bldc_state();
 
+    if ( 0 != Faultm_get_status() )
+    {
+// do not pass go
+        set_bldc_state( BLDC_FAULT );
+    }
+
     switch ( bldc_state )
     {
     default:
@@ -247,7 +257,6 @@ void BLDC_Update(void)
 
             set_commutation_period( BLDC_OL_TM_LO_SPD );
         }
-
         break;
 
     case BLDC_ON:

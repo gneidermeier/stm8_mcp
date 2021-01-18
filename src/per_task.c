@@ -14,7 +14,7 @@
 // app headers
 #include "system.h" // platform specific delarations
 #include "mcu_stm8s.h"
-
+#include "sequence.h"
 #include "bldc_sm.h"
 #include "pwm_stm8s.h"
 #include "faultm.h"
@@ -34,6 +34,8 @@
 
 #define TRIM_DEFAULT 28 // close to the minimum ramp DC
 
+#define V_SHUTDOWN_THR      0x0340 // experimentally determined!
+
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -47,6 +49,8 @@ static int8_t Digital_trim_switch; // trim switches have + and - extents
 static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
 
 static uint8_t Log_Level;
+
+static  uint16_t Vsystem; // persistent for averaging
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -151,6 +155,10 @@ void testUART(void)
     itoa( Vsystem,     cbuf, 16);
     strcat(sbuf, cbuf);
 
+    strcat(sbuf, " SF=");
+    itoa( Faultm_get_status(),     cbuf, 16);
+    strcat(sbuf, cbuf);
+
     strcat(sbuf, " bFi=");
     itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
     strcat(sbuf, cbuf);
@@ -172,6 +180,19 @@ void testUART(void)
 }
 
 /*
+ * monitors system voltage (stalled, stopped motor, over-current)
+ */
+void sys_voltage_mon(void)
+{
+    // eventually the sequencer should be averaging all 3 phases for this
+
+    // update system voltage
+    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
+
+    Faultm_setf(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
+}
+
+/*
  * Execution context is 'main()' so not to block ISR with ADC sampling.
  * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
  * Servicing the UART (presently just a simply one-way logging stream)
@@ -189,13 +210,7 @@ void Periodic_task(void)
     // of the fault state or poll it?
     if (BLDC_ON == bldc_state )
     {
-        if ( FAULT_SET == Faultm_update() )
-        {
-#if 1 // #if ENABLE_VLOW_FAULT
-            set_bldc_state( BLDC_FAULT ); // eerrggg you are violating the state machine
-#endif
-// 			set_fault(voltage_fault)
-        }
+        sys_voltage_mon();
     }
 
 //   svc a UI potentiometer
