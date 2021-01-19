@@ -31,8 +31,11 @@
 #define INT8_MAX  S8_MAX
 #endif
 
-
-#define TRIM_DEFAULT 28 // close to the minimum ramp DC
+#if 1 // test/dev
+ #define TRIM_DEFAULT 28 // close to the minimum ramp DC
+#else
+ #define TRIM_DEFAULT  0 // 
+#endif
 
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
@@ -175,21 +178,67 @@ void testUART(void)
     itoa(Analog_slider, cbuf, 16); // adc_tmp16
     strcat(sbuf, cbuf);
 
+    strcat(sbuf, " SM=");
+    itoa(get_bldc_state(), cbuf, 16); // adc_tmp16
+    strcat(sbuf, cbuf);
+
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
 }
 
 /*
  * monitors system voltage (stalled, stopped motor, over-current)
+ * The voltage measurement is understood to be while PWM cycle is driving one or more
+ * motor phases, so close to the DC rail voltage.
  */
 void sys_voltage_mon(void)
 {
     // eventually the sequencer should be averaging all 3 phases for this
 
-    // update system voltage
-    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
+    if (BLDC_ON == get_bldc_state() )
+    {
+        Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-    Faultm_setf(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
+        Faultm_setf(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
+    }
+}
+
+/*
+ * Service the slider and trim inputs for speed setting.
+ * The UI Speed value is a uint8 and represents the adjustment range of e.g. a 
+ * proportional RC radio control signal (eventually), and alternatively the 
+ * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where 
+ * is expected to be rescaled to suite the range/precision required for PWM timer.
+ * the 
+ */
+void set_ui_speed(void)
+{
+    BLDC_STATE_T sm_state;
+
+    int16_t tmp_sint16;
+
+//   svc a UI potentiometer
+    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
+    Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
+
+// careful with expression containing signed int ... ui_speed is defaulted
+// to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
+    UI_Speed = 0; // obviously not doing any averaging w/ this
+
+    tmp_sint16 = Digital_trim_switch;
+//    tmp_sint16 += Analog_slider; // neutered for now
+
+    if (tmp_sint16 > 0)
+    {
+        // clip to INT8 MAX S8
+        if (tmp_sint16 > U8_MAX)
+        {
+            tmp_sint16 = U8_MAX;
+        }
+        UI_Speed = tmp_sint16;
+    }
+
+    BLDC_PWMDC_Set(UI_Speed);
 }
 
 /*
@@ -204,35 +253,11 @@ void Periodic_task(void)
     int16_t tmp_sint16;
     char key;
 
-    BLDC_STATE_T bldc_state = get_bldc_state();
+    // update system voltage diagnostic
+    sys_voltage_mon();
 
-    // only do low-voltage/stalled diagnostic in ON state for now ... should it keep track
-    // of the fault state or poll it?
-    if (BLDC_ON == bldc_state )
-    {
-        sys_voltage_mon();
-    }
-
-//   svc a UI potentiometer
-    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
-    Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
-
-// careful with expression containing signed int ... ui_speed is defaulted
-// to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
-    UI_Speed = 0;
-    tmp_sint16 = Digital_trim_switch;
-    tmp_sint16 += Analog_slider;
-
-    if (tmp_sint16 > 0)
-    {
-        // clip to INT8 MAX S8
-        if (tmp_sint16 > U8_MAX)
-        {
-            tmp_sint16 = U8_MAX;
-        }
-        UI_Speed = tmp_sint16;
-    }
-    BLDC_PWMDC_Set(UI_Speed);
+    // update the UI speed input slider+trim
+    set_ui_speed();
 
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
@@ -256,6 +281,7 @@ void Periodic_task(void)
 
         if (key == ' ') // space character
         {
+            // reset the machine
             BLDC_Stop();
 
             UARTputs("###\r\n");
@@ -266,6 +292,7 @@ void Periodic_task(void)
         }
         else if (key == '+')
         {
+// if fault/throttle-high ... diag msg?
             if (Digital_trim_switch < INT8_MAX)
             {
                 Digital_trim_switch += 1;
@@ -275,6 +302,7 @@ void Periodic_task(void)
         }
         else if (key == '-')
         {
+// if fault/throttle-high ... diag msg?
             if (Digital_trim_switch > INT8_MIN)
             {
                 Digital_trim_switch -= 1;
