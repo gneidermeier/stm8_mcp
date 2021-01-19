@@ -66,8 +66,6 @@ fault_status_reg_t fault_status_reg;
 
 /* Private variables ---------------------------------------------------------*/
 
-static int vsys_fault_bucket;
-
 static faultm_mat_t fault_matrix[ NR_DEFINED_FAULTS ];
 
 
@@ -84,7 +82,6 @@ static faultm_mat_t fault_matrix[ NR_DEFINED_FAULTS ];
 void Faultm_init(void)
 {
     int nnn;
-    vsys_fault_bucket = FAULT_BUCKET_INI;
 
     // intialize fault matrix
     memset(fault_matrix, 0, sizeof(fault_matrix) /* size in bytes */ );
@@ -108,24 +105,50 @@ void Faultm_init(void)
  */
 fault_status_reg_t Faultm_get_status(void)
 {
-    return ( fault_status_reg != 0 );
+    return fault_status_reg;
 }
 
 /*
- * public function for fault matrix ... inline or possibly to be
- * converted to a macro
+ * set the fault matrix bit and status word
  */
-void Faultm_setf(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
+void Faultm_set(faultm_ID_t faultm_ID)
 {
 // assert (fault_ID < MAX)
-    fault_status_reg_t  mask = 1 << faultm_ID;
+
+// use a pointer to cleanup (and optimize away the array-access?)
+    faultm_mat_t * pfaultm  = &fault_matrix[ faultm_ID ];
+
+//    fault_status_reg_t  mask = (1 << faultm_ID); // maybe ... not necessary for now
+    fault_status_reg_t  mask = (fault_status_reg_t) faultm_ID;
+
+    pfaultm->state =  (FALSE != pfaultm->enabled);
+
+// set bucket full ... wouldn't really need the "state" varaible
+    pfaultm->bucket = -1; // FAULT_BUCKET_INI
+
+    // note: OR allows multiple faults to be indicated in the status-word not that it
+    // makes much difference
+    fault_status_reg |= mask;
+}
+
+
+/*
+ * set the fault matrix bit and status word
+ * If a single fault shuts down the system, it doesn't really need the means to 
+ * flag multiple conditions.
+ */
+void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
+{
+// assert (fault_ID < MAX)
+//    fault_status_reg_t  mask = (1 << faultm_ID); // maybe ... not necessary for now
+    fault_status_reg_t  mask = (fault_status_reg_t) faultm_ID;
 
 // use a pointer to cleanup (and optimize away the array-access?)
     faultm_mat_t * pfaultm  = &fault_matrix[ faultm_ID ];
 
     if (tcondition)
     {
-        // voltage has sagged ... likely motor stall!
+        // if bucket < thr, then increment it else latch the fault
         if ( pfaultm->bucket < FAULT_BUCKET_INI )
         {
             pfaultm->bucket += 1;
@@ -133,8 +156,7 @@ void Faultm_setf(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
         else
         {
             // if the fault is enabled, then set it
-            pfaultm->state =  (FALSE != pfaultm->enabled);
-            fault_status_reg |= mask;
+            Faultm_set(faultm_ID);
         }
     }
     else
@@ -145,8 +167,7 @@ void Faultm_setf(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
         }
         else
         {
-            pfaultm->state = FALSE ;
-            fault_status_reg &= ~mask;
+// shouldnt need to do anything here ... we don't clear faults (requires system reset)
         }
     }
 }

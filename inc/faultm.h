@@ -27,9 +27,12 @@ typedef char faultm_assert_t;
 
 typedef enum
 {
-    VOLTAGE_NG = 0,
-    THROTTLE_HI = 1,
-    FAULT_ID_NR
+// set explicit integer values to use bit-positions in system-error word w/o 
+// requiring any bit-shift/division to index bits in the array
+    FAULT_0 = 1,
+    FAULT_1 = 2,
+    VOLTAGE_NG = 4,
+    THROTTLE_HI = 8
 } faultm_ID_t;
 
 //#define NR_DEFINED_FAULTS  ( FAULT_ID_NR - 1 )
@@ -42,7 +45,11 @@ typedef uint8_t fault_status_reg_t; // fault status bitmap
  */
 
 void Faultm_init(void);
-void Faultm_setf(faultm_ID_t faultm_ID, faultm_assert_t tcondition);
+
+void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition);
+void Faultm_set(faultm_ID_t faultm_ID);
+void Faultm_clr(faultm_ID_t faultm_ID);
+
 fault_status_reg_t Faultm_get_status(void);
 
 

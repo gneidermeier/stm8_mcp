@@ -39,6 +39,9 @@
 
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
+// essentially the same thing but make an "internal" type for working with the 
+// state enumerations
+typedef BLDC_STATE_T  STATEM_T; // 
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -191,7 +194,7 @@ void testUART(void)
  * The voltage measurement is understood to be while PWM cycle is driving one or more
  * motor phases, so close to the DC rail voltage.
  */
-void sys_voltage_mon(void)
+void sys_voltage_mon(STATEM_T sm_state)
 {
     // eventually the sequencer should be averaging all 3 phases for this
 
@@ -199,7 +202,7 @@ void sys_voltage_mon(void)
     {
         Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-        Faultm_setf(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
+        Faultm_upd(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
     }
 }
 
@@ -211,10 +214,8 @@ void sys_voltage_mon(void)
  * is expected to be rescaled to suite the range/precision required for PWM timer.
  * the 
  */
-void set_ui_speed(void)
+void set_ui_speed(STATEM_T sm_state)
 {
-    BLDC_STATE_T sm_state;
-
     int16_t tmp_sint16;
 
 //   svc a UI potentiometer
@@ -226,7 +227,7 @@ void set_ui_speed(void)
     UI_Speed = 0; // obviously not doing any averaging w/ this
 
     tmp_sint16 = Digital_trim_switch;
-//    tmp_sint16 += Analog_slider; // neutered for now
+    tmp_sint16 += Analog_slider; // neutered for now
 
     if (tmp_sint16 > 0)
     {
@@ -236,6 +237,19 @@ void set_ui_speed(void)
             tmp_sint16 = U8_MAX;
         }
         UI_Speed = tmp_sint16;
+    }
+
+// only OFF state is of interest for Throttle-high diagnostic.
+// There is no check for the error condition to go away - the user
+// would need to lower the throttle stick and then the system to reset.
+    if (BLDC_OFF == sm_state)
+    {
+        // require stick to be put down before arming/ready
+        if (Analog_slider > 0)
+        {
+            Faultm_set(THROTTLE_HI);
+            UI_Speed = 0;
+        }
     }
 
     BLDC_PWMDC_Set(UI_Speed);
@@ -252,12 +266,13 @@ void Periodic_task(void)
     char cbuf[8] = { 0, 0 };
     int16_t tmp_sint16;
     char key;
+    BLDC_STATE_T sm_state = get_bldc_state();
 
     // update system voltage diagnostic
-    sys_voltage_mon();
+    sys_voltage_mon( (STATEM_T) sm_state );
 
     // update the UI speed input slider+trim
-    set_ui_speed();
+    set_ui_speed( (STATEM_T) sm_state );
 
     /*
      * debug logging information can be "scheduled" by setting the level, which for now
