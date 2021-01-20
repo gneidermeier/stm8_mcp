@@ -102,34 +102,46 @@ static uint8_t Manual_Ovrd;
  * @param   tgt_commutation_per  Target value to track.
  * @param   step integer step    Increment of the ramp (the slope).
  *
- * @return  +1 if positive increment
- *          -1 if negative increment
- *          0 if control variable equal to target
+ * If the integer step is 0, the target value is set directly with no ramping.
  */
-int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
+void timing_ramp_control(uint16_t tgt_commutation_per, uint8_t stepi)
 {
     int error;
-    int ret = 0;
-    uint16_t u16 = get_commutation_period();
+    uint16_t u16 = BLDC_OL_comm_tm;
 
-    error = tgt_commutation_per - u16;
-
-    // determine signage of error i.e. step increment
-    if (error < 0)
+    if (stepi > 0)
     {
-        // negate the step parameter
-        u16 -= increment;
-        ret = -1;
+        stepi &= ~0x08; // arbitrary limit on step, doesn't need to be that big
+        error = tgt_commutation_per - u16;
+
+        // determine signage of error i.e. step increment
+        if (error < 0)
+        {
+            u16 -= stepi;
+
+            if (u16 > S16_MAX)
+            {
+                // out of range and likely underflow
+                u16 = 0;
+            }
+        }
+        else if (error > 0)
+        {
+            u16 += stepi;
+
+            if (u16 > S16_MAX)
+            {
+                // clip to s16 max
+                u16 = S16_MAX;
+            }
+        }
     }
-    else if (error > 0)
+    else
     {
-        u16 += increment;
-        ret = 1;
+        u16 = tgt_commutation_per;
     }
 
-    BLDC_OL_comm_tm = u16;
-
-    return ret;
+    BLDC_OL_comm_tm  = u16;
 }
 
 /*
@@ -240,8 +252,9 @@ BLDC_STATE_T get_bldc_state(void)
 void BLDC_Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
-
-    int itemp;
+// commutation timing value defaults to table lookup indexed by duty-cycle
+    uint16_t timing_value = Get_OL_Timing( Commanded_Dutycycle );
+    uint8_t ramp_step = 1; // default ramp step in on-state
 
     if ( 0 != Faultm_get_status() )
     {
@@ -281,13 +294,13 @@ void BLDC_Update(void)
         break;
 
     case BLDC_RAMPUP:
-        itemp = timing_ramp_control(
-                    Get_OL_Timing( get_dutycycle() ), BLDC_ONE_RAMP_UNIT );
+        // timing_value == Get_OL_Timing() from above
 
-        if ( itemp >= 0 ) // ( comm_time < target )
+        timing_ramp_control(timing_value, BLDC_ONE_RAMP_UNIT );
+
+        if (timing_value > BLDC_OL_comm_tm)
         {
-            // state-transition trigger
-            set_bldc_state( BLDC_ON );
+            set_bldc_state( BLDC_ON ); // state-transition trigger
         }
         break;
 
