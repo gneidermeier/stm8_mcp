@@ -12,26 +12,17 @@
 #include <string.h> // memset
 #include "faultm.h"  // public types used internally
 
-#include "sequence.h"
 
 
 /* Private defines -----------------------------------------------------------*/
 
-/*
- * threshold and bucket establish the sensitivity of the fault action.
- * the bucket value is a counter related to the update rate of the function.
- */
-#define V_SHUTDOWN_THR      0x0340 // experimentally determined!
-
 //this macro should be derived from the faultm update rate somehow
 #define  FAULT_BUCKET_INI  63 // 6-bits (largets allowed by the bit-field)
 
-
-/* Private types -----------------------------------------------------------*/
-
-
 #define NR_DEFINED_FAULTS  8   // 8-bits provided by fault status bitmap
 
+
+/* Private types -----------------------------------------------------------*/
 
 typedef enum
 {
@@ -52,11 +43,6 @@ typedef struct fault_matrix
     faultm_state_t state:  1;
 
 } faultm_mat_t;
-
-
-
-static faultm_mat_t fault_matrix[ NR_DEFINED_FAULTS ];
-
 
 
 /* Public variables  ---------------------------------------------------------*/
