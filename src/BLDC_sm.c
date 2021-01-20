@@ -89,8 +89,6 @@ static uint8_t Manual_Ovrd;
 
 /* Private function prototypes -----------------------------------------------*/
 
-// only the state-machine is allowed to modify the state variable 
-BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
 
 
 /* Private functions ---------------------------------------------------------*/
@@ -129,7 +127,7 @@ int timing_ramp_control(uint16_t tgt_commutation_per, int increment)
         ret = 1;
     }
 
-    set_commutation_period( u16 );
+    BLDC_OL_comm_tm = u16;
 
     return ret;
 }
@@ -147,6 +145,13 @@ static void haltensie(void)
     Commanded_Dutycycle = PWM_0PCNT;
 }
 
+/*
+ * only the state-machine is allowed to modify the state variable
+ */
+static BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
+{
+    BLDC_State = newstate;
+}
 
 /* Public functions ---------------------------------------------------------*/
 
@@ -156,6 +161,10 @@ static void haltensie(void)
  */
 void BLDC_Stop(void)
 {
+    // had to move these into here again
+    haltensie();
+    Faultm_init();
+
     set_bldc_state( BLDC_RESET );
 }
 
@@ -175,6 +184,15 @@ void BLDC_PWMDC_Set(uint8_t dc)
         UI_speed = (uint16_t) dc;
     }
 }
+
+/*
+ * getter for the Commanded Duty Cycle
+ */
+uint16_t BLDC_PWMDC_Get(void)
+{
+    return Commanded_Dutycycle;
+}
+
 
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
@@ -203,11 +221,6 @@ void BLDC_Spd_inc()
   * None
   * @retval void None
   */
-void set_commutation_period(uint16_t u16pd)
-{
-    BLDC_OL_comm_tm = u16pd;
-}
-
 uint16_t get_commutation_period(void)
 {
     return BLDC_OL_comm_tm;
@@ -217,11 +230,6 @@ uint16_t get_commutation_period(void)
 BLDC_STATE_T get_bldc_state(void)
 {
     return BLDC_State;
-}
-// BLDC_set_state( state )
-BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
-{
-    BLDC_State = newstate;
 }
 
 /*
@@ -235,27 +243,24 @@ void BLDC_Update(void)
 
     int itemp;
 
-    BLDC_STATE_T bldc_state = get_bldc_state();
-
     if ( 0 != Faultm_get_status() )
     {
 // do not pass go
         set_bldc_state( BLDC_FAULT );
     }
 
-    switch ( bldc_state )
+    switch ( get_bldc_state() )
     {
     default:
     case BLDC_OFF:
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
-            // initial value of DC
             Commanded_Dutycycle = PWM_DC_RAMPUP;
 
             set_bldc_state( BLDC_RAMPUP );
 
-            set_commutation_period( BLDC_OL_TM_LO_SPD );
+            BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
         break;
 
@@ -287,15 +292,15 @@ void BLDC_Update(void)
         break;
 
     case BLDC_RESET:
-
-        haltensie();
-        Faultm_init();
-
+        /* inneffective ... seems to be a race resetting fault on reset
+                haltensie();
+                Faultm_init();
+        */
 // was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
-        set_commutation_period( LUDICROUS_SPEED );
+        BLDC_OL_comm_tm = LUDICROUS_SPEED;
 
         set_bldc_state( BLDC_OFF );
         break;
