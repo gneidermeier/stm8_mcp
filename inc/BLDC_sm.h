@@ -26,11 +26,12 @@
  */
 typedef enum
 {
-    BLDC_FAULT,
-    BLDC_RESET,
+    BLDC_RESET = 0,
     BLDC_OFF,
+    BLDC_READY,
     BLDC_RAMPUP,
-    BLDC_ON
+    BLDC_ON,
+    BLDC_FAULT = 255 // numerical value irrelevant other than for display purpose
 } BLDC_STATE_T;
 
 
@@ -39,15 +40,14 @@ typedef enum
  */
 
 BLDC_STATE_T get_bldc_state(void);
-BLDC_STATE_T set_bldc_state( BLDC_STATE_T );
 
-void set_commutation_period(uint16_t);
 uint16_t get_commutation_period(void);
 
 void BLDC_Spd_inc(void);
 void BLDC_Spd_dec(void);
 
 void BLDC_PWMDC_Set(uint8_t dc);
+uint16_t BLDC_PWMDC_Get(void);
 
 void BLDC_Stop(void);
 

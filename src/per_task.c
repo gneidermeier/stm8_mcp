@@ -12,11 +12,10 @@
 #include <string.h>
 
 // app headers
-#include "system.h" // platform specific delarations
+//#include "system.h" // platform specific delarations
 #include "mcu_stm8s.h"
 #include "sequence.h"
 #include "bldc_sm.h"
-#include "pwm_stm8s.h"
 #include "faultm.h"
 
 
@@ -125,10 +124,6 @@ char GetKey(void)
 extern int Back_EMF_Falling_PhX;
 extern int Back_EMF_Riseing_PhX;
 
-extern uint16_t Vsystem;
-
-// tmp
-uint16_t adc_tmp16;
 
 /*
  * temp, todo better function
@@ -154,7 +149,7 @@ void testUART(void)
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " DC=");
-    itoa( get_dutycycle(),     cbuf, 16);
+    itoa( BLDC_PWMDC_Get(),     cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " Vs=");
@@ -219,7 +214,7 @@ void set_ui_speed(STATEM_T sm_state)
     int16_t tmp_sint16;
 
 //   svc a UI potentiometer
-    adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
+    uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
     Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 
 // careful with expression containing signed int ... ui_speed is defaulted

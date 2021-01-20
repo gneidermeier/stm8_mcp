@@ -90,10 +90,6 @@ void set_dutycycle(uint16_t global_dutycycle)
     global_uDC = global_dutycycle;
 }
 
-uint16_t get_dutycycle(void)
-{
-    return global_uDC;
-}
 
 
 /*
