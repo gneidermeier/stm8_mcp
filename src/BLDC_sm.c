@@ -270,14 +270,14 @@ void BLDC_Update(void)
         if (UI_speed > _RampupDC_ )
         {
             Commanded_Dutycycle = PWM_DC_RAMPUP;
-
+            timing_value = BLDC_OL_TM_LO_SPD;
+            ramp_step = 0;
             set_bldc_state( BLDC_RAMPUP );
-
-            BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
         break;
 
     case BLDC_ON:
+				// timing_value == Get_OL_Timing() from above and ramp step is default
         // if UI_speed is changing, then release manual commutation button mode
         if (Commanded_Dutycycle != UI_speed)
         {
@@ -286,17 +286,13 @@ void BLDC_Update(void)
 
         if ( FALSE == Manual_Ovrd )
         {
-            const int step = 1;
-            timing_ramp_control( Get_OL_Timing( get_dutycycle() ), step );
-
             Commanded_Dutycycle = UI_speed;
         }
         break;
 
     case BLDC_RAMPUP:
-        // timing_value == Get_OL_Timing() from above
-
-        timing_ramp_control(timing_value, BLDC_ONE_RAMP_UNIT );
+        // timing_value == Get_OL_Timing() from above but ramp step is different
+        ramp_step = BLDC_ONE_RAMP_UNIT;
 
         if (timing_value > BLDC_OL_comm_tm)
         {
@@ -313,17 +309,18 @@ void BLDC_Update(void)
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
-        BLDC_OL_comm_tm = LUDICROUS_SPEED;
-
+        timing_value = LUDICROUS_SPEED;
+        ramp_step = 0;
         set_bldc_state( BLDC_OFF );
         break;
 
     case BLDC_FAULT:
 
         haltensie();
-
         break;
     }
+
+    timing_ramp_control( timing_value, ramp_step );
 
     set_dutycycle( Commanded_Dutycycle );
 }
