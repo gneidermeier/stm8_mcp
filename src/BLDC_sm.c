@@ -292,7 +292,13 @@ void _Update(void)
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
         BLDC_OL_comm_tm = LUDICROUS_SPEED;
-        set_bldc_state( BLDC_OFF );
+
+// while in Reset state, UI won't begin refreshing the UI Speed until the slider
+// goes low, so once it is greater than 0 then system startup may proceed.
+        if (UI_speed > 0)
+        {
+            set_bldc_state( BLDC_OFF );
+        }
         break;
 
     case BLDC_FAULT:

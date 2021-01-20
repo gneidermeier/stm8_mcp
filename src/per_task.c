@@ -237,7 +237,7 @@ void set_ui_speed(STATEM_T sm_state)
 // only OFF state is of interest for Throttle-high diagnostic.
 // There is no check for the error condition to go away - the user
 // would need to lower the throttle stick and then the system to reset.
-    if (BLDC_OFF == sm_state)
+    if (BLDC_RESET == sm_state)
     {
         // require stick to be put down before arming/ready
         if (Analog_slider > 0)
