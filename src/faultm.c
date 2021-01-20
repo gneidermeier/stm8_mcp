@@ -105,7 +105,7 @@ void Faultm_set(faultm_ID_t faultm_ID)
     faultm_mat_t * pfaultm  = &fault_matrix[ faultm_ID ];
 
 //    fault_status_reg_t  mask = (1 << faultm_ID); // maybe ... not necessary for now
-    fault_status_reg_t  mask = (fault_status_reg_t) faultm_ID;
+    uint8_t  mask = (uint8_t) faultm_ID;
 
     pfaultm->state =  (FALSE != pfaultm->enabled);
 
@@ -114,7 +114,7 @@ void Faultm_set(faultm_ID_t faultm_ID)
 
     // note: OR allows multiple faults to be indicated in the status-word not that it
     // makes much difference
-    fault_status_reg |= mask;
+    fault_status_reg = mask; // |= mask;
 }
 
 
