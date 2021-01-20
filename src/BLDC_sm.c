@@ -241,17 +241,10 @@ BLDC_STATE_T get_bldc_state(void)
  *  Called from ISR
  *  Handle the BLDC state:
  */
-void BLDC_Update(void)
+void _Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
-// commutation timing value defaults to table lookup indexed by duty-cycle
-    uint16_t timing_value;
-
-    if ( 0 != Faultm_get_status() )
-    {
-// do not pass go
-        set_bldc_state( BLDC_FAULT );
-    }
+    uint16_t timing_value; // temp var for table lookup
 
     switch ( get_bldc_state() )
     {
@@ -260,10 +253,9 @@ void BLDC_Update(void)
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
-            Commanded_Dutycycle = PWM_DC_RAMPUP;
-
             set_bldc_state( BLDC_RAMPUP );
-
+            // set initial conditions for ramp state
+            Commanded_Dutycycle = PWM_DC_RAMPUP;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
         break;
@@ -277,16 +269,12 @@ void BLDC_Update(void)
 
         if ( FALSE == Manual_Ovrd )
         {
-            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
-
             Commanded_Dutycycle = UI_speed;
         }
         break;
 
     case BLDC_RAMPUP:
         timing_value = Get_OL_Timing( Commanded_Dutycycle );
-
-        timing_ramp_control(Get_OL_Timing( Commanded_Dutycycle ));
 
         if (timing_value > BLDC_OL_comm_tm)
         {
@@ -304,16 +292,36 @@ void BLDC_Update(void)
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
         BLDC_OL_comm_tm = LUDICROUS_SPEED;
-
         set_bldc_state( BLDC_OFF );
         break;
 
     case BLDC_FAULT:
-
         haltensie();
         break;
     }
 
-
     set_dutycycle( Commanded_Dutycycle );
+}
+
+/*
+ * BLDC Update:
+ *  Called from ISR
+ *  Handle the BLDC state:
+ */
+void BLDC_Update(void)
+{
+    BLDC_STATE_T state = get_bldc_state() ;
+
+    if ( 0 != Faultm_get_status() )
+    {
+// do not pass go
+        set_bldc_state( BLDC_FAULT );
+    }
+
+    _Update();
+
+    if (BLDC_RAMPUP == state || BLDC_ON == state)
+    {
+        timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+    }
 }
