@@ -55,7 +55,7 @@
 // the commutation timing constants (TIM3 period) effectively have a factor of
 // 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
 // actual motor commutation frequency.
-#define BLDC_OL_TM_LO_SPD       0x1000 // 4096d  // start of ramp
+#define BLDC_OL_TM_LO_SPD         0x0B00 // start of ramp
 
 //#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
 
@@ -101,44 +101,36 @@ static uint8_t Manual_Ovrd;
  *
  * @param   tgt_commutation_per  Target value to track.
  * @param   step integer step    Increment of the ramp (the slope).
- *
- * If the integer step is 0, the target value is set directly with no ramping.
  */
-void timing_ramp_control(uint16_t tgt_commutation_per, uint8_t stepi)
+void timing_ramp_control(uint16_t tgt_commutation_per)
 {
+    const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
+
     int error;
     uint16_t u16 = BLDC_OL_comm_tm;
 
-    if (stepi > 0)
+    error = tgt_commutation_per - u16;
+
+    // determine signage of error i.e. step increment
+    if (error < 0)
     {
-        stepi &= ~0x08; // arbitrary limit on step, doesn't need to be that big
-        error = tgt_commutation_per - u16;
+        u16 -= stepi;
 
-        // determine signage of error i.e. step increment
-        if (error < 0)
+        if (u16 > S16_MAX)
         {
-            u16 -= stepi;
-
-            if (u16 > S16_MAX)
-            {
-                // out of range and likely underflow
-                u16 = 0;
-            }
-        }
-        else if (error > 0)
-        {
-            u16 += stepi;
-
-            if (u16 > S16_MAX)
-            {
-                // clip to s16 max
-                u16 = S16_MAX;
-            }
+            // out of range and likely underflow
+            u16 = 0;
         }
     }
-    else
+    else if (error > 0)
     {
-        u16 = tgt_commutation_per;
+        u16 += stepi;
+
+        if (u16 > S16_MAX)
+        {
+            // clip to s16 max
+            u16 = S16_MAX;
+        }
     }
 
     BLDC_OL_comm_tm  = u16;
@@ -253,8 +245,7 @@ void BLDC_Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
 // commutation timing value defaults to table lookup indexed by duty-cycle
-    uint16_t timing_value = Get_OL_Timing( Commanded_Dutycycle );
-    uint8_t ramp_step = 1; // default ramp step in on-state
+    uint16_t timing_value;
 
     if ( 0 != Faultm_get_status() )
     {
@@ -270,14 +261,14 @@ void BLDC_Update(void)
         if (UI_speed > _RampupDC_ )
         {
             Commanded_Dutycycle = PWM_DC_RAMPUP;
-            timing_value = BLDC_OL_TM_LO_SPD;
-            ramp_step = 0;
+
             set_bldc_state( BLDC_RAMPUP );
+
+            BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
         break;
 
     case BLDC_ON:
-				// timing_value == Get_OL_Timing() from above and ramp step is default
         // if UI_speed is changing, then release manual commutation button mode
         if (Commanded_Dutycycle != UI_speed)
         {
@@ -286,13 +277,16 @@ void BLDC_Update(void)
 
         if ( FALSE == Manual_Ovrd )
         {
+            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+
             Commanded_Dutycycle = UI_speed;
         }
         break;
 
     case BLDC_RAMPUP:
-        // timing_value == Get_OL_Timing() from above but ramp step is different
-        ramp_step = BLDC_ONE_RAMP_UNIT;
+        timing_value = Get_OL_Timing( Commanded_Dutycycle );
+
+        timing_ramp_control(Get_OL_Timing( Commanded_Dutycycle ));
 
         if (timing_value > BLDC_OL_comm_tm)
         {
@@ -309,8 +303,8 @@ void BLDC_Update(void)
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
 // or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
-        timing_value = LUDICROUS_SPEED;
-        ramp_step = 0;
+        BLDC_OL_comm_tm = LUDICROUS_SPEED;
+
         set_bldc_state( BLDC_OFF );
         break;
 
@@ -320,7 +314,6 @@ void BLDC_Update(void)
         break;
     }
 
-    timing_ramp_control( timing_value, ramp_step );
 
     set_dutycycle( Commanded_Dutycycle );
 }
