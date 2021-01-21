@@ -31,16 +31,18 @@
 #endif
 
 #if 1 // test/dev
- #define TRIM_DEFAULT 28 // close to the minimum ramp DC
+#define TRIM_DEFAULT 28 // close to the minimum ramp DC
 #else
- #define TRIM_DEFAULT  0 // 
+#define TRIM_DEFAULT  0 //
 #endif
 
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
-// essentially the same thing but make an "internal" type for working with the 
+#define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs 
+
+// essentially the same thing but make an "internal" type for working with the
 // state enumerations
-typedef BLDC_STATE_T  STATEM_T; // 
+typedef BLDC_STATE_T  STATEM_T;
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -128,7 +130,7 @@ extern int Back_EMF_Riseing_PhX;
 /*
  * temp, todo better function
  */
-void testUART(void)
+void testUART(int clear)
 {
     static uint16_t Line_Count = 0;
 
@@ -136,6 +138,11 @@ void testUART(void)
     char cbuf[8] = { 0, 0 };
 
     sbuf[0] = 0;
+
+    if ( 0 != clear)
+    {
+        Line_Count  = 0;
+    }
 
     Line_Count  += 1;;
 
@@ -160,7 +167,7 @@ void testUART(void)
     itoa( Faultm_get_status(),     cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " bFi=");
+    strcat(sbuf, " bRi=");
     itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
     strcat(sbuf, cbuf);
 
@@ -192,22 +199,21 @@ void testUART(void)
 void sys_voltage_mon(STATEM_T sm_state)
 {
     // eventually the sequencer should be averaging all 3 phases for this
+    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
+// system voltage is only available and useable when machine is on 
     if (BLDC_ON == get_bldc_state() )
     {
-        Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
-
         Faultm_upd(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
     }
 }
 
 /*
  * Service the slider and trim inputs for speed setting.
- * The UI Speed value is a uint8 and represents the adjustment range of e.g. a 
- * proportional RC radio control signal (eventually), and alternatively the 
- * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where 
+ * The UI Speed value is a uint8 and represents the adjustment range of e.g. a
+ * proportional RC radio control signal (eventually), and alternatively the
+ * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where
  * is expected to be rescaled to suite the range/precision required for PWM timer.
- * the 
  */
 void set_ui_speed(STATEM_T sm_state)
 {
@@ -246,6 +252,22 @@ void set_ui_speed(STATEM_T sm_state)
             UI_Speed = 0;
         }
     }
+    else if (BLDC_ON == sm_state)
+    {
+        if (Analog_slider > 0) //
+        {
+            // don't get to slow or it will stall and throw a low-voltage fault
+            if (UI_Speed < LOW_SPEED_THR)
+            {
+// u8_max to be used as an out-of-band value which can signify "Reset/Stop"
+                UI_Speed = U8_MAX; 
+                BLDC_Stop(); // ... PWMDC_Set() can  call Stop() ?
+
+                // log some info
+                Log_Level = 10;
+            }
+        }
+    }
 
     BLDC_PWMDC_Set(UI_Speed);
 }
@@ -282,12 +304,12 @@ void Periodic_task(void)
             Log_Level -= 1;
         }
 
-        testUART();// tmp test
+        testUART(0);// tmp test
     }
 
     if (SerialKeyPressed(&key))
     {
-        Log_Level = 1; // show some info
+//        Log_Level = 1; // show some info
 
         if (key == ' ') // space character
         {
@@ -296,7 +318,9 @@ void Periodic_task(void)
 
             UARTputs("###\r\n");
 
-            Log_Level = 0;
+//            Log_Level = 1;
+            testUART(1 /* clear line count */ );// tmp test
+
 // reset the simulated trim swtich between system runs
             Digital_trim_switch = TRIM_DEFAULT;
         }
@@ -308,7 +332,7 @@ void Periodic_task(void)
                 Digital_trim_switch += 1;
             }
             UARTputs("+++\r\n");
-            Log_Level = 255; // ahow some more info
+//            Log_Level = 255; // ahow some more info
         }
         else if (key == '-')
         {
@@ -316,6 +340,7 @@ void Periodic_task(void)
             if (Digital_trim_switch > INT8_MIN)
             {
                 Digital_trim_switch -= 1;
+                Log_Level = 1;
             }
             UARTputs("---\r\n");
         }
