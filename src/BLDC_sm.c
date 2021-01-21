@@ -173,19 +173,32 @@ void BLDC_Stop(void)
 }
 
 
-/*
- * sets motor speed from commanded throttle/UI setting  (experimental)
+/**
+ * @brief Sets motor speed from commanded throttle/UI setting
+ *
+ * The speed setting is checked for range and faults, if out of
+ *        range, Stop() is called.
+ *
+ * @param dc Speed input which can be in the range [0:255] but 255 is to be
+ *        reserved for special use (out of band value). If the PWM resolution
+ *        changes then the input speed will have to be re-scaled accordingly.
+ *
+ * @return n/a.
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    //  dc scale [0:255] is close enough to PWM range [0:250]
-    // but note ui_speed is u16 ... would argue that cast is not really needed
-    // as the implicit  promotion of the rvalue should be well understood and
-    // evident  according to  the rules of C.
-
-    if (BLDC_FAULT != get_bldc_state() )
+    if (UI_speed < U8_MAX)
     {
-        UI_speed = (uint16_t) dc;
+//        if (BLDC_FAULT != get_bldc_state() ) // doesn't seem to need this now
+        {
+// doesn't need a cast, uint8 dc is implicitly promoted to uint16 (type of UI_Speed)
+            UI_speed = (uint16_t) dc;
+        }
+    }
+    else
+    {
+        // speed out of range (U8 MAX can be used as OOB signal)
+        BLDC_Stop();
     }
 }
 
@@ -249,7 +262,7 @@ void _Update(void)
     switch ( get_bldc_state() )
     {
     default:
-    case BLDC_OFF:
+    case BLDC_READY:
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
@@ -297,7 +310,7 @@ void _Update(void)
 // goes low, so once it is greater than 0 then system startup may proceed.
         if (UI_speed > 0)
         {
-            set_bldc_state( BLDC_OFF );
+            set_bldc_state( BLDC_READY );
         }
         break;
 

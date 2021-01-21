@@ -27,7 +27,6 @@
 typedef enum
 {
     BLDC_RESET = 0,
-    BLDC_OFF,
     BLDC_READY,
     BLDC_RAMPUP,
     BLDC_ON,
