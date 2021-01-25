@@ -68,7 +68,7 @@
  * period) decremented by fixed amount each control-loop timestep. Slope
  * determined by experiment (conservative to avoid stalling the motor!)
  */
-#define BLDC_ONE_RAMP_UNIT      2
+#define BLDC_ONE_RAMP_UNIT       2   // RAMP_STEP_LIMIT
 
 
 /* Private types -----------------------------------------------------------*/
@@ -106,30 +106,23 @@ void timing_ramp_control(uint16_t tgt_commutation_per)
 {
     const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
 
-    int error;
     uint16_t u16 = BLDC_OL_comm_tm;
 
-    error = tgt_commutation_per - u16;
-
     // determine signage of error i.e. step increment
-    if (error < 0)
+    if (u16 > tgt_commutation_per)
     {
         u16 -= stepi;
-
-        if (u16 > S16_MAX)
+        if (u16 > BLDC_OL_comm_tm)
         {
-            // out of range and likely underflow
-            u16 = 0;
+            BLDC_OL_comm_tm = u16;
         }
     }
-    else if (error > 0)
+    else if (u16 < tgt_commutation_per)
     {
         u16 += stepi;
-
-        if (u16 > S16_MAX)
+        if (u16 < BLDC_OL_comm_tm)
         {
-            // clip to s16 max
-            u16 = S16_MAX;
+            BLDC_OL_comm_tm = u16;
         }
     }
 
