@@ -21,15 +21,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-//#include <stdint.h> ... no .. compile error
-#ifndef INT8_MIN
-#define INT8_MIN  S8_MIN
-#endif
-
-#ifndef INT8_MAX
-#define INT8_MAX  S8_MAX
-#endif
-
 #if 1 // test/dev
 #define TRIM_DEFAULT 28 // close to the minimum ramp DC
 #else
@@ -180,11 +171,11 @@ void testUART(int clear)
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " AS=");
-    itoa(Analog_slider, cbuf, 16); // adc_tmp16
+    itoa(Analog_slider, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " SM=");
-    itoa(get_bldc_state(), cbuf, 16); // adc_tmp16
+    itoa(get_bldc_state(), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, "\r\n");
@@ -214,6 +205,8 @@ void sys_voltage_mon(STATEM_T sm_state)
  * proportional RC radio control signal (eventually), and alternatively the
  * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where
  * is expected to be rescaled to suite the range/precision required for PWM timer.
+ *
+ * TODO: rate limit of speed input!
  */
 void set_ui_speed(STATEM_T sm_state)
 {
@@ -327,7 +320,7 @@ void Periodic_task(void)
         else if (key == '+')
         {
 // if fault/throttle-high ... diag msg?
-            if (Digital_trim_switch < INT8_MAX)
+            if (Digital_trim_switch < S8_MAX)
             {
                 Digital_trim_switch += 1;
             }
@@ -337,7 +330,7 @@ void Periodic_task(void)
         else if (key == '-')
         {
 // if fault/throttle-high ... diag msg?
-            if (Digital_trim_switch > INT8_MIN)
+            if (Digital_trim_switch > S8_MIN)
             {
                 Digital_trim_switch -= 1;
                 Log_Level = 1;
