@@ -68,7 +68,7 @@
  * period) decremented by fixed amount each control-loop timestep. Slope
  * determined by experiment (conservative to avoid stalling the motor!)
  */
-#define BLDC_ONE_RAMP_UNIT       2   // RAMP_STEP_LIMIT
+#define BLDC_ONE_RAMP_UNIT       1   // RAMP_STEP_LIMIT
 
 
 /* Private types -----------------------------------------------------------*/
@@ -112,21 +112,21 @@ void timing_ramp_control(uint16_t tgt_commutation_per)
     if (u16 > tgt_commutation_per)
     {
         u16 -= stepi;
-        if (u16 > BLDC_OL_comm_tm)
+        if (u16 < tgt_commutation_per)
         {
-            BLDC_OL_comm_tm = u16;
+            u16 = tgt_commutation_per;
         }
+        BLDC_OL_comm_tm  = u16;
     }
     else if (u16 < tgt_commutation_per)
     {
         u16 += stepi;
-        if (u16 < BLDC_OL_comm_tm)
+        if (u16 > tgt_commutation_per)
         {
-            BLDC_OL_comm_tm = u16;
+            u16 = tgt_commutation_per;
         }
+        BLDC_OL_comm_tm  = u16;	
     }
-
-    BLDC_OL_comm_tm  = u16;
 }
 
 /*
@@ -280,9 +280,9 @@ void _Update(void)
         break;
 
     case BLDC_RAMPUP:
-        timing_value = Get_OL_Timing( Commanded_Dutycycle );
+        timing_value = Get_OL_Timing( _RampupDC_ );
 
-        if (timing_value > BLDC_OL_comm_tm)
+        if ( BLDC_OL_comm_tm <= timing_value )
         {
             set_bldc_state( BLDC_ON ); // state-transition trigger
         }
