@@ -8,8 +8,7 @@
   ******************************************************************************
   */
 /**
- * \defgroup Faultm
- * @brief BLDC fault management, tracking, and system status
+ * \defgroup faultm  Faultmon
  * @{
  */
 
@@ -201,3 +200,5 @@ void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
         }
     }
 }
+
+/**@}*/ // defgroup
