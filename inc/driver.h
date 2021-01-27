@@ -1,10 +1,10 @@
 /**
   ******************************************************************************
   * @file driver.h
-  * @brief  
-  * @author
-  * @version 
-  * @date    
+  * @brief Support functions for the BLDC motor control
+  * @author Neidermeier
+  * @version
+  * @date March-2020
   ******************************************************************************
   *
   * BLAH BLAH BLAH
@@ -55,9 +55,8 @@
 
 void Driver_Step(void);
 void Driver_Update(void);
-uint16_t Driver_Get_ADC(void);
-uint16_t Driver_Get_Vbatt(void);
 
+uint16_t Driver_Get_ADC(void);
 uint16_t Driver_Get_Back_EMF_Avg(void);
 
 void bemf_samp_get(void);
