@@ -7,46 +7,79 @@
   * @date Jan-2021
   ******************************************************************************
   */
+/**
+ * \defgroup Faultm
+ * @brief BLDC fault management, tracking, and system status
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h> // memset
 #include "faultm.h"  // public types used internally
 
 
-
 /* Private defines -----------------------------------------------------------*/
 
-//this macro should be derived from the faultm update rate somehow
+/**
+ * @brief Initialization value for fault counter bucket. The fault matrix defines
+ * the bucket as a 6-bits unsigned integer bitfield.
+ * @note This value should be derived from the faultm update rate somehow
+ * @warning This is a warning!
+ */
 #define  FAULT_BUCKET_INI  63 // 6-bits (largets allowed by the bit-field)
 
-#define NR_DEFINED_FAULTS  8   // 8-bits provided by fault status bitmap
+/**
+ * @brief The fault status word is 8-bits wide.
+ */
+#define NR_DEFINED_FAULTS  8
 
 
 /* Private types -----------------------------------------------------------*/
 
+/**
+ * @brief Fault state - 1 bit
+ *
+ * Indicates that the fault condition has been detected frequently enough to
+ * fill the bucket.
+ */
 typedef enum
 {
     FCLR = 0,
     FSET = !FCLR
 } faultm_state_t;
 
+/**
+ * @brief Indicate the fault is enabled - 1 bit
+ */
 typedef enum
 {
     DISABLED = 0,
     ENABLED = !DISABLED
 } faultm_enable_t;
 
+/**
+ * @brief Fault tracking table. The fault matrix shall be instantiated as an
+ * array of 8-bit words
+ *
+ * Compact table for tracking faults with leaky-bucket algorithm.
+ * @note  the matrix is to be instantiated as array of 8-bit words to save RAM
+ * @warning the CPU could blow!
+ * @todo verify that these bitfields are effective!
+ */
 typedef struct fault_matrix
 {
-    unsigned char bucket: 6;
-    faultm_enable_t enabled: 1;
-    faultm_state_t state:  1;
+    unsigned char bucket: 6; /**< bucket counter (6 bits). */
+    faultm_enable_t enabled: 1; /**< Enable bit. */
+    faultm_state_t state:  1; /**< Fault activation state. */
 
 } faultm_mat_t;
 
 
 /* Public variables  ---------------------------------------------------------*/
 
+/**
+ * @brief Fault status system word
+ */
 fault_status_reg_t fault_status_reg;
 
 
@@ -62,8 +95,10 @@ static faultm_mat_t fault_matrix[ NR_DEFINED_FAULTS ];
 
 /* Public functions ---------------------------------------------------------*/
 
-/*
- * initialize
+/**
+ * @brief Initialize the Fault Manager
+ *
+ * Must be called each time the motor state changes from off to running.
  */
 void Faultm_init(void)
 {
@@ -84,18 +119,27 @@ void Faultm_init(void)
     fault_status_reg = 0;
 }
 
-/*
- * return the system status bitmap boolean state
- * 0: all faults cleeared
- * !0: at least one fault is set
+/**
+ * @brief Returns the status word
+ *
+ * @details Returns the system status bitmap boolean state.
+ * @retval  0  all faults cleared
+ * @retval  !0  at least one fault is set
  */
 fault_status_reg_t Faultm_get_status(void)
 {
     return fault_status_reg;
 }
 
-/*
- * set the fault matrix bit and status word
+/**
+ * @brief Set the fault matrix bit and status word.
+ * @note TBD a single fault shuts down the system, i.e. no need to flag/mask multiple
+ * faults?
+ *
+ * @param faultm_ID  Numerical ID of the fault to be set.
+ *
+ * @par Returns
+ *    Nothing.
  */
 void Faultm_set(faultm_ID_t faultm_ID)
 {
@@ -118,10 +162,10 @@ void Faultm_set(faultm_ID_t faultm_ID)
 }
 
 
-/*
- * set the fault matrix bit and status word
- * If a single fault shuts down the system, it doesn't really need the means to 
- * flag multiple conditions.
+/**
+ * @brief Manage fault status with leaky bucket.
+ * @param faultm_ID  Numerical ID of the fault to be set.
+ * @param tcondition  Boolean condition indicating if the fault condition was detected.
  */
 void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
 {
