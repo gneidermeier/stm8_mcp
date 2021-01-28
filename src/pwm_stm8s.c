@@ -27,6 +27,11 @@
   * @date Sept-2020
   ******************************************************************************
   */
+/**
+ * @defgroup mcu Platform STM8S
+ * @brief STM8S platform and peripheral configuration.
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -42,19 +47,6 @@
 /* Private types -----------------------------------------------------------*/
 
 
-
-/*
- * 3 electrical phases
- */
-typedef enum /* THREE_PHASE_CHANNELS */
-{
-    PHASE_NONE,
-    PHASE_A,
-    PHASE_B,
-    PHASE_C
-} BLDC_PHASE_t;
-
-
 /* Public variables  ---------------------------------------------------------*/
 
 
@@ -68,8 +60,8 @@ static uint16_t global_uDC;
 
 /* Public functions ---------------------------------------------------------*/
 
-/*
- * low-level stop: turns off all PWM
+/**
+ * @brief Turn off PWM and disable all 3 phases.
  */
 void All_phase_stop(void)
 {
@@ -84,7 +76,10 @@ void All_phase_stop(void)
     PWM_PhC_HB_DISABLE(0);
 }
 
-
+/**
+ * @brief Putter accessor for PWM duty cycle 
+ * @details Motor speed is controlled through the UI and converted to PWM duty cycle .
+ */ 
 void set_dutycycle(uint16_t global_dutycycle)
 {
     global_uDC = global_dutycycle;
@@ -98,14 +93,7 @@ void set_dutycycle(uint16_t global_dutycycle)
  * since there could be different selections for timer periopheral, channel allocation
  * depending upon device caps.
  */
-
-//           TIM2      CH 1   CH 2   CH 3
-/**
-  * @brief  TIM1 PWM Disable
-  * @par Parameters:
-  * None
-  * @retval void None
-  */
+/** @cond */ // hide the low-level code
 void PWM_PhA_Disable(void)
 {
     TIM2_CCxCmd( TIM2_CHANNEL_1, DISABLE );
@@ -121,12 +109,6 @@ void PWM_PhC_Disable(void)
     TIM2_CCxCmd( TIM2_CHANNEL_3, DISABLE );
 }
 
-/**
-  * @brief  TIM2 PWM Enable and set duty-cycle
-  * @par Parameters:
-  * None
-  * @retval void None
-  */
 void PWM_PhA_Enable(void)
 {
     TIM2_SetCompare1( global_uDC );
@@ -144,3 +126,6 @@ void PWM_PhC_Enable(void)
     TIM2_SetCompare3( global_uDC );
     TIM2_CCxCmd( TIM2_CHANNEL_3, ENABLE );
 }
+/** @endcond */
+
+/**@}*/ // defgroup

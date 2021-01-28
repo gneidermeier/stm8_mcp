@@ -83,8 +83,8 @@
 /* Public types -----------------------------------------------------------*/
 
 
-/*
- * re-purpose the TIM2 channel enumeration but disguise it
+/**
+ * @brief  Generic PWM channel type.
  */
 typedef  TIM2_Channel_TypeDef PWM_Channel_Typedef ; 
 

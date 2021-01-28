@@ -17,8 +17,8 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-/*
- * mainly looping
+/**
+ * @brief mainly looping
  */
 main()
 {
@@ -28,7 +28,7 @@ main()
 
     enableInterrupts(); // interrupts are globally disabled by default
 
-    UARTputs("\033c"); // sends ANSI code to  clear the serial terminal
+//    UARTputs("\033c"); // sends ANSI code to  clear the serial terminal
     UARTputs("Program Startup....... \r\n");
 
     while(1)
@@ -40,7 +40,6 @@ main()
             disableInterrupts();
             BLDC_Stop();
             enableInterrupts();
-            // reset line couunter of the serial-port logger
         }
 
         if (! (( GPIOA->IDR)&(1<<6)))
@@ -63,8 +62,7 @@ main()
 #endif
         }
 
-// while( FALSE == TaskRdy )
-        if ( FALSE == Task_Ready() )  // idk .. don't block here in case there were actually some background tasks to do
+        if ( FALSE == Task_Ready() )
         {
             nop();
         }

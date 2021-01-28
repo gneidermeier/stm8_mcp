@@ -1,12 +1,17 @@
 /**
   ******************************************************************************
-  * @file table.c
-  * @brief support functions for the BLDC motor control
+  * @file mdata.c
+  * @brief  Motor data table lookup
   * @author Neidermeier
   * @version
   * @date Nov-2020
   ******************************************************************************
   */
+/**
+ * \defgroup mdata Motor Model Data
+  * @brief  Motor data table lookup
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -20,28 +25,28 @@
  *   y =  ( 4000 * EXP( -t/25 ) ) + 150
  *
  * Excel was used  to find initial parameters using some data obtained by
- * experimentaiton with running the motor and manually syncing it using the 
+ * experimentaiton with running the motor and manually syncing it using the
  * butttons and terminal inputs for ocmmutiation timing and PWM DC.
  *
  * sync range seems to be [32-68] (duty-cycle) with parameters roughly in these ranges:
- *  A     = [ 1800 : 2000 ]  
+ *  A     = [ 1800 : 2000 ]
  *  TAU   = [ 38 : 34 ]
  *  Y_INT = [ 25 : 30 ]
  *  X_INT = 0
  *
- *  (32-80)/(788-268) =  -0.0923077  
+ *  (32-80)/(788-268) =  -0.0923077
  *
  * The range that needs to be synced is between "Idle" (DC=32) and some higher speed where b-emf is measureable.
- * The exponential seems to do a better job at tracking over the needed 
+ * The exponential seems to do a better job at tracking over the needed
  * interval. Taking the coordinates at the start and end of the range over which
  * the motor is able to stay in sync would give the slope that could be tried for
  * a linear tracking function.
- * 
+ *
  */
 static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 {
 #if 0
- // leave the old data
+// leave the old data
     0x0000,	 // 00 0
     0x0000,	 // 01 1
     0x0000,	 // 02 2
@@ -52,22 +57,22 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
     0x0000,	 // 07 7
     0x0000,	 // 08 8
     0x0CC0,	 // 09 9   /////////////////////// ooozez to a halt
-    0x0BC0,	 // 0A 10    
+    0x0BC0,	 // 0A 10
     0x09E0,	 // 0B 11
-    0x0900,	 // 0C 12 
+    0x0900,	 // 0C 12
     0x0880,	 // 0D 13
-    0x0800,	 // 0E 14 
-    0x0780,	 // 0F 15  
+    0x0800,	 // 0E 14
+    0x0780,	 // 0F 15
     0x0700,	 // 10 16
-    0x0670,	 // 11 17 
+    0x0670,	 // 11 17
     0x0640,	 // 12 18  // 660      680 632
     0x05E1,	 // 13 19  // 600                /// 5e1
-    0x0560,	 // 14 20     
+    0x0560,	 // 14 20
     0x04F0,	 // 15 21
     0x04C0,	 // 16 22
-    0x0490,	 // 17 23 
+    0x0490,	 // 17 23
     0x0460,	 // 18 24
-    0x0430,	 // 19 25 
+    0x0430,	 // 19 25
     0x03F0,	 // 1A 26
     0x03E0,	 // 1B 27
     0x03D0,	 // 1C 28
@@ -127,25 +132,30 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
     0x0172,	 // 50 80
     0x0171,	 // 50 80
     0x0170,	 // 50 80
- //  
+//
 // truncated ... needs more values more precision needed of commutation time period!
 
 #else
- #include "model.h" // hack   headers are horrible
+#include "model.h" // hack   headers are horrible
 #endif
 };
 
 #define OL_TIMING_TBL_SIZE    ( sizeof(OL_Timing) / sizeof(uint16_t) )
 
-/*
- * accessor for table data
+/**
+ * @brief Table lookup for open-loop commutation timing
+ *
+ * @param index  Index into the table - motor speed i.e. PWM duty-cycle
+ *
+ * @return LUT value @ index
+ * @retval -1 error
  */
 uint16_t Get_OL_Timing(uint16_t index)
 {
     // assert index < OL_TIMING_TBL_SIZE
-		if ( index < OL_TIMING_TBL_SIZE )
-		{
-		    return OL_Timing[ index ];
+    if ( index < OL_TIMING_TBL_SIZE )
+    {
+        return OL_Timing[ index ];
     }
-		return -1; // error
+    return -1; // error
 }

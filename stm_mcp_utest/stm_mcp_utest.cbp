@@ -34,10 +34,50 @@
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Unit filename="../inc/BLDC_sm.h" />
+		<Unit filename="../inc/driver.h" />
+		<Unit filename="../inc/faultm.h" />
+		<Unit filename="../inc/mcu_stm8s.h" />
+		<Unit filename="../inc/mdata.h" />
+		<Unit filename="../inc/model.h" />
+		<Unit filename="../inc/parameter.h" />
+		<Unit filename="../inc/per_task.h" />
+		<Unit filename="../inc/pwm_stm8s.h" />
+		<Unit filename="../inc/sequence.h" />
+		<Unit filename="../inc/stm8s_conf.h" />
+		<Unit filename="../inc/stm8s_it.h" />
+		<Unit filename="../inc/system.h" />
 		<Unit filename="../src/BLDC_sm.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="../src/driver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/faultm.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/mcu_stm8s.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="../src/mdata.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/model.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/per_task.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/pwm_stm8s.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/sequence.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../src/stm8s_it.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="inc/putf.h" />
@@ -54,6 +94,15 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Extensions>
+			<DoxyBlocks>
+				<comment_style block="0" line="0" />
+				<doxyfile_project />
+				<doxyfile_build />
+				<doxyfile_warnings />
+				<doxyfile_output />
+				<doxyfile_dot />
+				<general />
+			</DoxyBlocks>
 			<lib_finder disable_auto="1" />
 		</Extensions>
 	</Project>

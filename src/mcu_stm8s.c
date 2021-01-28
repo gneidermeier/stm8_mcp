@@ -1,12 +1,17 @@
 /**
   ******************************************************************************
   * @file mcu_stm8s.c
-  * @brief This file contains the main function for the BLDC motor control
+  * @brief STM8S platform and peripheral configuration.
   * @author Neidermeier
   * @version
   * @date December-2020
   ******************************************************************************
   */
+/**
+ * @defgroup mcu Platform STM8S
+ * @brief STM8S platform and peripheral configuration.
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -35,8 +40,8 @@
 /*
  * some of this bulk could be reduced with macros
  * or otherwise would be suitable for STM8 Peripheral Library.
- * Noting the situation regarding unused IO pins ... I am trying to assert the 
- * configuration on the few pins needed as GPIO (general purpose IO and noting 
+ * Noting the situation regarding unused IO pins ... I am trying to assert the
+ * configuration on the few pins needed as GPIO (general purpose IO and noting
  * that the specific module initialization (A/D, TIMx - and these are done
  * mostly with STM8 PL) will handle setting up suitable IO pin behavior.
 
@@ -51,7 +56,7 @@
  *  floating (reset state), configured as input with internal pull-up/down resistor,
  *  configured as output push-pull low.
 */
-void GPIO_Config(void)
+static void GPIO_Config(void)
 {
 // OUTPUTS
 // built-in LED
@@ -85,11 +90,11 @@ void GPIO_Config(void)
     GPIOD->DDR |=  (1<<1); //?
     GPIOD->CR1 |=  (1<<1); //?
 
-GPIOE->ODR &=  ~(1<<0); //E0 data 
+GPIOE->ODR &=  ~(1<<0); //E0 data
     GPIOE->DDR |=  (1<<0); //E0 dir
     GPIOE->CR1 |=  (1<<0); //E0	cfg
 
-    GPIOA->ODR &= ~(1 << 5); // set pin off 
+    GPIOA->ODR &= ~(1 << 5); // set pin off
     GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
     GPIOA->CR1 |= (1 << 5);  // push pull output
 
@@ -182,7 +187,7 @@ GPIOE->ODR &=  ~(1<<0); //E0 data
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
  */
-void UART_setup(void)
+static void UART_setup(void)
 {
     UART2_DeInit();
 
@@ -196,10 +201,13 @@ void UART_setup(void)
     UART2_Cmd(ENABLE);
 }
 
-/*
-*  Send a message to the debug port (UART1).
-*    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
-*/
+/**
+ *  @brief Send a message to the debug port (UART2).
+ *  @details
+ *  Sends a variable length, null-terminated string to the UART.
+ *    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+ *  @param message Pointer to char array, i.e. a null-terminated ASCII string.
+ */
 void UARTputs(char *message)
 {
     char *ch = message;
@@ -211,17 +219,14 @@ void UARTputs(char *message)
     }
 }
 
-/*
- * https://www.st.com/resource/en/application_note/cd00282842-rs232-communications-with-a-terminal-using-the-stm8sdiscovery-stmicroelectronics.pdf
- */
-/*******************************************************************************
-* Function Name  : SerialKeyPressed
-* Description    : Test to see if a key has been pressed on the HyperTerminal
-* Input          : - key: The key pressed
-* Output         : None
-* Return         : 1: Correct
-*                  0: Error
-*******************************************************************************/
+/**
+* @brief  Test to see if a key has been pressed on the terminal.
+*
+* @details Allows reading a character but non-blocking.
+* @param [out]  key  Pointer to byte for receiving character code.
+* @retval  1  a character has been read
+* @retval  0  no character has been read
+*/
 uint8_t SerialKeyPressed(char *key)
 {
     FlagStatus flag  ;
@@ -238,8 +243,6 @@ uint8_t SerialKeyPressed(char *key)
     }
 }
 
-
-
 /*
  * set ADC clock to 4Mhz  - sample time from the data sheet @ 4Mhz
  * min sample time .75 useconds @ fADC = 4Mhz
@@ -248,12 +251,12 @@ uint8_t SerialKeyPressed(char *key)
 #ifdef CLOCK_16
  #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 8 -> 16/4 = 4
 #else
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // 4 ->  8/2 = 4 
+ #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // 4 ->  8/2 = 4
 #endif
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
  */
-void ADC1_setup(void)
+static void ADC1_setup(void)
 {
 // Port B[0..7]=floating input no interr
 // STM8 Discovery, all PortB pins are on CN3
@@ -287,14 +290,6 @@ void ADC1_setup(void)
  * from:
  *   http://www.emcu.it/STM8/STM8-Discovery/Tim1eTim4/TIM1eTIM4.html
  *
- * manual mode (ramp-up) commutation timing?
- * based on OTS ESC analysic, rampup start at
- *  pd = 0.008  sec
- *       0.003  sec  rampup to 3000 RPM
- *       0.004  sec  settle to 2500 RPM
- *       0.008  sec  1250 RPM slowest attainable after initial sync
- *
- *       0.0012 sec
 */
 #ifdef CLOCK_16
 #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
@@ -304,7 +299,7 @@ void ADC1_setup(void)
 
 #define PWM_MODE  TIM1_OCMODE_PWM1
 
-void TIM1_setup(void)
+static void TIM1_setup(void)
 {
     const uint16_t T1_Period = TIM2_PWM_PD /* TIMx_PWM_PD */ ;  // 16-bit counter  ... 260 test
 
@@ -360,7 +355,7 @@ void TIM1_setup(void)
  #define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
 #endif
 
-void TIM2_setup(void)
+static void TIM2_setup(void)
 {
     /* TIM2 Peripheral Configuration */
     TIM2_DeInit();
@@ -399,11 +394,10 @@ void TIM2_setup(void)
  * Setting periodic task for fast-ish rate of A/D acquisition.
  * ISR must set 'TaskRdy' flag and not block on the task since A/D does a blocking wait.
  */
-void TIM4_setup(void)
+static void TIM4_setup(void)
 {
 //    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
-    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ... 
-//    const uint8_t T4_Period = 32; // double the rate (for logging) ???
+    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ...
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -431,6 +425,12 @@ void TIM4_setup(void)
 #define TIM3_PSCR  0x01  // 2^1 == 2
 #endif
 
+/**
+ * @brief Sets TIM3 period.
+ * Sets the TIM3 prescaler, auto-reload register (ARR), enables interrupt.
+ * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
+ * @param  period  Value written to TIM3 ARR
+ */
 void TIM3_setup(uint16_t period)
 {
     TIM3->PSCR = TIM3_PSCR;
@@ -449,7 +449,7 @@ void TIM3_setup(uint16_t period)
  * ("HSI", or high-speed internal) divided by eight  as a clock source. This results in a base timer frequency of 2MHz.
  * Using this function just to show the library way to explicit clock setup.
  */
-void Clock_setup(void)
+static void Clock_setup(void)
 {
     CLK_DeInit();
 #ifdef INTCLOCK
@@ -468,18 +468,18 @@ void Clock_setup(void)
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);
+    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER3, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
-/*
- * single point init for MCU module
- *
+/**
+ * @brief  Initialize MCU and peripheral modules
+ * Configures clocks, GPIO, UART, ADC, timers, PWM.
  */
 void MCU_Init(void)
 {
-	    Clock_setup();
+    Clock_setup();
     GPIO_Config();
     UART_setup();
     ADC1_setup();
@@ -487,3 +487,5 @@ void MCU_Init(void)
     TIM2_setup();
     TIM4_setup();
 }
+
+/**@}*/ // defgroup

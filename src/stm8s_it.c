@@ -25,7 +25,8 @@
 #include "driver.h"
 
 
-/** @addtogroup I2C_EEPROM
+/** @addtogroup STM8S_IT STM8S ISR
+  * @brief STM8S ISR Template
   * @{
   */
 /* Private typedef -----------------------------------------------------------*/
@@ -276,10 +277,10 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 #endif
 
-GPIOD->ODR |= (1 << LED);
+//GPIOD->ODR |= (1 << LED);
 
 
-// 4 channels are sampled (single-mode conversion) - ADC End Of Conversion 
+// 4 channels are sampled (single-mode conversion) - ADC End Of Conversion
 // interrupt is enabled in the one-time ADC peripheral setup in MCU_init()
 
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
@@ -288,7 +289,7 @@ GPIOD->ODR |= (1 << LED);
 // ADON = 1 for the 2nd time => starts the ADC conversion
     ADC1_StartConversion();
 
-GPIOD->ODR &= ~(1 << LED);
+//GPIOD->ODR &= ~(1 << LED);
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
@@ -509,11 +510,11 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     }
 #endif
 
-//    GPIOD->ODR |=  (1<<LED); // set test pin
+   GPIOD->ODR |=  (1<<LED); // set test pin
 
     Driver_Update();
 
-//    GPIOD->ODR &=  ~(1<<LED); // clear test pin
+   GPIOD->ODR &=  ~(1<<LED); // clear test pin
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
