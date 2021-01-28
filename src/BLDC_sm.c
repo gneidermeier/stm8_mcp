@@ -1,12 +1,17 @@
 /**
   ******************************************************************************
-  * @file BLDC.c
+  * @file BLDC_sm.c
   * @brief state-manager for BLDC
   * @author Neidermeier
   * @version
   * @date Nov-2020
   ******************************************************************************
   */
+/**
+ * \defgroup BLDC_sm BLDC State
+ * @brief BLDC state management and timing control
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -90,19 +95,17 @@ static uint8_t Manual_Ovrd;
 /* Private function prototypes -----------------------------------------------*/
 
 
-
 /* Private functions ---------------------------------------------------------*/
 
 /**
- * @brief     .
- *   Simple ramping of commutation time period. At each iteration the
- *   commutation time period is ramped to the target value stepped in increment
- *   of +/- step depending of the sign of the error.
+ * @brief  Commutation timing ramp control.
+ *
+ * At each iteration the commutation time period is ramped to the target value
+ * stepped in increment of +/- step depending on the sign of the error.
  *
  * @param   tgt_commutation_per  Target value to track.
- * @param   step integer step    Increment of the ramp (the slope).
  */
-void timing_ramp_control(uint16_t tgt_commutation_per)
+static void timing_ramp_control(uint16_t tgt_commutation_per)
 {
     const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
 
@@ -125,7 +128,7 @@ void timing_ramp_control(uint16_t tgt_commutation_per)
         {
             u16 = tgt_commutation_per;
         }
-        BLDC_OL_comm_tm  = u16;	
+        BLDC_OL_comm_tm  = u16;
     }
 }
 
@@ -152,7 +155,9 @@ static BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
 
 /* Public functions ---------------------------------------------------------*/
 
-/*
+/**
+ * @brief Stop motor
+ *
  *    System reset / re-arm function (has to be called both at program startup
  *    as well as following a fault condition state.
  */
@@ -175,8 +180,6 @@ void BLDC_Stop(void)
  * @param dc Speed input which can be in the range [0:255] but 255 is to be
  *        reserved for special use (out of band value). If the PWM resolution
  *        changes then the input speed will have to be re-scaled accordingly.
- *
- * @return n/a.
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
@@ -195,14 +198,18 @@ void BLDC_PWMDC_Set(uint8_t dc)
     }
 }
 
-/*
- * getter for the Commanded Duty Cycle
+/**
+ * @brief Accessor for Commanded Duty Cycle
+ *
+ * @return Commanded Duty Cycle
  */
 uint16_t BLDC_PWMDC_Get(void)
 {
     return Commanded_Dutycycle;
 }
 
+
+/** @cond */ // hide some developer/debug code
 
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
@@ -223,25 +230,30 @@ void BLDC_Spd_inc()
 
     BLDC_OL_comm_tm -= 1; // faster
 }
+/** @endcond */
 
 
 /**
-  * @brief  .
-  * @par Parameters:
-  * None
-  * @retval void None
+  * @brief Accessor for commutation period.
+  *
+  * @return commutation period
   */
 uint16_t get_commutation_period(void)
 {
     return BLDC_OL_comm_tm;
 }
 
-// BLDC_get_state()
+/**
+ * @brief Accessor for state variable.
+ *
+ * @return state value
+ */
 BLDC_STATE_T get_bldc_state(void)
 {
     return BLDC_State;
 }
 
+/** @cond */ // hide some developer/debug code
 /*
  * BLDC Update:
  *  Called from ISR
@@ -266,7 +278,7 @@ void _Update(void)
         }
         break;
 
-    case BLDC_ON:
+    case BLDC_RUNNING:
         // if UI_speed is changing, then release manual commutation button mode
         if (Commanded_Dutycycle != UI_speed)
         {
@@ -284,7 +296,7 @@ void _Update(void)
 
         if ( BLDC_OL_comm_tm <= timing_value )
         {
-            set_bldc_state( BLDC_ON ); // state-transition trigger
+            set_bldc_state( BLDC_RUNNING ); // state-transition trigger
         }
         break;
 
@@ -315,10 +327,14 @@ void _Update(void)
     set_dutycycle( Commanded_Dutycycle );
 }
 
-/*
- * BLDC Update:
- *  Called from ISR
- *  Handle the BLDC state:
+/** @endcond */
+
+/**
+ * @brief Periodic state machine update.
+ *
+ * Called from ISR. Evaluate state transition conditions and determine new
+ * state.
+ *
  */
 void BLDC_Update(void)
 {
@@ -332,7 +348,7 @@ void BLDC_Update(void)
 
     _Update();
 
-    if (BLDC_RAMPUP == state || BLDC_ON == state)
+    if (BLDC_RAMPUP == state || BLDC_RUNNING == state)
     {
         timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
     }
