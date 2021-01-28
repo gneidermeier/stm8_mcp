@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file periodic_task.c
+  * @file per_task.h
   * @brief This file contains the main function for the BLDC motor control
   * @author Neidermeier
   * @version

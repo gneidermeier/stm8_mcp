@@ -1,18 +1,22 @@
 /**
   ******************************************************************************
-  * @file periodic_task.c
-  * @brief This file contains the main function for the BLDC motor control
+  * @file per_task.c
+  * @brief Background task / periodic task
   * @author Neidermeier
   * @version
   * @date Dec-2020
   ******************************************************************************
   */
+/**
+ * \defgroup per_task Periodic Task
+ * @brief Background task / periodic task
+ * @{
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
 
 // app headers
-//#include "system.h" // platform specific delarations
 #include "mcu_stm8s.h"
 #include "sequence.h"
 #include "bldc_sm.h"
@@ -29,10 +33,13 @@
 
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
-#define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs 
+#define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
-// essentially the same thing but make an "internal" type for working with the
-// state enumerations
+/**
+ * @brief  Internal type for working with the state enumerations.
+ * @details If the declaration for the state-type changes, there will be only one
+ * place to change it in this module.
+ */
 typedef BLDC_STATE_T  STATEM_T;
 
 /* Public variables  ---------------------------------------------------------*/
@@ -59,7 +66,7 @@ static  uint16_t Vsystem; // persistent for averaging
  * home-made itoa function (16-bits only, hex-only)
  * seems Cosmic only provide atoi in stdlib and not itoa
  */
-char * itoa(uint16_t u16in, char *sbuf, int base)
+static char * itoa(uint16_t u16in, char *sbuf, int base)
 {
     int x;
     int shift = 16 - 4;	/* 4-bits to 1 nibble */
@@ -100,7 +107,7 @@ char * itoa(uint16_t u16in, char *sbuf, int base)
 * Output         : None
 * Return         : The Key Pressed
 *******************************************************************************/
-char GetKey(void)
+static char GetKey(void)
 {
     char key = 0;
     /* Waiting for user input */
@@ -112,16 +119,16 @@ char GetKey(void)
 }
 
 
+/** @cond */ // hide some developer/debug code
 // hack, temp
-
 extern int Back_EMF_Falling_PhX;
 extern int Back_EMF_Riseing_PhX;
-
+/** @endcond */
 
 /*
  * temp, todo better function
  */
-void testUART(int clear)
+static void testUART(int clear)
 {
     static uint16_t Line_Count = 0;
 
@@ -187,13 +194,13 @@ void testUART(int clear)
  * The voltage measurement is understood to be while PWM cycle is driving one or more
  * motor phases, so close to the DC rail voltage.
  */
-void sys_voltage_mon(STATEM_T sm_state)
+static void sys_voltage_mon(STATEM_T sm_state)
 {
     // eventually the sequencer should be averaging all 3 phases for this
     Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-// system voltage is only available and useable when machine is on 
-    if (BLDC_ON == get_bldc_state() )
+// system voltage is only available and useable when machine is on
+    if (BLDC_RUNNING == get_bldc_state() )
     {
         Faultm_upd(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
     }
@@ -208,7 +215,7 @@ void sys_voltage_mon(STATEM_T sm_state)
  *
  * TODO: rate limit of speed input!
  */
-void set_ui_speed(STATEM_T sm_state)
+static void set_ui_speed(STATEM_T sm_state)
 {
     int16_t tmp_sint16;
 
@@ -245,7 +252,7 @@ void set_ui_speed(STATEM_T sm_state)
             UI_Speed = 0;
         }
     }
-    else if (BLDC_ON == sm_state)
+    else if (BLDC_RUNNING == sm_state)
     {
         if (Analog_slider > 0) //
         {
@@ -253,7 +260,7 @@ void set_ui_speed(STATEM_T sm_state)
             if (UI_Speed < LOW_SPEED_THR)
             {
 // u8_max to be used as an out-of-band value which can signify "Reset/Stop"
-                UI_Speed = U8_MAX; 
+                UI_Speed = U8_MAX;
                 BLDC_Stop(); // ... PWMDC_Set() can  call Stop() ?
 
                 // log some info
@@ -270,7 +277,7 @@ void set_ui_speed(STATEM_T sm_state)
  * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
  * Servicing the UART (presently just a simply one-way logging stream)
  */
-void Periodic_task(void)
+static void Periodic_task(void)
 {
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
@@ -349,8 +356,12 @@ void Periodic_task(void)
     }
 }
 
-/*
- * retrieve status of global flag set by ISR
+/**
+ * @brief Run Periodic Task if ready
+ * @details
+ * Called in non-ISR context - checks the background task ready flag which if !0
+ * will invoke the Periodic Task function.
+ * @note referred to as Pertask_chk_ready
  */
 uint8_t Task_Ready(void)
 {
@@ -362,10 +373,16 @@ uint8_t Task_Ready(void)
     return TaskRdy;
 }
 
-/*
- * activate task ready flag (from ISR context)
+/**
+ * @brief  Trigger background task.
+ * @details
+ * Called in ISR context - sets the background task ready flag which when seen
+ * by polling Task_Ready in background task will invoke the Periodic Task function.
+ * @note referred to as Pertask_set_ready
  */
 void Periodic_Task_Wake(void)
 {
     TaskRdy = TRUE; // notify background process
 }
+
+/**@}*/ // defgroup

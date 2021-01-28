@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
   * @file driver.c
-  * @brief support functions for the BLDC motor control
+  * @brief  Interface functions for motor control.
   * @author Neidermeier
   * @version
   * @date March-2020
@@ -9,6 +9,7 @@
   */
 /**
  * \defgroup driver  Driver
+ * @brief  Interface functions for motor control.
  * @{
  */
 

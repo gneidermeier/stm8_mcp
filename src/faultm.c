@@ -9,6 +9,7 @@
   */
 /**
  * \defgroup faultm  Faultmon
+ * @brief Fault manager for BLDC
  * @{
  */
 

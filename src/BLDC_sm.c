@@ -353,3 +353,6 @@ void BLDC_Update(void)
         timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
     }
 }
+
+/**@}*/ // defgroup
+

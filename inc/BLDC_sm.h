@@ -32,7 +32,7 @@ typedef enum
 } BLDC_STATE_T;
 
 /** @deprecated */
-#define BLDC_ON BLDC_RUNNING // tmp
+//#define BLDC_ON BLDC_RUNNING // tmp
 
 
 /* prototypes ------------------------------------------------------------------*/
