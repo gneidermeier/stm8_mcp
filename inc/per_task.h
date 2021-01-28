@@ -17,17 +17,6 @@
 #include "system.h" // platform specific delarations
 
 
-/* Private defines -----------------------------------------------------------*/
-
-
-/* Public variables  ---------------------------------------------------------*/
-
-extern uint8_t Log_Level;         // global log-level
-
-
-/* Private variables ---------------------------------------------------------*/
-
-
 /* Public function prototypes -----------------------------------------------*/
 
 void Periodic_Task_Wake(void);

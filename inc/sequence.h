@@ -1,13 +1,13 @@
 /**
   ******************************************************************************
-  * @file driver.h
-  * @brief  
+  * @file sequence.h
+  * @brief
   * @author
-  * @version 
-  * @date    
+  * @version
+  * @date
   ******************************************************************************
   *
-  * BLAH BLAH BLAH
+  * TBD
   *
   * <h2><center>&copy; COPYRIGHT 2112 asdf</center></h2>
   ******************************************************************************
@@ -15,28 +15,11 @@
 #ifndef SEQUENCE_H
 #define SEQUENCE_H
 
-//#ifndef UNIT_TEST // is it broken?
-  #include "system.h"
-//#endif
+#include "system.h"
 
 
-/*
- * defines
- */
+/* prototypes -----------------------------------------------------------*/
 
-
-/* types -----------------------------------------------------------*/
-
-
-
-/*
- * variables
- */
-
-
-/*
- * prototypes
- */
 uint16_t Seq_Get_Vbatt(void);
 
 void Sequence_Step(void);
