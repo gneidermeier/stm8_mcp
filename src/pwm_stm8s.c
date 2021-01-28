@@ -2,6 +2,7 @@
   ******************************************************************************
   * @file pwm_stm8s.c
   * @brief BLDC motor control - PWM, STM8s specific
+  *
   *   TIM2 is being used despite TIM1 being the capable motor control features,
   *   but PC1 PC2 PC3 pins are taken up by  cap touch demo on the STM8-Discovery board
   *
@@ -77,9 +78,9 @@ void All_phase_stop(void)
 }
 
 /**
- * @brief Putter accessor for PWM duty cycle 
+ * @brief Putter accessor for PWM duty cycle
  * @details Motor speed is controlled through the UI and converted to PWM duty cycle .
- */ 
+ */
 void set_dutycycle(uint16_t global_dutycycle)
 {
     global_uDC = global_dutycycle;

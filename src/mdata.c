@@ -159,3 +159,5 @@ uint16_t Get_OL_Timing(uint16_t index)
     }
     return -1; // error
 }
+
+/**@}*/ // defgroup
