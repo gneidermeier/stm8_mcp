@@ -28,13 +28,13 @@
 
 /* Private types -----------------------------------------------------------*/
 
- /**
- * @brief Pointer to step handler function.
- *
- * Each commutation step sequence is implemented as a simple function -
- * aggregating the function pointers into a table.
- * @return  void
- */
+/**
+* @brief Pointer to step handler function.
+*
+* Each commutation step sequence is implemented as a simple function -
+* aggregating the function pointers into a table.
+* @return  void
+*/
 typedef void (*step_ptr_t)( void );
 
 
@@ -70,6 +70,26 @@ static const step_ptr_t step_ptr_table[] =
 };
 
 
+/*
+ * Timing error term -  magnitude of the "falling"
+ * (right) side is proportional to the degree of timing advance .. advanced
+ * condition is seen when there is greater distribution of back-emf area on the
+ * right side.
+ */
+//static int16_t comm_timing_error; 
+//#define TIMING_ERROR_TERM   (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX)
+
+
+// There isn't a timing control point to use to determine the error - however 
+// ratio of the leading and falling slopes (integration) indicates the direction
+// and varies according to the magnitude of the timing error.
+//  ratio = ( L / F  ) - 1
+static int16_t comm_tm_err_ratio;
+
+#define ERROR_SCALE_64_LSH   6
+#define ERROR_SCALE_64_ONE  (1 << ERROR_SCALE_64_LSH)
+
+
 /* Private functions ---------------------------------------------------------*/
 
 static void sector_0(void)
@@ -82,11 +102,14 @@ static void sector_0(void)
 
 //PWM OFF: C
     PWM_PhC_Disable();
+
 //Float: C
     PWM_PhC_HB_DISABLE(0);
+
 //PWM_LO: B
     PWM_PhB_OUTP_LO( 0 );
     PWM_PhB_HB_ENABLE(1);
+
 //PWM_HI: A
     PWM_PhA_Enable();
     PWM_PhA_HB_ENABLE(1);
@@ -98,11 +121,14 @@ static void sector_1(void)
 
 //PWM OFF:
 //        NOP
+
 //Float: B
     PWM_PhB_HB_DISABLE(0);
+
 //PWM_LO: C
     PWM_PhC_OUTP_LO( 0 );
     PWM_PhC_HB_ENABLE(1);
+
 //PWM_HI:
 //      NOP (A)
 }
@@ -116,11 +142,14 @@ static void sector_2(void)
 
 //PWM OFF: A
     PWM_PhA_Disable();
+
 //Float: A
     PWM_PhA_HB_DISABLE(0);
+
 //PWM_LO: C
     PWM_PhC_OUTP_LO( 0 );
     PWM_PhC_HB_ENABLE(1);
+
 //PWM_HI: B
     PWM_PhB_Enable();
     PWM_PhB_HB_ENABLE(1);
@@ -136,11 +165,14 @@ static void sector_3(void)
 
 //PWM OFF:
 //        NOP
+
 //Float: C
     PWM_PhC_HB_DISABLE(0);
+
 //PWM_LO: A
     PWM_PhA_OUTP_LO( 0 );
     PWM_PhA_HB_ENABLE(1);
+
 //PWM_HI:
 //      NOP (B)
 }
@@ -174,6 +206,18 @@ static void sector_5(void)
     PWM_PhB_HB_ENABLE(1);
 //PWM_HI:
 //        NOP (C)
+
+// update the timing error once per frame
+//  comm_timing_error = (comm_timing_error + TIMING_ERROR_TERM) > 1; // sma
+
+    // signed_error_ratio = ( post / pre ) - 1
+    // Uses scalar of 64 to get most precision from ADC 10-bit terms (assuming max 0x03ff).
+    // ADC 10-bit i.e. 0x03FF << 6 = 0xFFC0
+    // Calculation result gets scaled down in conjunction with factoring in of
+    //  controller gain term(s).
+    comm_tm_err_ratio =
+        (int16_t)( (Back_EMF_Falling_PhX << 6) / Back_EMF_Riseing_PhX )
+        - (int16_t)ERROR_SCALE_64_ONE;
 }
 
 /* Public functions ---------------------------------------------------------*/
@@ -181,18 +225,19 @@ static void sector_5(void)
 /**
  * @brief Accessor for control error.
  *
- * @details If the motor timing is advanced, the control error should be 
- *  positive i.e.  increasing commutation period slows the motor. 
+ * @details If the motor timing is advanced, the control error should be
+ *  positive i.e.  increasing commutation period slows the motor.
  *
  * @return signed error which at its extreme should be equal to or less than the
  *  range of the initial ADC measurement i.e. 0x0400
  */
 int16_t Seq_get_timing_error(void)
 {
-// the magnitude of the "falling" (right) side is proportional to the degree 
-// of timing advance .. advanced condition is seen when there is greater distribution 
-// of back-emf area on the right side. 
-    return (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX);
+//    int16_t perror = comm_timing_error; // positive if advanced
+
+    int16_t perror = comm_tm_err_ratio;  // positive if advanced
+
+    return perror;
 }
 
 /**
