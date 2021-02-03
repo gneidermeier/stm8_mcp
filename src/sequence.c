@@ -179,6 +179,23 @@ static void sector_5(void)
 /* Public functions ---------------------------------------------------------*/
 
 /**
+ * @brief Accessor for control error.
+ *
+ * @details If the motor timing is advanced, the control error should be 
+ *  positive i.e.  increasing commutation period slows the motor. 
+ *
+ * @return signed error which at its extreme should be equal to or less than the
+ *  range of the initial ADC measurement i.e. 0x0400
+ */
+int16_t Seq_get_timing_error(void)
+{
+// the magnitude of the "falling" (right) side is proportional to the degree 
+// of timing advance .. advanced condition is seen when there is greater distribution 
+// of back-emf area on the right side. 
+    return (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX);
+}
+
+/**
  * @brief Accessor for system voltage measurement.
  *
  * @details Vbatt is in this module because the measurement has to be timed to

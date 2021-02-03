@@ -21,6 +21,7 @@
 /* prototypes -----------------------------------------------------------*/
 
 uint16_t Seq_Get_Vbatt(void);
+int16_t Seq_get_timing_error(void);
 
 void Sequence_Step(void);
 

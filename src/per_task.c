@@ -135,6 +135,16 @@ static void testUART(int clear)
     char sbuf[256] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
+// TODO yes probably use DI/EI to do all shared access in one swoop
+// DI
+int16_t timing_error = Seq_get_timing_error();
+//  BLDC_PWMDC_Get()
+//  get_commutation_period()
+//  Faultm_get_status
+//  Seq_Get_Vbatt()
+//  Faultm_upd()
+// EI
+
     sbuf[0] = 0;
 
     if ( 0 != clear)
@@ -163,6 +173,10 @@ static void testUART(int clear)
 
     strcat(sbuf, " SF=");
     itoa( Faultm_get_status(),     cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " TTE=");
+    itoa( timing_error,     cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " bRi=");
@@ -318,8 +332,8 @@ static void Periodic_task(void)
 
             UARTputs("###\r\n");
 
-//            Log_Level = 1;
-            testUART(1 /* clear line count */ );// tmp test
+            Log_Level = 1; // stop the logger output
+            testUART(1 /* clear line count */ );
 
 // reset the simulated trim swtich between system runs
             Digital_trim_switch = TRIM_DEFAULT;
