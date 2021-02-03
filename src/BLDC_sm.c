@@ -15,10 +15,11 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "bldc_sm.h"
+#include "bldc_sm.h" // external types used internally
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
 #include "faultm.h"
+#include "sequence.h"
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -259,7 +260,7 @@ BLDC_STATE_T get_bldc_state(void)
  *  Called from ISR
  *  Handle the BLDC state:
  */
-void _Update(void)
+void sm_update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
     uint16_t timing_value; // temp var for table lookup
@@ -336,9 +337,21 @@ void _Update(void)
  * state.
  *
  */
+int16_t Prop_timing_error;
+// prop gain is really only meaningful if there are other controller terms
+#define KPROP  1 // power of 2 shift .. arbitrary gain and also unscaling
+ // arbitrary ... might have good feedback from the turbolators  at that point
+#define FTL_THRSH  0x30  // probably use a lower threshld to drop out of FTL
+
 void BLDC_Update(void)
 {
+//    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
+    const uint16_t ramp_tm_pd = Get_OL_Timing( PWM_DC_RAMPUP );
+
     BLDC_STATE_T state = get_bldc_state() ;
+
+    static int16_t error ;
+
 
     if ( 0 != Faultm_get_status() )
     {
@@ -346,11 +359,42 @@ void BLDC_Update(void)
         set_bldc_state( BLDC_FAULT );
     }
 
-    _Update();
+    sm_update(); // update sm
 
-    if (BLDC_RAMPUP == state || BLDC_RUNNING == state)
+
+    // do wip running control stuff here
+    error = ( error + Seq_get_timing_error() ) >> 1; // sma
+
+    if (BLDC_RAMPUP == state )
     {
         timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+    }
+    else if ( BLDC_RUNNING == state)
+    {
+        uint16_t timing_term = Get_OL_Timing( Commanded_Dutycycle );
+
+// this needs to be in proportion/inverse to commutation period however you look at it but this mmight work for now ...
+//        _error =  (  error * (int16_t)BLDC_OL_comm_tm / (int16_t)ramp_tm_pd  ) >> KPSCALE  ;
+        error = error >> 1 ; // factor out some of the scale bits
+
+// prop gain is really only meaningful if there are other controller terms
+        Prop_timing_error =  error >> KPROP ; // factor out some of the scale bits
+
+        if (Commanded_Dutycycle > FTL_THRSH ) // probably use a lower threshld to drop out of FTL
+        {
+#ifdef MAKE_YOUR_EYES_WATER
+            BLDC_OL_comm_tm = (int16_t)BLDC_OL_comm_tm + Prop_timing_error;
+#else
+  #ifdef BLOWS_THE_MAINS
+            timing_term = (int16_t)BLDC_OL_comm_tm + Prop_timing_error; // make sure signed add!
+  #endif
+            timing_ramp_control( timing_term ); // ramp to the new timing term
+#endif
+        }
+        else
+        {
+            timing_ramp_control( timing_term ); // ramp to the new timing term
+        }
     }
 }
 
