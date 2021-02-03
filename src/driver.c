@@ -75,8 +75,6 @@
 
 static uint16_t ADC_Global;
 
-static uint16_t Back_EMF_fbuf[4]; // 4 samples per commutation period
-
 static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
 
 static uint8_t  ph0_adc_tbct;
@@ -156,16 +154,7 @@ void Driver_on_ADC_conv(void)
  */
 uint16_t Driver_Get_Back_EMF_Avg(void)
 {
-    uint16_t u16tmp =
-        ( Back_EMF_fbuf[0] + \
-          Back_EMF_fbuf[1] + \
-          Back_EMF_fbuf[2] + \
-          Back_EMF_fbuf[3] ) >> 2 ; // divide by 4
-#ifndef OLD_AVG_FOUR
     return phase_average;
-#else
-    return u16tmp;
-#endif
 }
 
 /**
@@ -231,41 +220,17 @@ void Driver_Step(void)
     switch(index)
     {
     case 0:
-
-// average 8 samples from frame buffer
-        udpate_phase_average();
+        udpate_phase_average(); // average 8 samples from frame buffer
 
         memset (ph0_adc_fbuf, MID_ADC, PH0_ADC_TBUF_SZ);
         ph0_adc_tbct = 0; // reset the sample index
 
-
         Sequence_Step();
-
-        adc_15304560[0] = GET_BACK_EMF_ADC( );
         break;
+
     case 1:
-        adc_15304560[1] = GET_BACK_EMF_ADC( );
-        break;
     case 2:
-        adc_15304560[2] = GET_BACK_EMF_ADC( );
-        break;
     case 3:
-        adc_15304560[3] = GET_BACK_EMF_ADC( );
-// unrolling this memcpy saves about 20uS !
-//        memcpy( Back_EMF_Falling_4, Back_EMF_15304560, sizeof(Back_EMF_Falling_4) );
-        Back_EMF_fbuf[0] = adc_15304560[0];
-        Back_EMF_fbuf[1] = adc_15304560[1];
-        Back_EMF_fbuf[2] = adc_15304560[2];
-        Back_EMF_fbuf[3] = adc_15304560[3];
-
-// reset the accumulation buffer ... reset value is 1/2 because there may be
-// less than 4 PWM cycles occuring. Instead of trying to sort it out, just let
-// any elements that dont get refreshed to be added into the average with no effect.
-        adc_15304560[0] = // MID_ADC;
-            adc_15304560[1] = // MID_ADC;
-                adc_15304560[2] = // MID_ADC;
-                    adc_15304560[3] = MID_ADC;
-
         break;
     }
 }
