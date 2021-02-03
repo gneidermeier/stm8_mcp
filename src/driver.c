@@ -25,6 +25,12 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+#define PH0_ADC_TBUF_SZ  8
+
+
+// half of 10-bit ADC which is also assumed to be exactly half DC thanks to perfectly sized resistor divider, unflinching supply voltage set exactly to 13.8v 
+#define MID_ADC 0x0200  // tbd ... DC HALF
+
 // divider: 33k/18k
 //  18/(18+33)=0.35
 // 0.35 * 14.1v = 4.98
@@ -71,21 +77,74 @@ static uint16_t ADC_Global;
 
 static uint16_t Back_EMF_fbuf[4]; // 4 samples per commutation period
 
+static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
+
+static uint8_t  ph0_adc_tbct;
+
+static uint16_t phase_average;
+
 
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
 
+/*
+ * averag 8 samples .. could be inline or macro
+ */
+static void udpate_phase_average(void)
+{
+    int n;
+// use midpoint  as initial condition which yields neutral control action
+    phase_average = MID_ADC;
+
+    for(n  = 0 ; n < PH0_ADC_TBUF_SZ; n++)
+    {
+        phase_average = (phase_average  + ph0_adc_fbuf[n]) >> 1;
+    }
+}
+
+/* External functions ---------------------------------------------------------*/
+
 /**
- * @brief  Capture ADC conversion channel 0
+ * @brief  Hook for synchronizing to the PWM pulse.
+ *
+ * @details  Phase voltage measurements must be synchronized to PWM on i.e. the
+ * rising egde.
+ * Called from TIM2 UPD+OVF+BRK IRQ Handler.
+ * Initiates ADC sample sequence on start of PWM pulse.
+ * ADC may be configured for several (3 phases + throttle input) channels.
+ * This may be a limitation as the throttle input may be needed although the 
+ * TIM2/PWM is disabled.
+ * On ADC ISR, call ADCx_GetBufferValue(n) to retrieve ADC Channel n. 
+ * The ADC is configured to trigger IRQ on converion complete.
+ * See ADC setup in MCU init for ADC clock setup.
+ */
+void Driver_on_PWM_edge(void)
+{
+    ph0_adc_tbct += 1 ; // advance the buffer index
+
+// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+    ADC1_Cmd(ENABLE);
+
+// ADON = 1 for the 2nd time => starts the ADC conversion
+    ADC1_StartConversion();
+}
+
+/**
+ * @brief  Capture ADC conversion channel 0 to buffer
  *
  * @details  Captures phase voltage measurement from ADC Channel 0, to be
  * used as back-EMF sensing or system voltage.
  * Called from ADC1 ISR
  */
-void bemf_samp_get(void)
+void Driver_on_ADC_conv(void)
 {
     ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
+
+    if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
+    {
+        ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
+    }
 }
 
 /**
@@ -102,8 +161,11 @@ uint16_t Driver_Get_Back_EMF_Avg(void)
           Back_EMF_fbuf[1] + \
           Back_EMF_fbuf[2] + \
           Back_EMF_fbuf[3] ) >> 2 ; // divide by 4
-
+#ifndef OLD_AVG_FOUR
+    return phase_average;
+#else
     return u16tmp;
+#endif
 }
 
 /**
@@ -134,7 +196,6 @@ void Driver_Update(void)
     TIM3_setup( get_commutation_period() );
 }
 
-#define MID_ADC 0x0200 // half vref?
 
 /**
  * @brief
@@ -170,7 +231,14 @@ void Driver_Step(void)
     switch(index)
     {
     case 0:
-// does the step first (using Back_EMF from memcpy in prev. step)
+
+// average 8 samples from frame buffer
+        udpate_phase_average();
+
+        memset (ph0_adc_fbuf, MID_ADC, PH0_ADC_TBUF_SZ);
+        ph0_adc_tbct = 0; // reset the sample index
+
+
         Sequence_Step();
 
         adc_15304560[0] = GET_BACK_EMF_ADC( );

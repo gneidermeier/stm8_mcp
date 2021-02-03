@@ -279,15 +279,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
 //GPIOD->ODR |= (1 << LED);
 
-
-// 4 channels are sampled (single-mode conversion) - ADC End Of Conversion
-// interrupt is enabled in the one-time ADC peripheral setup in MCU_init()
-
-// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
-    ADC1_Cmd(ENABLE);
-
-// ADON = 1 for the 2nd time => starts the ADC conversion
-    ADC1_StartConversion();
+    Driver_on_PWM_edge();
 
 //GPIOD->ODR &= ~(1 << LED);
 
@@ -470,7 +462,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
 
 GPIOC->ODR |= (1 << 4);
 
-    bemf_samp_get();
+    Driver_on_ADC_conv();
 
 GPIOC->ODR &= ~(1 << 4);
 

@@ -59,7 +59,8 @@ void Driver_Update(void);
 uint16_t Driver_Get_ADC(void);
 uint16_t Driver_Get_Back_EMF_Avg(void);
 
-void bemf_samp_get(void);
+void Driver_on_PWM_edge(void);
+void Driver_on_ADC_conv(void);
 
 
 #endif // DRIVER_H
