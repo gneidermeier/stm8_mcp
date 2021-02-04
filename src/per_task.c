@@ -80,7 +80,7 @@ static char * itoa(uint16_t u16in, char *sbuf, int base)
     x = 0;
     while (x < 4 /* 4 nibbles in 16-bit word */ )
     {
-        unsigned char c = (n16 >> shift) & 0x000F;
+        unsigned char c = (uint8_t)( (n16 >> shift) & 0x000F );
 
         if (c > 9)
         {
@@ -216,7 +216,7 @@ static void sys_voltage_mon(STATEM_T sm_state)
 // system voltage is only available and useable when machine is on
     if (BLDC_RUNNING == get_bldc_state() )
     {
-        Faultm_upd(VOLTAGE_NG, Vsystem < V_SHUTDOWN_THR);
+        Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
     }
 }
 
@@ -251,7 +251,8 @@ static void set_ui_speed(STATEM_T sm_state)
         {
             tmp_sint16 = U8_MAX;
         }
-        UI_Speed = tmp_sint16;
+
+        UI_Speed = (uint8_t)tmp_sint16;
     }
 
 // only OFF state is of interest for Throttle-high diagnostic.
@@ -286,6 +287,22 @@ static void set_ui_speed(STATEM_T sm_state)
     BLDC_PWMDC_Set(UI_Speed);
 }
 
+/**
+ * @brief stop the system
+ *
+ * needs to be externable to main because the hard-button stop button is polled there
+ */
+void UI_Stop(void)
+{
+// reset the simulated trim swtich between system runs
+    Digital_trim_switch = TRIM_DEFAULT;
+    UI_Speed = 0;
+ 
+ // reset the machine
+    BLDC_Stop();
+}
+
+
 /*
  * Execution context is 'main()' so not to block ISR with ADC sampling.
  * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
@@ -297,7 +314,14 @@ static void Periodic_task(void)
     char cbuf[8] = { 0, 0 };
     int16_t tmp_sint16;
     char key;
-    BLDC_STATE_T sm_state = get_bldc_state();
+    BLDC_STATE_T sm_state;
+
+//disableInterrupts();
+
+    sm_state = get_bldc_state();
+
+//enableInterrupts();
+
 
     // update system voltage diagnostic
     sys_voltage_mon( (STATEM_T) sm_state );
@@ -328,7 +352,7 @@ static void Periodic_task(void)
         if (key == ' ') // space character
         {
             // reset the machine
-            BLDC_Stop();
+            UI_Stop();
 
             UARTputs("###\r\n");
 

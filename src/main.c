@@ -38,7 +38,7 @@ main()
         {
 //            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
             disableInterrupts();
-            BLDC_Stop();
+            UI_Stop();
             enableInterrupts();
         }
 

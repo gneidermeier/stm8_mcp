@@ -23,5 +23,6 @@ void Periodic_Task_Wake(void);
 
 uint8_t Task_Ready(void);
 
+void UI_Stop(void);
 
 #endif // PER_TASK_H
