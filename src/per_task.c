@@ -283,7 +283,7 @@ void UI_Stop(void)
 // reset the simulated trim swtich between system runs
     Digital_trim_switch = TRIM_DEFAULT;
     UI_Speed = 0;
- 
+
  // reset the machine
     BLDC_Stop();
 }
@@ -364,7 +364,7 @@ disableInterrupts();
 enableInterrupts();
 
     // update system voltage diagnostic
-    if (BLDC_RUNNING == sm_state || BLDC_RAMPUP == sm_state)
+    if (BLDC_RUNNING == sm_state)
     {
         Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
     }
@@ -372,8 +372,8 @@ enableInterrupts();
     // update the UI speed input slider+trim
     set_ui_speed( (STATEM_T) sm_state );
 
-    handle_term_inp(); 
- 
+    handle_term_inp();
+
     /*
      * debug logging to terminal
      */

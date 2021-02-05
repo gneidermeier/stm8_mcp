@@ -25,11 +25,8 @@
 
 #define PWM_0PCNT      0
 
-#define PWM_10PCNT     ( PWM_100PCNT / 10 )
-#define PWM_20PCNT     ( PWM_100PCNT / 5 )
-#define PWM_50PCNT     ( PWM_100PCNT / 2 )
-
-#define PWM_X_PCNT( _PCNT_ )   ( _PCNT_ * PWM_100PCNT / 100 )
+// cast arg to 16-bit and group the pcnt*100 term to retain precision
+#define PWM_X_PCNT( _PCNT_ )   ( ( (uint16_t)_PCNT_ * PWM_100PCNT ) / 100.0 )
 
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
@@ -149,7 +146,7 @@ static void haltensie(void)
 /*
  * only the state-machine is allowed to modify the state variable
  */
-static BLDC_STATE_T set_bldc_state( BLDC_STATE_T newstate)
+static void set_bldc_state( BLDC_STATE_T newstate)
 {
     BLDC_State = newstate;
 }
@@ -262,8 +259,10 @@ BLDC_STATE_T get_bldc_state(void)
  */
 void sm_update(void)
 {
-    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
-    uint16_t timing_value; // temp var for table lookup
+ // TODO:  warnings on macro 
+    const uint16_t _RampupDC_ = PWM_DC_RAMPUP;
+
+    Commanded_Dutycycle = UI_speed;
 
     switch ( get_bldc_state() )
     {
@@ -272,40 +271,19 @@ void sm_update(void)
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
-            set_bldc_state( BLDC_RAMPUP );
+            set_bldc_state( BLDC_RUNNING );
+
             // set initial conditions for ramp state
-            Commanded_Dutycycle = PWM_DC_RAMPUP;
+            Commanded_Dutycycle = _RampupDC_ ;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
         break;
 
     case BLDC_RUNNING:
-        // if UI_speed is changing, then release manual commutation button mode
-        if (Commanded_Dutycycle != UI_speed)
-        {
-            Manual_Ovrd = FALSE;
-        }
-
-        if ( FALSE == Manual_Ovrd )
-        {
-            Commanded_Dutycycle = UI_speed;
-        }
-        break;
-
-    case BLDC_RAMPUP:
-        timing_value = Get_OL_Timing( _RampupDC_ );
-
-        if ( BLDC_OL_comm_tm <= timing_value )
-        {
-            set_bldc_state( BLDC_RUNNING ); // state-transition trigger
-        }
         break;
 
     case BLDC_RESET:
-        /* inneffective ... seems to be a race resetting fault on reset
-                haltensie();
-                Faultm_init();
-        */
+
 // was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
@@ -345,13 +323,7 @@ int16_t Prop_timing_error;
 
 void BLDC_Update(void)
 {
-//    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // TODO:  the macro in the if() expression causes strange linker error
-    const uint16_t ramp_tm_pd = Get_OL_Timing( PWM_DC_RAMPUP );
-
     BLDC_STATE_T state = get_bldc_state() ;
-
-    static int16_t error ;
-
 
     if ( 0 != Faultm_get_status() )
     {
@@ -361,14 +333,16 @@ void BLDC_Update(void)
 
     sm_update(); // update sm
 
-
-    // do wip running control stuff here
-    error = ( error + Seq_get_timing_error() ) >> 1; // sma
-
-    if (BLDC_RAMPUP == state )
+/*
+ * ideas on -> closed-loop transition ...
+ *  Motor tending to start advanced .. positive error. Advance ramp until error swing negative.
+ *  Secondly, don't enable until enough area, e.g. leading and training back-EMF > some threshold.
+*/
+    if (BLDC_RUNNING == state )
     {
         timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
     }
+#if 0
     else if ( BLDC_RUNNING == state)
     {
         uint16_t timing_term = Get_OL_Timing( Commanded_Dutycycle );
@@ -396,6 +370,7 @@ void BLDC_Update(void)
             timing_ramp_control( timing_term ); // ramp to the new timing term
         }
     }
+#endif
 }
 
 /**@}*/ // defgroup

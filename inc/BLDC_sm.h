@@ -26,7 +26,6 @@ typedef enum
 {
     BLDC_RESET = 0,
     BLDC_READY,
-    BLDC_RAMPUP,
     BLDC_RUNNING,
     BLDC_FAULT = 255 // numerical value irrelevant other than for display purpose
 } BLDC_STATE_T;

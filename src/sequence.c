@@ -295,14 +295,14 @@ void Sequence_Step(void)
 
 // intentionally letting motor windmill (i.e. not braking) when switched off
 // normally
-    if (BLDC_RUNNING == bldc_state || BLDC_RAMPUP == bldc_state )
+    if (BLDC_RUNNING == bldc_state )
     {
         // let'er rip!
         step_ptr_table[s_step]();
     }
     else
     {
-        // intitialize the averages measurements
+        // intitialize the averages measurements ... doesn't really matter and might go away 
         Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
     }
 }
