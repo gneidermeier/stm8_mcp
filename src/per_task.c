@@ -205,22 +205,6 @@ int16_t timing_error = Seq_get_timing_error();
     UARTputs(sbuf);
 }
 
-/*
- * monitors system voltage (stalled, stopped motor, over-current)
- * The voltage measurement is understood to be while PWM cycle is driving one or more
- * motor phases, so close to the DC rail voltage.
- */
-static void sys_voltage_mon(STATEM_T sm_state)
-{
-    // eventually the sequencer should be averaging all 3 phases for this
-    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
-
-// system voltage is only available and useable when machine is on
-    if (BLDC_RUNNING == get_bldc_state() )
-    {
-        Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
-    }
-}
 
 /*
  * Service the slider and trim inputs for speed setting.
@@ -244,7 +228,7 @@ static void set_ui_speed(STATEM_T sm_state)
     UI_Speed = 0; // obviously not doing any averaging w/ this
 
     tmp_sint16 = Digital_trim_switch;
-    tmp_sint16 += Analog_slider; // neutered for now
+    tmp_sint16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
 
     if (tmp_sint16 > 0)
     {
@@ -256,7 +240,7 @@ static void set_ui_speed(STATEM_T sm_state)
 
         UI_Speed = (uint8_t)tmp_sint16;
     }
-
+#if 1 // this is iffy
 // only OFF state is of interest for Throttle-high diagnostic.
 // There is no check for the error condition to go away - the user
 // would need to lower the throttle stick and then the system to reset.
@@ -285,7 +269,7 @@ static void set_ui_speed(STATEM_T sm_state)
             }
         }
     }
-
+#endif
     BLDC_PWMDC_Set(UI_Speed);
 }
 
@@ -371,14 +355,19 @@ static void Periodic_task(void)
 {
     BLDC_STATE_T sm_state;
 
-//disableInterrupts();
+disableInterrupts();
 
     sm_state = get_bldc_state();
 
-//enableInterrupts();
+    Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
+
+enableInterrupts();
 
     // update system voltage diagnostic
-    sys_voltage_mon( (STATEM_T) sm_state );
+    if (BLDC_RUNNING == sm_state || BLDC_RAMPUP == sm_state)
+    {
+        Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
+    }
 
     // update the UI speed input slider+trim
     set_ui_speed( (STATEM_T) sm_state );
