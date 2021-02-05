@@ -125,10 +125,12 @@ extern int Back_EMF_Falling_PhX;
 extern int Back_EMF_Riseing_PhX;
 /** @endcond */
 
-/*
- * temp, todo better function
+/**
+ * @brief Print one line to the debug serial port.
+ *
+ * @param clearf set 1 to zero the line count
  */
-static void testUART(int clear)
+static void dbg_println(int zrof)
 {
     static uint16_t Line_Count = 0;
 
@@ -147,7 +149,7 @@ int16_t timing_error = Seq_get_timing_error();
 
     sbuf[0] = 0;
 
-    if ( 0 != clear)
+    if ( 0 != zrof)
     {
         Line_Count  = 0;
     }
@@ -302,48 +304,15 @@ void UI_Stop(void)
     BLDC_Stop();
 }
 
-
 /*
- * Execution context is 'main()' so not to block ISR with ADC sampling.
- * TODO moving A/D acquisition to ramp-step (TIM3) to coordinate with PWM on/off cycling.
- * Servicing the UART (presently just a simply one-way logging stream)
+ * check for characters coming in on the debug serial port
  */
-static void Periodic_task(void)
+static void handle_term_inp(void)
 {
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
     int16_t tmp_sint16;
     char key;
-    BLDC_STATE_T sm_state;
-
-//disableInterrupts();
-
-    sm_state = get_bldc_state();
-
-//enableInterrupts();
-
-
-    // update system voltage diagnostic
-    sys_voltage_mon( (STATEM_T) sm_state );
-
-    // update the UI speed input slider+trim
-    set_ui_speed( (STATEM_T) sm_state );
-
-    /*
-     * debug logging information can be "scheduled" by setting the level, which for now
-     * simply designates number of reps ... spacing TBD? this task is now tied to
-     * BLDC Update cycle ( about 1/2sec?)
-     */
-    if (Log_Level > 0)
-    {
-// allow log to sticky-on
-        if (Log_Level < 255)
-        {
-            Log_Level -= 1;
-        }
-
-        testUART(0);// tmp test
-    }
 
     if (SerialKeyPressed(&key))
     {
@@ -357,7 +326,7 @@ static void Periodic_task(void)
             UARTputs("###\r\n");
 
             Log_Level = 1; // stop the logger output
-            testUART(1 /* clear line count */ );
+            dbg_println(1 /* clear line count */ );
 
 // reset the simulated trim swtich between system runs
             Digital_trim_switch = TRIM_DEFAULT;
@@ -391,6 +360,42 @@ static void Periodic_task(void)
         strcat(sbuf, cbuf);
         strcat(sbuf, "\r\n");
         UARTputs(sbuf);
+    }
+}
+
+/*
+ * Execution context is 'main()'
+ * Servicing the UI and communication handlers
+ */
+static void Periodic_task(void)
+{
+    BLDC_STATE_T sm_state;
+
+//disableInterrupts();
+
+    sm_state = get_bldc_state();
+
+//enableInterrupts();
+
+    // update system voltage diagnostic
+    sys_voltage_mon( (STATEM_T) sm_state );
+
+    // update the UI speed input slider+trim
+    set_ui_speed( (STATEM_T) sm_state );
+
+    handle_term_inp(); 
+ 
+    /*
+     * debug logging to terminal
+     */
+    if (Log_Level > 0)
+    {
+        // if log level less than <threshold> then decrement the count
+        if (Log_Level < 255)
+        {
+            Log_Level -= 1;
+        }
+        dbg_println(0);
     }
 }
 

@@ -82,10 +82,10 @@ String.100.0=STM8S105C6
 
 [Root.Config.0.Settings.3]
 String.2.0=Compiling $(InputFile)...
-String.3.0=cxstm8 +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
+String.3.0=cxstm8 +warn +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
 String.4.0=$(IntermPath)$(InputName).$(ObjectExt)
 String.5.0=$(IntermPath)$(InputName).ls
-String.6.0=2011,5,27,15,58,15
+String.6.0=2021,2,5,8,45,5
 
 [Root.Config.0.Settings.4]
 String.2.0=Assembling $(InputFile)...
@@ -284,10 +284,10 @@ Int.1=0
 
 [Root.STM8S_StdPeriph_Lib.Config.0.Settings.1]
 String.2.0=Compiling $(InputFile)...
-String.3.0=cxstm8 +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
+String.3.0=cxstm8 +warn +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
 String.4.0=$(IntermPath)$(InputName).$(ObjectExt)
 String.5.0=$(IntermPath)$(InputName).ls
-String.6.0=2011,5,27,15,58,15
+String.6.0=2021,2,5,8,45,5
 
 [Root.STM8S_StdPeriph_Lib.Config.0.Settings.2]
 String.2.0=Assembling $(InputFile)...
@@ -402,10 +402,10 @@ Int.1=0
 
 [Root.STM8_TouchSensing_Lib.Config.0.Settings.1]
 String.2.0=Compiling $(InputFile)...
-String.3.0=cxstm8 +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
+String.3.0=cxstm8 +warn +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
 String.4.0=$(IntermPath)$(InputName).$(ObjectExt)
 String.5.0=$(IntermPath)$(InputName).ls
-String.6.0=2011,5,27,15,58,15
+String.6.0=2021,2,5,8,45,5
 
 [Root.STM8_TouchSensing_Lib.Config.0.Settings.2]
 String.2.0=Assembling $(InputFile)...
@@ -485,10 +485,10 @@ Int.1=0
 
 [Root.Source Files.Config.0.Settings.1]
 String.2.0=Compiling $(InputFile)...
-String.3.0=cxstm8 +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
+String.3.0=cxstm8 +warn +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
 String.4.0=$(IntermPath)$(InputName).$(ObjectExt)
 String.5.0=$(IntermPath)$(InputName).ls
-String.6.0=2011,5,27,15,58,15
+String.6.0=2021,2,5,8,45,5
 
 [Root.Source Files.Config.0.Settings.2]
 String.2.0=Assembling $(InputFile)...
@@ -612,10 +612,10 @@ Int.1=0
 
 [Root.Include Files.Config.0.Settings.1]
 String.2.0=Compiling $(InputFile)...
-String.3.0=cxstm8 +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
+String.3.0=cxstm8 +warn +mods0 -customDebCompat -customOpt+compact -customC-pp -customLst -l -i..\..\..\discover\inc -i..\..\..\..\libraries\stm8_touchsensing_driver\inc -i..\..\..\..\libraries\stm8s_stdperiph_driver\inc -i..\..\inc $(ToolsetIncOpts) -cl$(IntermPath) -co$(IntermPath) $(InputFile)
 String.4.0=$(IntermPath)$(InputName).$(ObjectExt)
 String.5.0=$(IntermPath)$(InputName).ls
-String.6.0=2011,5,27,15,58,15
+String.6.0=2021,2,5,8,45,5
 
 [Root.Include Files.Config.0.Settings.2]
 String.2.0=Assembling $(InputFile)...
