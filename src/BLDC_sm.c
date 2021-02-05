@@ -259,7 +259,7 @@ BLDC_STATE_T get_bldc_state(void)
  */
 void sm_update(void)
 {
- // TODO:  warnings on macro 
+// TODO:  warnings on macro
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP;
 
     Commanded_Dutycycle = UI_speed;
@@ -297,10 +297,11 @@ void sm_update(void)
             set_bldc_state( BLDC_READY );
         }
         break;
-
+#if 0
     case BLDC_FAULT:
         haltensie();
         break;
+#endif
     }
 
     set_dutycycle( Commanded_Dutycycle );
@@ -314,36 +315,36 @@ void sm_update(void)
  * Called from ISR. Evaluate state transition conditions and determine new
  * state.
  *
+ * ideas on transition to  closed-loop control ...
+ *  Motor tending to start advanced .. positive error. Advance ramp until error swing negative.
+ *  Secondly, don't enable until enough area, e.g. leading and training back-EMF > some
  */
 int16_t Prop_timing_error;
 // prop gain is really only meaningful if there are other controller terms
 #define KPROP  1 // power of 2 shift .. arbitrary gain and also unscaling
- // arbitrary ... might have good feedback from the turbolators  at that point
-#define FTL_THRSH  0x30  // probably use a lower threshld to drop out of FTL
 
 void BLDC_Update(void)
 {
     BLDC_STATE_T state = get_bldc_state() ;
 
-    if ( 0 != Faultm_get_status() )
+    if ( 0 == Faultm_get_status() )
+    {
+        if (BLDC_RUNNING == state )
+        {
+            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+        }
+    }
+    else
     {
 // do not pass go
-        set_bldc_state( BLDC_FAULT );
+//        set_bldc_state( BLDC_FAULT );
+        haltensie();
     }
 
     sm_update(); // update sm
 
-/*
- * ideas on -> closed-loop transition ...
- *  Motor tending to start advanced .. positive error. Advance ramp until error swing negative.
- *  Secondly, don't enable until enough area, e.g. leading and training back-EMF > some threshold.
-*/
-    if (BLDC_RUNNING == state )
-    {
-        timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
-    }
 #if 0
-    else if ( BLDC_RUNNING == state)
+    if ( BLDC_RUNNING == state)
     {
         uint16_t timing_term = Get_OL_Timing( Commanded_Dutycycle );
 
@@ -356,19 +357,10 @@ void BLDC_Update(void)
 
         if (Commanded_Dutycycle > FTL_THRSH ) // probably use a lower threshld to drop out of FTL
         {
-#ifdef MAKE_YOUR_EYES_WATER
-            BLDC_OL_comm_tm = (int16_t)BLDC_OL_comm_tm + Prop_timing_error;
-#else
-  #ifdef BLOWS_THE_MAINS
-            timing_term = (int16_t)BLDC_OL_comm_tm + Prop_timing_error; // make sure signed add!
-  #endif
-            timing_ramp_control( timing_term ); // ramp to the new timing term
-#endif
+            uint16_t timing_term = (int16_t)BLDC_OL_comm_tm + Prop_timing_error; // make sure signed add!
         }
-        else
-        {
-            timing_ramp_control( timing_term ); // ramp to the new timing term
-        }
+
+        timing_ramp_control( timing_term ); // ramp to the new timing term
     }
 #endif
 }
