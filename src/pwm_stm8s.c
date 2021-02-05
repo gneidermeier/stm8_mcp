@@ -68,13 +68,13 @@ void All_phase_stop(void)
 {
 // kill the driver signals
     PWM_PhA_Disable();
-    PWM_PhA_HB_DISABLE(0);
+    PWM_PhA_HB_DISABLE();
 
     PWM_PhB_Disable();
-    PWM_PhB_HB_DISABLE(0);
+    PWM_PhB_HB_DISABLE();
 
     PWM_PhC_Disable();
-    PWM_PhC_HB_DISABLE(0);
+    PWM_PhC_HB_DISABLE();
 }
 
 /**

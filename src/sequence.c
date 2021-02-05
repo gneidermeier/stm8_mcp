@@ -76,18 +76,18 @@ static const step_ptr_t step_ptr_table[] =
  * condition is seen when there is greater distribution of back-emf area on the
  * right side.
  */
-//static int16_t comm_timing_error; 
+//static int16_t comm_timing_error;
 //#define TIMING_ERROR_TERM   (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX)
 
 
-// There isn't a timing control point to use to determine the error - however 
+// There isn't a timing control point to use to determine the error - however
 // ratio of the leading and falling slopes (integration) indicates the direction
 // and varies according to the magnitude of the timing error.
 //  ratio = ( L / F  ) - 1
 static int16_t comm_tm_err_ratio;
 
-#define ERROR_SCALE_64_LSH   6
-#define ERROR_SCALE_64_ONE  (1 << ERROR_SCALE_64_LSH)
+#define SCALE_64_LSH   6
+#define SCALE_64_ONE  (1 << SCALE_64_LSH)
 
 
 /* Private functions ---------------------------------------------------------*/
@@ -104,15 +104,15 @@ static void sector_0(void)
     PWM_PhC_Disable();
 
 //Float: C
-    PWM_PhC_HB_DISABLE(0);
+    PWM_PhC_HB_DISABLE();
 
 //PWM_LO: B
-    PWM_PhB_OUTP_LO( 0 );
-    PWM_PhB_HB_ENABLE(1);
+    PWM_PhB_OUTP_LO();
+    PWM_PhB_HB_ENABLE();
 
 //PWM_HI: A
     PWM_PhA_Enable();
-    PWM_PhA_HB_ENABLE(1);
+    PWM_PhA_HB_ENABLE();
 }
 
 static void sector_1(void)
@@ -123,11 +123,11 @@ static void sector_1(void)
 //        NOP
 
 //Float: B
-    PWM_PhB_HB_DISABLE(0);
+    PWM_PhB_HB_DISABLE();
 
 //PWM_LO: C
-    PWM_PhC_OUTP_LO( 0 );
-    PWM_PhC_HB_ENABLE(1);
+    PWM_PhC_OUTP_LO();
+    PWM_PhC_HB_ENABLE();
 
 //PWM_HI:
 //      NOP (A)
@@ -144,15 +144,15 @@ static void sector_2(void)
     PWM_PhA_Disable();
 
 //Float: A
-    PWM_PhA_HB_DISABLE(0);
+    PWM_PhA_HB_DISABLE();
 
 //PWM_LO: C
-    PWM_PhC_OUTP_LO( 0 );
-    PWM_PhC_HB_ENABLE(1);
+    PWM_PhC_OUTP_LO();
+    PWM_PhC_HB_ENABLE();
 
 //PWM_HI: B
     PWM_PhB_Enable();
-    PWM_PhB_HB_ENABLE(1);
+    PWM_PhB_HB_ENABLE();
 }
 
 static void sector_3(void)
@@ -167,11 +167,11 @@ static void sector_3(void)
 //        NOP
 
 //Float: C
-    PWM_PhC_HB_DISABLE(0);
+    PWM_PhC_HB_DISABLE();
 
 //PWM_LO: A
-    PWM_PhA_OUTP_LO( 0 );
-    PWM_PhA_HB_ENABLE(1);
+    PWM_PhA_OUTP_LO();
+    PWM_PhA_HB_ENABLE();
 
 //PWM_HI:
 //      NOP (B)
@@ -184,13 +184,13 @@ static void sector_4(void)
 //PWM OFF: B
     PWM_PhB_Disable();
 //Float: B
-    PWM_PhB_HB_DISABLE(0);
+    PWM_PhB_HB_DISABLE();
 //PWM_LO: A
-    PWM_PhA_OUTP_LO( 0 );
-    PWM_PhA_HB_ENABLE(1);
+    PWM_PhA_OUTP_LO();
+    PWM_PhA_HB_ENABLE();
 //PWM_HI: C
     PWM_PhC_Enable();
-    PWM_PhC_HB_ENABLE(1);
+    PWM_PhC_HB_ENABLE();
 }
 
 static void sector_5(void)
@@ -200,10 +200,10 @@ static void sector_5(void)
 //PWM OFF:
 //        NOP
 //Float: A
-    PWM_PhA_HB_DISABLE(0);
+    PWM_PhA_HB_DISABLE();
 //PWM_LO: B
-    PWM_PhB_OUTP_LO( 0 );
-    PWM_PhB_HB_ENABLE(1);
+    PWM_PhB_OUTP_LO();
+    PWM_PhB_HB_ENABLE();
 //PWM_HI:
 //        NOP (C)
 
@@ -216,8 +216,8 @@ static void sector_5(void)
     // Calculation result gets scaled down in conjunction with factoring in of
     //  controller gain term(s).
     comm_tm_err_ratio =
-        (int16_t)( (Back_EMF_Falling_PhX << 6) / Back_EMF_Riseing_PhX )
-        - (int16_t)ERROR_SCALE_64_ONE;
+        (int16_t)( ( Back_EMF_Falling_PhX << SCALE_64_LSH ) / Back_EMF_Riseing_PhX )
+        - (int16_t)SCALE_64_ONE;
 }
 
 /* Public functions ---------------------------------------------------------*/
@@ -286,18 +286,19 @@ void Sequence_Step(void)
     // note this sizeof and divide done in preprocessor - verified in the assembly
     const uint8_t N_CSTEPS = sizeof(step_ptr_table) / sizeof(step_ptr_t);
 
-    static uint8_t Sequence_step;
+    static uint8_t s_step;
 
     BLDC_STATE_T bldc_state = get_bldc_state();
 
-    Sequence_step = (Sequence_step + 1) % N_CSTEPS;
+// has to cast modulus expression to uint8
+    s_step = (uint8_t)((s_step + 1) % N_CSTEPS);
 
 // intentionally letting motor windmill (i.e. not braking) when switched off
 // normally
     if (BLDC_RUNNING == bldc_state || BLDC_RAMPUP == bldc_state )
     {
         // let'er rip!
-        step_ptr_table[Sequence_step]();
+        step_ptr_table[s_step]();
     }
     else
     {
