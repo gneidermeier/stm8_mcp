@@ -35,12 +35,6 @@
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
-/**
- * @brief  Internal type for working with the state enumerations.
- * @details If the declaration for the state-type changes, there will be only one
- * place to change it in this module.
- */
-typedef BLDC_STATE_T  STATEM_T;
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -139,7 +133,7 @@ static void dbg_println(int zrof)
 
 // TODO yes probably use DI/EI to do all shared access in one swoop
 // DI
-int16_t timing_error = Seq_get_timing_error();
+    int16_t timing_error = Seq_get_timing_error();
 //  BLDC_PWMDC_Get()
 //  get_commutation_period()
 //  Faultm_get_status
@@ -197,10 +191,6 @@ int16_t timing_error = Seq_get_timing_error();
     itoa(Analog_slider, cbuf, 16);
     strcat(sbuf, cbuf);
 
-    strcat(sbuf, " SM=");
-    itoa(get_bldc_state(), cbuf, 16);
-    strcat(sbuf, cbuf);
-
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
 }
@@ -215,7 +205,7 @@ int16_t timing_error = Seq_get_timing_error();
  *
  * TODO: rate limit of speed input!
  */
-static void set_ui_speed(STATEM_T sm_state)
+static void set_ui_speed(void)
 {
     int16_t tmp_sint16;
 
@@ -240,7 +230,7 @@ static void set_ui_speed(STATEM_T sm_state)
 
         UI_Speed = (uint8_t)tmp_sint16;
     }
-#if 1 // this is iffy
+#if 0 // this is borken
 // only OFF state is of interest for Throttle-high diagnostic.
 // There is no check for the error condition to go away - the user
 // would need to lower the throttle stick and then the system to reset.
@@ -284,7 +274,7 @@ void UI_Stop(void)
     Digital_trim_switch = TRIM_DEFAULT;
     UI_Speed = 0;
 
- // reset the machine
+// reset the machine
     BLDC_Stop();
 }
 
@@ -353,24 +343,24 @@ static void handle_term_inp(void)
  */
 static void Periodic_task(void)
 {
-    BLDC_STATE_T sm_state;
+    BL_RUNSTATE_t bl_state;
 
-disableInterrupts();
+    disableInterrupts();
 
-    sm_state = get_bldc_state();
+    bl_state = BL_get_state();
 
     Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-enableInterrupts();
+    enableInterrupts();
 
     // update system voltage diagnostic
-    if (BLDC_RUNNING == sm_state)
+    if (BL_IS_RUNNING == bl_state )
     {
         Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
     }
 
     // update the UI speed input slider+trim
-    set_ui_speed( (STATEM_T) sm_state );
+    set_ui_speed();
 
     handle_term_inp();
 

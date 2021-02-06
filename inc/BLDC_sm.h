@@ -19,21 +19,6 @@
 
 /* types ------------------------------------------------------------------*/
 
-/**
- * @brief Typedef for state machine variable.
- */
-typedef enum
-{
-    BLDC_RESET = 0,
-    BLDC_READY,
-    BLDC_RUNNING,
-    BLDC_FAULT = 255 // numerical value irrelevant other than for display purpose
-} BLDC_STATE_T;
-
-/** @deprecated */
-//#define BLDC_ON BLDC_RUNNING // tmp
-
-
 /* prototypes ------------------------------------------------------------------*/
 
 /**
@@ -41,7 +26,11 @@ typedef enum
  *
  * @return state value
  */
-BLDC_STATE_T get_bldc_state(void);
+typedef enum
+{
+    BL_NOT_RUNNING,
+    BL_IS_RUNNING
+} BL_RUNSTATE_t;
 
 /**
   * @brief Accessor for commutation period.
@@ -57,6 +46,8 @@ void BLDC_PWMDC_Set(uint8_t dc);
 uint16_t BLDC_PWMDC_Get(void);
 
 void BLDC_Stop(void);
+
+BL_RUNSTATE_t BL_get_state(void);
 
 /**
  * @brief Periodic state machine update.

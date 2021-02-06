@@ -75,6 +75,17 @@
 
 
 /* Private types -----------------------------------------------------------*/
+/**
+ * @brief Typedef for state machine variable.
+ */
+/** @deprecated */
+typedef enum
+{
+    BLDC_RESET = 0,
+    BLDC_READY,
+    BLDC_RUNNING,
+    BLDC_FAULT = 255 // numerical value irrelevant other than for display purpose
+} BLDC_STATE_T;
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -183,11 +194,8 @@ void BLDC_PWMDC_Set(uint8_t dc)
 {
     if (UI_speed < U8_MAX)
     {
-//        if (BLDC_FAULT != get_bldc_state() ) // doesn't seem to need this now
-        {
 // doesn't need a cast, uint8 dc is implicitly promoted to uint16 (type of UI_Speed)
-            UI_speed = (uint16_t) dc;
-        }
+        UI_speed = (uint16_t) dc;
     }
     else
     {
@@ -246,9 +254,14 @@ uint16_t get_commutation_period(void)
  *
  * @return state value
  */
-BLDC_STATE_T get_bldc_state(void)
+BL_RUNSTATE_t BL_get_state(void)
 {
-    return BLDC_State;
+    if (BLDC_RUNNING == BLDC_State)
+    {
+        return BL_IS_RUNNING;
+    }
+    // else
+    return BL_NOT_RUNNING;
 }
 
 /** @cond */ // hide some developer/debug code
@@ -260,13 +273,15 @@ BLDC_STATE_T get_bldc_state(void)
 void sm_update(void)
 {
 // TODO:  warnings on macro
-    const uint16_t _RampupDC_ = PWM_DC_RAMPUP;
+    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
 
     Commanded_Dutycycle = UI_speed;
 
-    switch ( get_bldc_state() )
+    switch ( BLDC_State )
     {
     default:
+        break;
+
     case BLDC_READY:
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
@@ -277,9 +292,6 @@ void sm_update(void)
             Commanded_Dutycycle = _RampupDC_ ;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
-        break;
-
-    case BLDC_RUNNING:
         break;
 
     case BLDC_RESET:
@@ -297,11 +309,6 @@ void sm_update(void)
             set_bldc_state( BLDC_READY );
         }
         break;
-#if 0
-    case BLDC_FAULT:
-        haltensie();
-        break;
-#endif
     }
 
     set_dutycycle( Commanded_Dutycycle );
@@ -325,11 +332,9 @@ int16_t Prop_timing_error;
 
 void BLDC_Update(void)
 {
-    BLDC_STATE_T state = get_bldc_state() ;
-
     if ( 0 == Faultm_get_status() )
     {
-        if (BLDC_RUNNING == state )
+        if (BL_IS_RUNNING == BL_get_state())
         {
             timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
         }
@@ -337,7 +342,6 @@ void BLDC_Update(void)
     else
     {
 // do not pass go
-//        set_bldc_state( BLDC_FAULT );
         haltensie();
     }
 

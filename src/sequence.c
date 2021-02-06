@@ -288,21 +288,19 @@ void Sequence_Step(void)
 
     static uint8_t s_step;
 
-    BLDC_STATE_T bldc_state = get_bldc_state();
-
 // has to cast modulus expression to uint8
     s_step = (uint8_t)((s_step + 1) % N_CSTEPS);
 
 // intentionally letting motor windmill (i.e. not braking) when switched off
 // normally
-    if (BLDC_RUNNING == bldc_state )
+    if (BL_IS_RUNNING == BL_get_state() )
     {
         // let'er rip!
         step_ptr_table[s_step]();
     }
     else
     {
-        // intitialize the averages measurements ... doesn't really matter and might go away 
+        // intitialize the averages measurements ... doesn't really matter and might go away
         Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
     }
 }
