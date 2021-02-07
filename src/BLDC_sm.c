@@ -276,20 +276,13 @@ void BLDC_Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
 
-    if ( 0 == Faultm_get_status() )
-    {
-        if (BL_IS_RUNNING == BL_get_state())
-        {
-            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
-        }
-    }
-    else
+    if ( 0 != Faultm_get_status() )
     {
 // do not pass go
-        haltensie();
+        haltensie(); // sets UI speed 0
     }
 
-    Commanded_Dutycycle = UI_speed;
+    Commanded_Dutycycle = UI_speed; // upon transition from ramp->run it gets set to ramp DC
 
     switch ( BLDC_State )
     {
@@ -327,6 +320,7 @@ void BLDC_Update(void)
 
     set_dutycycle( Commanded_Dutycycle );
 
+    timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
 
 #if 0
     if ( BLDC_RUNNING == state)
