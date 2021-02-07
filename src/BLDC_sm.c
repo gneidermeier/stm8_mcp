@@ -82,9 +82,7 @@
 typedef enum
 {
     BLDC_RESET = 0,
-    BLDC_READY,
-    BLDC_RUNNING,
-    BLDC_FAULT = 255 // numerical value irrelevant other than for display purpose
+    BLDC_RUNNING
 } BLDC_STATE_T;
 
 /* Public variables  ---------------------------------------------------------*/
@@ -290,7 +288,7 @@ void BLDC_Update(void)
 
     Commanded_Dutycycle = UI_speed; // upon transition from ramp->run it gets set to ramp DC
 
-    if (BLDC_READY == BLDC_State)
+    if (BLDC_RESET == BLDC_State)
     {
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
@@ -300,15 +298,6 @@ void BLDC_Update(void)
             // set initial conditions for ramp state
             Commanded_Dutycycle = _RampupDC_ ;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
-        }
-    }
-    else if (BLDC_RESET == BLDC_State)
-    {
-// while in Reset state, UI won't begin refreshing the UI Speed until the slider
-// goes low, so once it is greater than 0 then system startup may proceed.
-        if (UI_speed > 0)
-        {
-            set_bldc_state( BLDC_READY );
         }
     }
 
