@@ -270,11 +270,24 @@ BL_RUNSTATE_t BL_get_state(void)
  * Called from ISR. Evaluate state transition conditions and determine new
  * state.
  *
- * Closed loop control condition: speed > threshold, error switches sign, and sufficient "integration area".
+ * closed-loop control ... speed duty-cycle threshold, error switch sign? area under integratino curve
  */
 void BLDC_Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
+
+    if ( 0 == Faultm_get_status() )
+    {
+        if (BL_IS_RUNNING == BL_get_state())
+        {
+            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+        }
+    }
+    else
+    {
+// do not pass go
+        haltensie();
+    }
 
     Commanded_Dutycycle = UI_speed;
 
@@ -314,18 +327,6 @@ void BLDC_Update(void)
 
     set_dutycycle( Commanded_Dutycycle );
 
-    if ( 0 == Faultm_get_status() )
-    {
-        if (BL_IS_RUNNING == BL_get_state())
-        {
-            timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
-        }
-    }
-    else
-    {
-// do not pass go
-        haltensie();
-    }
 
 #if 0
     if ( BLDC_RUNNING == state)
