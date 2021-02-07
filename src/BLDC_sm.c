@@ -284,12 +284,8 @@ void BLDC_Update(void)
 
     Commanded_Dutycycle = UI_speed; // upon transition from ramp->run it gets set to ramp DC
 
-    switch ( BLDC_State )
+    if (BLDC_READY == BLDC_State)
     {
-    default:
-        break;
-
-    case BLDC_READY:
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
@@ -299,14 +295,12 @@ void BLDC_Update(void)
             Commanded_Dutycycle = _RampupDC_ ;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
-        break;
-
-    case BLDC_RESET:
-
+    }
+    else if (BLDC_RESET == BLDC_State)
+    {
 // was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
 // (even tho the function seeemed by look of the terminal to be running .. )
 // the commutation period (TIM3) apparantly has to be set to something (not 0)
-// or else something goes wrong ... this also was useful to observe effect on system load at hightes motor speed! and visually to see motor state is _OFF
         BLDC_OL_comm_tm = LUDICROUS_SPEED;
 
 // while in Reset state, UI won't begin refreshing the UI Speed until the slider
@@ -315,7 +309,6 @@ void BLDC_Update(void)
         {
             set_bldc_state( BLDC_READY );
         }
-        break;
     }
 
     set_dutycycle( Commanded_Dutycycle );
