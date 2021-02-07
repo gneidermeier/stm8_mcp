@@ -264,15 +264,16 @@ BL_RUNSTATE_t BL_get_state(void)
     return BL_NOT_RUNNING;
 }
 
-/** @cond */ // hide some developer/debug code
-/*
- * BLDC Update:
- *  Called from ISR
- *  Handle the BLDC state:
+/**
+ * @brief Periodic state machine update.
+ *
+ * Called from ISR. Evaluate state transition conditions and determine new
+ * state.
+ *
+ * Closed loop control condition: speed > threshold, error switches sign, and sufficient "integration area".
  */
-void sm_update(void)
+void BLDC_Update(void)
 {
-// TODO:  warnings on macro
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
 
     Commanded_Dutycycle = UI_speed;
@@ -312,26 +313,7 @@ void sm_update(void)
     }
 
     set_dutycycle( Commanded_Dutycycle );
-}
 
-/** @endcond */
-
-/**
- * @brief Periodic state machine update.
- *
- * Called from ISR. Evaluate state transition conditions and determine new
- * state.
- *
- * ideas on transition to  closed-loop control ...
- *  Motor tending to start advanced .. positive error. Advance ramp until error swing negative.
- *  Secondly, don't enable until enough area, e.g. leading and training back-EMF > some
- */
-int16_t Prop_timing_error;
-// prop gain is really only meaningful if there are other controller terms
-#define KPROP  1 // power of 2 shift .. arbitrary gain and also unscaling
-
-void BLDC_Update(void)
-{
     if ( 0 == Faultm_get_status() )
     {
         if (BL_IS_RUNNING == BL_get_state())
@@ -344,8 +326,6 @@ void BLDC_Update(void)
 // do not pass go
         haltensie();
     }
-
-    sm_update(); // update sm
 
 #if 0
     if ( BLDC_RUNNING == state)
