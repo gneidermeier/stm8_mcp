@@ -252,7 +252,7 @@ static void set_ui_speed(void)
             {
 // u8_max to be used as an out-of-band value which can signify "Reset/Stop"
                 UI_Speed = U8_MAX;
-                BLDC_Stop(); // ... PWMDC_Set() can  call Stop() ?
+                BL_reset();
 
                 // log some info
                 Log_Level = 10;
@@ -275,7 +275,7 @@ void UI_Stop(void)
     UI_Speed = 0;
 
 // reset the machine
-    BLDC_Stop();
+    BL_reset();
 }
 
 /*

@@ -17,9 +17,14 @@
 #include <stdint.h> // was supposed to go thru sytsem.h :(
 #endif
 
-/* types ------------------------------------------------------------------*/
+/* macros --------------------------------------------------------------------*/
+#define PWM_BL_STOP  U8_MAX
 
-/* prototypes ------------------------------------------------------------------*/
+
+/* types ---------------------------------------------------------------------*/
+
+
+/* prototypes ----------------------------------------------------------------*/
 
 /**
  * @brief Accessor for state variable.
@@ -45,7 +50,7 @@ void BLDC_Spd_dec(void);
 void BLDC_PWMDC_Set(uint8_t dc);
 uint16_t BLDC_PWMDC_Get(void);
 
-void BLDC_Stop(void);
+void BL_reset(void);
 
 BL_RUNSTATE_t BL_get_state(void);
 

@@ -142,6 +142,7 @@ static void timing_ramp_control(uint16_t tgt_commutation_per)
 }
 
 /*
+ * BL_stop
  * common sub for stopping and fault states
  */
 static void haltensie(void)
@@ -165,13 +166,18 @@ static void set_bldc_state( BLDC_STATE_T newstate)
 /* Public functions ---------------------------------------------------------*/
 
 /**
- * @brief Stop motor
+ * @brief Initialize/reset motor
  *
  *    System reset / re-arm function (has to be called both at program startup
  *    as well as following a fault condition state.
  */
-void BLDC_Stop(void)
+void BL_reset(void)
 {
+// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
+// (even tho the function seeemed by look of the terminal to be running .. )
+// the commutation period (TIM3) apparantly has to be set to something (not 0)
+    BLDC_OL_comm_tm = LUDICROUS_SPEED;
+
     // had to move these into here again
     haltensie();
     Faultm_init();
@@ -200,7 +206,7 @@ void BLDC_PWMDC_Set(uint8_t dc)
     else
     {
         // speed out of range (U8 MAX can be used as OOB signal)
-        BLDC_Stop();
+//        BLDC_Stop(); // doesn't explicitly need this right now
     }
 }
 
@@ -298,11 +304,6 @@ void BLDC_Update(void)
     }
     else if (BLDC_RESET == BLDC_State)
     {
-// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
-// (even tho the function seeemed by look of the terminal to be running .. )
-// the commutation period (TIM3) apparantly has to be set to something (not 0)
-        BLDC_OL_comm_tm = LUDICROUS_SPEED;
-
 // while in Reset state, UI won't begin refreshing the UI Speed until the slider
 // goes low, so once it is greater than 0 then system startup may proceed.
         if (UI_speed > 0)

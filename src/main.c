@@ -24,7 +24,7 @@ main()
 {
     MCU_Init();
 
-    BLDC_Stop();
+    BL_reset();
 
     enableInterrupts(); // interrupts are globally disabled by default
 
