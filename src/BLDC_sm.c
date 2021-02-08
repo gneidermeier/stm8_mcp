@@ -91,12 +91,13 @@ typedef enum
 
 static BLDC_STATE_T BLDC_State;
 
-static uint16_t BLDC_OL_comm_tm;
+static uint16_t BLDC_OL_comm_tm;     // persistent value of ramp timing
 
-static uint16_t Commanded_Dutycycle;
-static uint16_t UI_speed;
+static uint16_t Commanded_Dutycycle; // copied select DC to global for logging
 
-static uint8_t Manual_Ovrd;
+static uint8_t UI_speed;             // input from UI task, file-scope for sm_update
+
+static uint8_t Manual_Ovrd;   // indicates manual commuation buttons are active
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -150,7 +151,6 @@ static void haltensie(void)
 
     // kill the driver signals
     All_phase_stop();
-    Commanded_Dutycycle = PWM_0PCNT;
 }
 
 /*
@@ -196,10 +196,9 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    if (UI_speed < U8_MAX)
+    if (1) // if (UI_speed < U8_MAX)
     {
-// doesn't need a cast, uint8 dc is implicitly promoted to uint16 (type of UI_Speed)
-        UI_speed = (uint16_t) dc;
+        UI_speed = dc;
     }
     else
     {
