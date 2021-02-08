@@ -81,8 +81,8 @@
 /** @deprecated */
 typedef enum
 {
-    BLDC_RESET = 0,
-    BLDC_RUNNING
+    BDC_RESET = 0,
+    BDC_RUNNING
 } BLDC_STATE_T;
 
 /* Public variables  ---------------------------------------------------------*/
@@ -171,16 +171,17 @@ static void set_bldc_state( BLDC_STATE_T newstate)
  */
 void BL_reset(void)
 {
-// was going to set commutation period to zero (0) here, but then the motor wouldn't fire up
-// (even tho the function seeemed by look of the terminal to be running .. )
-// the commutation period (TIM3) apparantly has to be set to something (not 0)
+    // stop the system in case it is already running
+    haltensie();
+
+    // reset the system
+
+    // the commutation period (TIM3) apparantly has to be set to something (not 0)
     BLDC_OL_comm_tm = LUDICROUS_SPEED;
 
-    // had to move these into here again
-    haltensie();
     Faultm_init();
 
-    set_bldc_state( BLDC_RESET );
+    set_bldc_state( BDC_RESET );
 }
 
 
@@ -259,7 +260,7 @@ uint16_t get_commutation_period(void)
  */
 BL_RUNSTATE_t BL_get_state(void)
 {
-    if (BLDC_RUNNING == BLDC_State)
+    if (BDC_RUNNING == BLDC_State)
     {
         return BL_IS_RUNNING;
     }
@@ -279,30 +280,37 @@ void BLDC_Update(void)
 {
     const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
 
-    if ( 0 != Faultm_get_status() )
+    uint16_t inp_dutycycle = 0; // intialize to 0
+
+    if ( 0 == Faultm_get_status() )
     {
-// do not pass go
+        inp_dutycycle = UI_speed;
+    }
+    else
+    {
+        // do not pass go
         haltensie(); // sets UI speed 0
+        // assert ... inp_dutycycle = 0;
     }
 
-    Commanded_Dutycycle = UI_speed; // upon transition from ramp->run it gets set to ramp DC
-
-    if (BLDC_RESET == BLDC_State)
+    if ( BDC_RUNNING != BLDC_State  )
     {
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
         {
-            set_bldc_state( BLDC_RUNNING );
+            set_bldc_state( BDC_RUNNING );
 
             // set initial conditions for ramp state
-            Commanded_Dutycycle = _RampupDC_ ;
+            inp_dutycycle = _RampupDC_ ;
             BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
         }
     }
 
-    set_dutycycle( Commanded_Dutycycle );
+    // finally, refresh the duty-cycle and commutation period
+    set_dutycycle( inp_dutycycle );
+    timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
 
-    timing_ramp_control( Get_OL_Timing( Commanded_Dutycycle ) );
+    Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
 
 #if 0
     if ( BLDC_RUNNING == state)
