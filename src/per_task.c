@@ -210,12 +210,12 @@ static void set_ui_speed(void)
     int16_t tmp_sint16;
 
 //   svc a UI potentiometer
-    uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 );
+    uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
     Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 
-// careful with expression containing signed int ... ui_speed is defaulted
+// careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
-    UI_Speed = 0; // obviously not doing any averaging w/ this
+    UI_Speed = 0;
 
     tmp_sint16 = Digital_trim_switch;
     tmp_sint16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
@@ -260,7 +260,6 @@ static void set_ui_speed(void)
         }
     }
 #endif
-    BLDC_PWMDC_Set(UI_Speed);
 }
 
 /**
@@ -270,12 +269,8 @@ static void set_ui_speed(void)
  */
 void UI_Stop(void)
 {
-// reset the simulated trim swtich between system runs
-    Digital_trim_switch = TRIM_DEFAULT;
-    UI_Speed = 0;
-
 // reset the machine
-    BL_reset();
+    BL_reset(); //  // ISR safe ... hmmmm
 }
 
 /*
@@ -290,10 +285,11 @@ static void handle_term_inp(void)
 
     if (SerialKeyPressed(&key))
     {
-//        Log_Level = 1; // show some info
-
         if (key == ' ') // space character
         {
+// reset the simulated trim swich between system runs
+//    Digital_trim_switch = TRIM_DEFAULT; // hack ... for development
+
             // reset the machine
             UI_Stop();
 
@@ -345,24 +341,30 @@ static void Periodic_task(void)
 {
     BL_RUNSTATE_t bl_state;
 
-    disableInterrupts();
+// invoke the terminal input and ui speed subs, updates from their globals to occur in the CS 
+    handle_term_inp();
+
+    // update the UI speed input slider+trim
+    set_ui_speed();
+
+
+    disableInterrupts();          // DI
+
+    BLDC_PWMDC_Set(UI_Speed);
 
     bl_state = BL_get_state();
 
     Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-    enableInterrupts();
+    enableInterrupts();           // EI EI O
 
-    // update system voltage diagnostic
+
+    // update system voltage diagnostic - should be interrupt safe, the status word
+    // is the only access in ISR context, and it is a byte so shoud be atomic.
     if (BL_IS_RUNNING == bl_state )
     {
         Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
     }
-
-    // update the UI speed input slider+trim
-    set_ui_speed();
-
-    handle_term_inp();
 
     /*
      * debug logging to terminal
