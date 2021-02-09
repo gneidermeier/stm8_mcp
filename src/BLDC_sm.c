@@ -26,14 +26,14 @@
 #define PWM_0PCNT      0
 
 // cast arg to 16-bit and group the pcnt*100 term to retain precision
-#define PWM_X_PCNT( _PCNT_ )   ( ( (uint16_t)_PCNT_ * PWM_100PCNT ) / 100.0 )
+#define PWM_X_PCNT( _PCNT_ )   (uint16_t)( ( _PCNT_ * PWM_100PCNT ) / 100.0 )
 
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
 #define PWM_DC_RAMPUP    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
 
-#define PWM_DC_IDLE      PWM_X_PCNT( PWM_DC_RAMPUP )
+#define PWM_DC_SHUTOFF   PWM_X_PCNT( 8.0 )   // stalls below 18 counts (7.4 %)
 
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
@@ -71,7 +71,7 @@
  * period) decremented by fixed amount each control-loop timestep. Slope
  * determined by experiment (conservative to avoid stalling the motor!)
  */
-#define BLDC_ONE_RAMP_UNIT       1   // RAMP_STEP_LIMIT
+#define BLDC_ONE_RAMP_UNIT       2     // working range [1:6] ?? (exper.)
 
 
 /* Private types -----------------------------------------------------------*/
@@ -172,11 +172,15 @@ static void set_bldc_state( BLDC_STATE_T newstate)
 void BL_reset(void)
 {
     // stop the system in case it is already running
-    haltensie();
+    haltensie();  //  zeros the  UI speed 
 
     // reset the system
 
     // the commutation period (TIM3) apparantly has to be set to something (not 0)
+    // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
+    // Therefore, default the period to the highest expected speed to assert CPU
+    // load is handled, this is also simpler than trying to keep track of what
+    // state to enable the commutation control .
     BLDC_OL_comm_tm = LUDICROUS_SPEED;
 
     Faultm_init();
@@ -188,23 +192,26 @@ void BL_reset(void)
 /**
  * @brief Sets motor speed from commanded throttle/UI setting
  *
- * The speed setting is checked for range and faults, if out of
- *        range, Stop() is called.
- *
  * @param dc Speed input which can be in the range [0:255] but 255 is to be
  *        reserved for special use (out of band value). If the PWM resolution
  *        changes then the input speed will have to be re-scaled accordingly.
+ *
+ * Now with low speed cut off !
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    if (1) // if (UI_speed < U8_MAX)
+    // as long as requested speed is less than min, hold it in reset
+    if (dc < PWM_DC_SHUTOFF)
     {
-        UI_speed = dc;
+        // reset needed in case system was running, in which case there is no 
+        // going back .. has to ramp again to get started. 
+        BL_reset();
+
+        UI_speed = 0; // note redundant if BL reset does it
     }
     else
     {
-        // speed out of range (U8 MAX can be used as OOB signal)
-//        BLDC_Stop(); // doesn't explicitly need this right now
+        UI_speed = dc;
     }
 }
 
@@ -293,7 +300,7 @@ void BLDC_Update(void)
         // assert ... inp_dutycycle = 0;
     }
 
-    if ( BDC_RUNNING != BLDC_State  )
+    if ( BDC_RUNNING != BLDC_State )
     {
         // allow motor to start when throttle has been raised
         if (UI_speed > _RampupDC_ )
@@ -308,6 +315,9 @@ void BLDC_Update(void)
 
     // finally, refresh the duty-cycle and commutation period
     set_dutycycle( inp_dutycycle );
+
+    // there isn't much point in enabling commuation timing contrl if speed is 0
+    // however, it is simpler to just leave it running as long as ISR period no shorter than max speed see other assert warning)
     timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
 
     Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
