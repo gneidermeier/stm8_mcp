@@ -90,7 +90,7 @@ static void GPIO_Config(void)
     GPIOD->DDR |=  (1<<1); //?
     GPIOD->CR1 |=  (1<<1); //?
 
-GPIOE->ODR &=  ~(1<<0); //E0 data
+    GPIOE->ODR &=  ~(1<<0); //E0 data
     GPIOE->DDR |=  (1<<0); //E0 dir
     GPIOE->CR1 |=  (1<<0); //E0	cfg
 
@@ -396,8 +396,9 @@ static void TIM2_setup(void)
  */
 static void TIM4_setup(void)
 {
-//    const uint8_t T4_Period = 32;     // Period =  256uS ... stable, any faster becomes jittery
-    const uint8_t T4_Period = 64;    // Period =  0.000512 S  (512 uS) ...
+// 32 means nothing other than startingrelative to prevous timer setting of 64
+    const uint8_t T4_Period = (32 * SYS_RATE_MULT) ;    // Period =  0.000512 S  (512 uS) ...
+//    const uint8_t T4_Period = (32 * 4);     // Period =  0.001024 S  (1024 uS) ...
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -435,8 +436,8 @@ void TIM3_setup(uint16_t period)
 {
     TIM3->PSCR = TIM3_PSCR;
 
-    TIM3->ARRH = period >> 8;   // be sure to set byte ARRH first, see data sheet
-    TIM3->ARRL = period & 0xff;
+    TIM3->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+    TIM3->ARRL = (uint8_t)(period & 0xff);
 
     TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
     TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count

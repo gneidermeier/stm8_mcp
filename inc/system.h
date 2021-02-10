@@ -17,8 +17,8 @@
 
 // horrors of unit testing
 #ifndef UNIT_TEST
-  // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
-  #include <stm8s.h>
+// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
+#include <stm8s.h>
 #endif // UNIT_TEST
 
 
@@ -26,6 +26,21 @@
  * (un)comment macro to set stm8 clock from 8Mhz or 16Mhz
  */
 //#define CLOCK_16
+
+/*
+ * The base system rate multiplier
+ * Starting value was 2 which means nothing other than startingrelative to
+ * factoring out a power-of-two factor from certain time related structures
+ * aligned with this rate such as fault manager and control ramp timing
+ */
+#define SYS_RATE_MULT  2  // periodic task multipler constant term (@ 0.512 ms as before)
+
+
+// bl_sm and bg_task both derived from TIM4 and invoked thru the Driver ISR
+// handlers ... but could end up being invoked at sep. subrates?
+//#define PERT_RATEM  SYS_RATE_MULT  // periodic task rate multiplier
+
+#define CTRL_RATEM  SYS_RATE_MULT  // control task rate multiplier
 
 
 /*

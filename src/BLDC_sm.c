@@ -60,18 +60,12 @@
 // actual motor commutation frequency.
 #define BLDC_OL_TM_LO_SPD         0x0B00 // start of ramp
 
-//#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
-
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 //#define LUDICROUS_SPEED         0x006F // 111
 
 
-/*
- * Slope of what is basically a linear startup ramp, commutation time (i.e. TIM3)
- * period) decremented by fixed amount each control-loop timestep. Slope
- * determined by experiment (conservative to avoid stalling the motor!)
- */
-#define BLDC_ONE_RAMP_UNIT       2     // working range [1:6] ?? (exper.)
+// ramp rate derived from control rate which is derived from overall system rate
+#define BLDC_ONE_RAMP_UNIT    (1 * CTRL_RATEM)   // working range  ??
 
 
 /* Private types -----------------------------------------------------------*/
@@ -161,7 +155,7 @@ void BL_reset(void)
     // the commutation period (TIM3) apparantly has to be set to something (not 0)
     // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
 
-    // Set initial commutation timing period upon state transition. 
+    // Set initial commutation timing period upon state transition.
     BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
 
     Faultm_init();
@@ -171,8 +165,8 @@ void BL_reset(void)
 /**
  * @brief Sets motor speed from commanded throttle/UI setting
  *
- * @details  Establishes the condition to transition from off->running. The motor 
- *  is enabled to start once reaching the ramp speed threshold, and allowed to 
+ * @details  Establishes the condition to transition from off->running. The motor
+ *  is enabled to start once reaching the ramp speed threshold, and allowed to
  *  slow down to the low shutoff threshold.
  *  UI Speed is shared with background task so this function all should
  *  be invoked only from within a CS.
@@ -199,7 +193,7 @@ void BLDC_PWMDC_Set(uint8_t dc)
         // going back .. has to ramp again to get started.
         BL_reset(); // asserting this ... so what, system not running anyway!
 
-        // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions 
+        // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions
     }
 }
 
@@ -251,10 +245,10 @@ uint16_t get_commutation_period(void)
 /**
  * @brief Accessor for state variable.
  *
- * @details 
+ * @details
  *  External modules can query if the machine is running or not.
- *  There are only these two states bases on the set speed greater or less than 
- *  the shutdown threshold. 
+ *  There are only these two states bases on the set speed greater or less than
+ *  the shutdown threshold.
  *
  * @return state value
  */
@@ -273,9 +267,9 @@ BL_RUNSTATE_t BL_get_state(void)
  *
  * @details
  * Called from TIM4 ISR. FRom the driver, the commutation-rate timer is being set
- * synchronous to this wihch is ideal, however, the control an probably be performed at 
+ * synchronous to this wihch is ideal, however, the control an probably be performed at
  * a lower rate (100Hz, 50Hz, 10Hz ..?). There is  no evident documentation of how this
- * timer rate came to be (TIM4 at ~ 0.5ms) Reducing it would give the commutation 
+ * timer rate came to be (TIM4 at ~ 0.5ms) Reducing it would give the commutation
  * time variable and therefore the control timing more precision .
  *
  * closed-loop control ... speed duty-cycle threshold, error switch sign? area under integratino curve
