@@ -63,7 +63,7 @@
 //#define BLDC_OL_TM_HI_SPD       0x03C0 //  960d
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
-#define LUDICROUS_SPEED         0x006F // 111
+//#define LUDICROUS_SPEED         0x006F // 111
 
 
 /*
@@ -75,21 +75,10 @@
 
 
 /* Private types -----------------------------------------------------------*/
-/**
- * @brief Typedef for state machine variable.
- */
-/** @deprecated */
-typedef enum
-{
-    BDC_RESET = 0,
-    BDC_RUNNING
-} BLDC_STATE_T;
 
 /* Public variables  ---------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
-static BLDC_STATE_T BLDC_State;
 
 static uint16_t BLDC_OL_comm_tm;     // persistent value of ramp timing
 
@@ -153,13 +142,6 @@ static void haltensie(void)
     All_phase_stop();
 }
 
-/*
- * only the state-machine is allowed to modify the state variable
- */
-static void set_bldc_state( BLDC_STATE_T newstate)
-{
-    BLDC_State = newstate;
-}
 
 /* Public functions ---------------------------------------------------------*/
 
@@ -172,25 +154,28 @@ static void set_bldc_state( BLDC_STATE_T newstate)
 void BL_reset(void)
 {
     // stop the system in case it is already running
-    haltensie();  //  zeros the  UI speed 
+    haltensie();  //  zeros the  UI speed
 
     // reset the system
 
     // the commutation period (TIM3) apparantly has to be set to something (not 0)
     // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
-    // Therefore, default the period to the highest expected speed to assert CPU
-    // load is handled, this is also simpler than trying to keep track of what
-    // state to enable the commutation control .
-    BLDC_OL_comm_tm = LUDICROUS_SPEED;
+
+    // Set initial commutation timing period upon state transition. 
+    BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
 
     Faultm_init();
-
-    set_bldc_state( BDC_RESET );
 }
 
 
 /**
  * @brief Sets motor speed from commanded throttle/UI setting
+ *
+ * @details  Establishes the condition to transition from off->running. The motor 
+ *  is enabled to start once reaching the ramp speed threshold, and allowed to 
+ *  slow down to the low shutoff threshold.
+ *  UI Speed is shared with background task so this function all should
+ *  be invoked only from within a CS.
  *
  * @param dc Speed input which can be in the range [0:255] but 255 is to be
  *        reserved for special use (out of band value). If the PWM resolution
@@ -200,18 +185,21 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    // as long as requested speed is less than min, hold it in reset
-    if (dc < PWM_DC_SHUTOFF)
+    if (dc > PWM_DC_SHUTOFF)
     {
-        // reset needed in case system was running, in which case there is no 
-        // going back .. has to ramp again to get started. 
-        BL_reset();
-
-        UI_speed = 0; // note redundant if BL reset does it
+        // Update the dc if speed input greater than ramp start, OR if system already running
+        if ( dc > PWM_DC_RAMPUP  ||  0 != UI_speed )
+        {
+            UI_speed = dc;
+        }
     }
     else
     {
-        UI_speed = dc;
+        // reset needed in case system was running, in which case there is no
+        // going back .. has to ramp again to get started.
+        BL_reset(); // asserting this ... so what, system not running anyway!
+
+        // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions 
     }
 }
 
@@ -233,7 +221,7 @@ uint16_t BLDC_PWMDC_Get(void)
  */
 void BLDC_Spd_dec()
 {
-    Manual_Ovrd = TRUE;
+    Manual_Ovrd = TRUE; //tbd
 
     BLDC_OL_comm_tm += 1; // slower
 }
@@ -243,7 +231,7 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-    Manual_Ovrd = TRUE;
+    Manual_Ovrd = TRUE; // tbd
 
     BLDC_OL_comm_tm -= 1; // faster
 }
@@ -263,11 +251,16 @@ uint16_t get_commutation_period(void)
 /**
  * @brief Accessor for state variable.
  *
+ * @details 
+ *  External modules can query if the machine is running or not.
+ *  There are only these two states bases on the set speed greater or less than 
+ *  the shutdown threshold. 
+ *
  * @return state value
  */
 BL_RUNSTATE_t BL_get_state(void)
 {
-    if (BDC_RUNNING == BLDC_State)
+    if (UI_speed > PWM_DC_SHUTOFF )
     {
         return BL_IS_RUNNING;
     }
@@ -278,15 +271,17 @@ BL_RUNSTATE_t BL_get_state(void)
 /**
  * @brief Periodic state machine update.
  *
- * Called from ISR. Evaluate state transition conditions and determine new
- * state.
+ * @details
+ * Called from TIM4 ISR. FRom the driver, the commutation-rate timer is being set
+ * synchronous to this wihch is ideal, however, the control an probably be performed at 
+ * a lower rate (100Hz, 50Hz, 10Hz ..?). There is  no evident documentation of how this
+ * timer rate came to be (TIM4 at ~ 0.5ms) Reducing it would give the commutation 
+ * time variable and therefore the control timing more precision .
  *
  * closed-loop control ... speed duty-cycle threshold, error switch sign? area under integratino curve
  */
 void BLDC_Update(void)
 {
-    const uint16_t _RampupDC_ = PWM_DC_RAMPUP; // warning : truncating assignment`
-
     uint16_t inp_dutycycle = 0; // intialize to 0
 
     if ( 0 == Faultm_get_status() )
@@ -300,25 +295,17 @@ void BLDC_Update(void)
         // assert ... inp_dutycycle = 0;
     }
 
-    if ( BDC_RUNNING != BLDC_State )
-    {
-        // allow motor to start when throttle has been raised
-        if (UI_speed > _RampupDC_ )
-        {
-            set_bldc_state( BDC_RUNNING );
-
-            // set initial conditions for ramp state
-            inp_dutycycle = _RampupDC_ ;
-            BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
-        }
-    }
-
-    // finally, refresh the duty-cycle and commutation period
+    // refresh the duty-cycle and commutation period ... sets the pwm
+    // which will be upated to the PWM timer peripheral at next commutation point.
     set_dutycycle( inp_dutycycle );
 
     // there isn't much point in enabling commuation timing contrl if speed is 0
-    // however, it is simpler to just leave it running as long as ISR period no shorter than max speed see other assert warning)
-    timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
+    // and by leaving it along until the system is actually running, it can set
+    // the initial condition in the global BL_Reset() above.
+    if (inp_dutycycle > 0)
+    {
+        timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
+    }
 
     Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
 
