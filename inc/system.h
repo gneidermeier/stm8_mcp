@@ -33,7 +33,7 @@
  * factoring out a power-of-two factor from certain time related structures
  * aligned with this rate such as fault manager and control ramp timing
  */
-#define SYS_RATE_MULT  2  // periodic task multipler constant term (@ 0.512 ms as before)
+#define SYS_RATE_MULT  4  // periodic task multipler constant term (@ 1.024 ms)
 
 
 // bl_sm and bg_task both derived from TIM4 and invoked thru the Driver ISR
