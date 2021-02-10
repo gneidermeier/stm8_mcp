@@ -75,6 +75,8 @@
 
 static uint16_t ADC_Global;
 
+// Accummulates a string of 10-bit ADC samples for averaging - could reduce 
+// to 8 bits as possibly the 2 lsb's are not that significant anyway.
 static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
 
 static uint8_t  ph0_adc_tbct;
@@ -98,7 +100,12 @@ static void udpate_phase_average(void)
     for(n  = 0 ; n < PH0_ADC_TBUF_SZ; n++)
     {
         phase_average = (phase_average  + ph0_adc_fbuf[n]) >> 1;
+
+        ph0_adc_fbuf[n] = MID_ADC; // initialize each element to midpoint
     }
+
+    ph0_adc_tbct = 0; // reset the sample index
+
 }
 
 /* External functions ---------------------------------------------------------*/
@@ -177,12 +184,16 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
+    // rescale table value if needed
+    uint16_t p16 =  get_commutation_period();
+
     BLDC_Update();
 
     Periodic_Task_Wake();
 
 //  update the timer for the OL commutation switch time
-    TIM3_setup( get_commutation_period() );
+
+    TIM3_setup( p16 );
 }
 
 
@@ -201,11 +212,7 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
-    // adc at each 15-degree sector is double-buffered to ensure integrity
-    // across samples set of 1 motor frame
-    static uint16_t adc_15304560[4];
-
-    static uint8_t index = 0;
+    static int index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used
 // instead of a MOD (%) to save a few instructions, which is actually significant
@@ -221,10 +228,6 @@ void Driver_Step(void)
     {
     case 0:
         udpate_phase_average(); // average 8 samples from frame buffer
-
-        memset (ph0_adc_fbuf, MID_ADC, PH0_ADC_TBUF_SZ);
-        ph0_adc_tbct = 0; // reset the sample index
-
         Sequence_Step();
         break;
 
