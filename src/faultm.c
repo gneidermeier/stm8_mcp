@@ -15,7 +15,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include <string.h> // memset
-#include "faultm.h"  // public types used internally
+#include "faultm.h" // public types used internally
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -23,10 +23,23 @@
 /**
  * @brief Initialization value for fault counter bucket. The fault matrix defines
  * the bucket as a 6-bits unsigned integer bitfield.
- * @note This value should be derived from the faultm update rate somehow
+ *
+ * @note This value should be derived from the faultm update rate somehow - it is 
+ * expected that faulm_upd() would be called for all fault codes from within 
+ * the background task. Therefore the bucket counts and/or increment rates should
+ * share a timing factor with the background task.
+ *
  * @warning This is a warning!
  */
-#define  FAULT_BUCKET_INI  63 // 6-bits (largets allowed by the bit-field)
+#define  FAULT_BUCKET_BITS   6 // power of 2 ...  2^6==64
+
+// size limit of bucket - the fault is latched if the fault count reaches the limit
+#define  FAULT_BUCKET_MASK   ( ( 1 << FAULT_BUCKET_BITS ) - 1)  // 63 // 6-bits bit-field
+#define  FAULT_BUCKET_LIM     FAULT_BUCKET_MASK
+
+// INI must be <= Limit
+#define  FAULT_BUCKET_INI    (64 - 1)
+
 
 /**
  * @brief The fault status word is 8-bits wide.
@@ -68,7 +81,7 @@ typedef enum
  */
 typedef struct fault_matrix
 {
-    unsigned char bucket: 6; /**< bucket counter (6 bits). */
+    unsigned char bucket: FAULT_BUCKET_BITS; /**< bucket counter (6 bits). */
     faultm_enable_t enabled: 1; /**< Enable bit. */
     faultm_state_t state:  1; /**< Fault activation state. */
 
@@ -131,6 +144,16 @@ fault_status_reg_t Faultm_get_status(void)
     return fault_status_reg;
 }
 
+void Faultm_enable(faultm_ID_t faultm_ID, int enable_b)
+{
+// assert (fault_ID < MAX)
+
+// use a pointer to cleanup (and optimize away the array-access?)
+    faultm_mat_t * pfaultm  = &fault_matrix[ faultm_ID ];
+
+    pfaultm->enabled = enable_b;
+}
+
 /**
  * @brief Set the fault matrix bit and status word.
  * @note TBD a single fault shuts down the system, i.e. no need to flag/mask multiple
@@ -154,7 +177,7 @@ void Faultm_set(faultm_ID_t faultm_ID)
     pfaultm->state =  (FALSE != pfaultm->enabled);
 
 // set bucket full ... wouldn't really need the "state" varaible
-    pfaultm->bucket = -1; // FAULT_BUCKET_INI
+    pfaultm->bucket = FAULT_BUCKET_INI;
 
     // note: OR allows multiple faults to be indicated in the status-word not that it
     // makes much difference
@@ -169,6 +192,9 @@ void Faultm_set(faultm_ID_t faultm_ID)
  */
 void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
 {
+    // suspect that compiler clips the intermediate macro term out of range of 6-bit bitfield??
+    const uint8_t const_lmt_term = FAULT_BUCKET_INI; // FixMyMacro
+
 // assert (fault_ID < MAX)
 //    fault_status_reg_t  mask = (1 << faultm_ID); // maybe ... not necessary for now
     fault_status_reg_t  mask = (fault_status_reg_t) faultm_ID;
@@ -179,7 +205,7 @@ void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
     if (tcondition)
     {
         // if bucket < thr, then increment it else latch the fault
-        if ( pfaultm->bucket < FAULT_BUCKET_INI )
+        if ( pfaultm->bucket < const_lmt_term )
         {
             pfaultm->bucket += 1;
         }
