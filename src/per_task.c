@@ -39,6 +39,7 @@ static void comm_minus(void);
 static void spd_plus(void);
 static void spd_minus(void);
 static void m_stop(void);
+static void set_ctlm(void);
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -51,11 +52,12 @@ typedef void (*ui_handlrp_t)( void );
 // local enum only for setting enumerated order to UI event dispatcher
 enum
 {
+    SET_CTLM   = 'z',
     COMM_PLUS  = ']',
     COMM_MINUS = '[',
-    SPD_PLUS   = '+',  // '>',
-    SPD_MINUS  = '-',  // '<',
-    M_STOP = ' ' // one space character
+    SPD_PLUS   = '.', //'>',
+    SPD_MINUS  = ',', //'<',
+    M_STOP     = ' '  // one space character
 };
 
 typedef char ui_keycode_t;
@@ -80,6 +82,7 @@ static  uint16_t Vsystem; // persistent for averaging
 
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
+    {SET_CTLM,   set_ctlm},
     {COMM_PLUS,  comm_plus},
     {COMM_MINUS, comm_minus},
     {SPD_PLUS,   spd_plus},
@@ -261,16 +264,18 @@ void UI_Stop(void)
  * handlers for UI events must be short as they are invoked in ISR context
  */
 // for development user only
-void comm_plus(void)
+static void comm_plus(void)
 {
+    BLDC_Spd_inc();
 }
 // for development user only
-void comm_minus(void)
+static void comm_minus(void)
 {
+    BLDC_Spd_dec();
 }
 
 // stop key from terminal ... merge w/ UI_stop?
-void m_stop(void)
+static void m_stop(void)
 {
     // reset the machine
     UI_Stop();
@@ -284,7 +289,7 @@ void m_stop(void)
     dbg_println(1 /* clear line count */ );
 }
 
-void spd_plus(void)
+static void spd_plus(void)
 {
     // if fault/throttle-high ... diag msg?
     if (Digital_trim_switch < S8_MAX)
@@ -294,7 +299,7 @@ void spd_plus(void)
 //    UARTputs("+++\r\n");               // no not inside CS
 //            Log_Level = 255; // ahow some more info
 }
-void spd_minus(void)
+static void spd_minus(void)
 {
     // if fault/throttle-high ... diag msg?
     if (Digital_trim_switch > S8_MIN)
@@ -304,6 +309,15 @@ void spd_minus(void)
     }
 //    UARTputs("---\r\n");                // no not inside CS
 }
+
+void BL_set_ctlm(void); // tmp
+
+static void set_ctlm(void)
+{
+// toggle or rest the ftl state??
+    BL_set_ctlm();
+}
+
 
 static ui_handlrp_t handle_term_inp(void)
 {

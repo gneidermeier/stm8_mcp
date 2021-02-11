@@ -61,7 +61,7 @@
 #define BLDC_OL_TM_LO_SPD         0x0B00 // start of ramp
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
-//#define LUDICROUS_SPEED         0x006F // 111
+#define LUDICROUS_SPEED         0x006F // 111
 
 
 // ramp rate derived from control rate which is derived from overall system rate
@@ -80,7 +80,7 @@ static uint16_t Commanded_Dutycycle; // copied select DC to global for logging
 
 static uint8_t UI_speed;             // input from UI task, file-scope for sm_update
 
-static uint8_t Manual_Ovrd;   // indicates manual commuation buttons are active
+static uint8_t Control_mode;   // indicates manual commuation buttons are active
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -144,6 +144,9 @@ static void haltensie(void)
  *
  *    System reset / re-arm function (has to be called both at program startup
  *    as well as following a fault condition state.
+ *
+ * @details
+ *    expect to be called from non-ISR/CS context (i.e. from  UI handler)
  */
 void BL_reset(void)
 {
@@ -159,6 +162,11 @@ void BL_reset(void)
     BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
 
     Faultm_init();
+
+    Control_mode = FALSE;
+    // eventually it gets around to asserting the timer/PWM reset in the ISR update
+    // but explicitly handled here will be more deterministic
+//    set_dutycycle( PWM_0PCNT );
 }
 
 
@@ -185,6 +193,15 @@ void BLDC_PWMDC_Set(uint8_t dc)
         if ( dc > PWM_DC_RAMPUP  ||  0 != UI_speed )
         {
             UI_speed = dc;
+
+            // on speed change, check for condition to transition to closed loopo
+            if (FALSE == Control_mode)
+            {
+//              if ( Seq_get_timing_error() ... )
+                {
+//                  Control_mode = TRUE;
+                }
+            }
         }
     }
     else
@@ -213,9 +230,17 @@ uint16_t BLDC_PWMDC_Get(void)
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
+void BL_set_ctlm(void)
+{
+    int16_t timing_error = Seq_get_timing_error();
+
+//    BLDC_OL_comm_tm += timing_error ;
+    Control_mode = TRUE;
+}
+
 void BLDC_Spd_dec()
 {
-    Manual_Ovrd = TRUE; //tbd
+    Control_mode = TRUE; //tbd
 
     BLDC_OL_comm_tm += 1; // slower
 }
@@ -225,7 +250,7 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-    Manual_Ovrd = TRUE; // tbd
+    Control_mode = TRUE; // tbd
 
     BLDC_OL_comm_tm -= 1; // faster
 }
@@ -276,9 +301,23 @@ BL_RUNSTATE_t BL_get_state(void)
  */
 void BLDC_Update(void)
 {
+    // note: this sub-rate is connected to the control term "gain" or vice-versa
+    // too high and it may loses "sync" on the slowdown ...
+    static const uint8_t CONTROL_MODULUS  = 32;
+    // 1 bit is /2 for sma, 1 bit is /2 for "gain"
+ #define SMA_SH  1 // tmp
+ #define GAIN_SH  2 // tmp
+    static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
+
+    static  int16_t timing_error ;
+    static uint8_t ctrl_tick = 0; // persistent count for sub-rating the control loop
+
+// does it need static previous copy of speed input to check for state transition?
     uint16_t inp_dutycycle = 0; // intialize to 0
 
-    if ( 0 == Faultm_get_status() )
+    fault_status_reg_t  fm_status = Faultm_get_status();
+
+    if ( 0 == fm_status )
     {
         inp_dutycycle = UI_speed;
     }
@@ -296,33 +335,31 @@ void BLDC_Update(void)
     // there isn't much point in enabling commuation timing contrl if speed is 0
     // and by leaving it along until the system is actually running, it can set
     // the initial condition in the global BL_Reset() above.
-    if (inp_dutycycle > 0)
+    if (inp_dutycycle > 0    &&  ( 0 == fm_status ) )
     {
-        timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
+        if (FALSE == Control_mode)
+        {
+            timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
+        }
+        else
+        {
+            // adjust on the error feedback - controller has to adjust fast enuff to respond to the size of the PWM step but slowed it down be able to use larger proportion of error signal
+            if ( 0 == (ctrl_tick++ % CONTROL_MODULUS) )
+            {
+                uint16_t t16 = BLDC_OL_comm_tm ;
+                timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
+                t16 += timing_error;
+
+// if this overshoots, the control runs away until the TIM3 becomes so low the system locks up and no faultm can work .. not failsafe!
+                if (t16 > LUDICROUS_SPEED)
+                {
+                    BLDC_OL_comm_tm  = t16;
+                }
+            }
+        }
     }
 
     Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
-
-#if 0
-    if ( BLDC_RUNNING == state)
-    {
-        uint16_t timing_term = Get_OL_Timing( Commanded_Dutycycle );
-
-// this needs to be in proportion/inverse to commutation period however you look at it but this mmight work for now ...
-//        _error =  (  error * (int16_t)BLDC_OL_comm_tm / (int16_t)ramp_tm_pd  ) >> KPSCALE  ;
-        error = error >> 1 ; // factor out some of the scale bits
-
-// prop gain is really only meaningful if there are other controller terms
-        Prop_timing_error =  error >> KPROP ; // factor out some of the scale bits
-
-        if (Commanded_Dutycycle > FTL_THRSH ) // probably use a lower threshld to drop out of FTL
-        {
-            uint16_t timing_term = (int16_t)BLDC_OL_comm_tm + Prop_timing_error; // make sure signed add!
-        }
-
-        timing_ramp_control( timing_term ); // ramp to the new timing term
-    }
-#endif
 }
 
 /**@}*/ // defgroup
