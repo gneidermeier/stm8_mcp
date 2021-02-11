@@ -25,19 +25,46 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#if 1 // test/dev
-#define TRIM_DEFAULT 28 // close to the minimum ramp DC
-#else
 #define TRIM_DEFAULT  0 //
-#endif
 
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
 
+/* Private function prototypes -----------------------------------------------*/
+
+static void comm_plus(void);
+static void comm_minus(void);
+static void spd_plus(void);
+static void spd_minus(void);
+static void m_stop(void);
+
+
 /* Public variables  ---------------------------------------------------------*/
 
+
+/* Private types     ---------------------------------------------------------*/
+
+typedef void (*ui_handlrp_t)( void );
+
+// local enum only for setting enumerated order to UI event dispatcher
+enum
+{
+    COMM_PLUS  = ']',
+    COMM_MINUS = '[',
+    SPD_PLUS   = '+',  // '>',
+    SPD_MINUS  = '-',  // '<',
+    M_STOP = ' ' // one space character
+};
+
+typedef char ui_keycode_t;
+
+typedef struct
+{
+    ui_keycode_t   key_code;
+    ui_handlrp_t   phandler;
+} ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 
@@ -51,8 +78,20 @@ static uint8_t Log_Level;
 
 static  uint16_t Vsystem; // persistent for averaging
 
+static const ui_key_handler_t ui_keyhandlers_tb[] =
+{
+    {COMM_PLUS,  comm_plus},
+    {COMM_MINUS, comm_minus},
+    {SPD_PLUS,   spd_plus},
+    {SPD_MINUS,  spd_minus},
+    {M_STOP,     m_stop}
+};
 
-/* Private function prototypes -----------------------------------------------*/
+// macros to help make the LUT slightly more encapsulateed
+#define _SIZE_K_LUT  ( sizeof( ui_keyhandlers_tb ) / sizeof( ui_key_handler_t ) )
+#define _GET_KEY_CODE( _INDEX_ )  ui_keyhandlers_tb[ _INDEX_ ].key_code
+#define _GET_UI_HDLRP( _INDEX_ )  ui_keyhandlers_tb[ _INDEX_ ].phandler
+
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -94,25 +133,6 @@ static char * itoa(uint16_t u16in, char *sbuf, int base)
 }
 
 
-/*******************************************************************************
-* Function Name  : GetKey
-* Description    : Get a key from the HyperTerminal
-* Input          : None
-* Output         : None
-* Return         : The Key Pressed
-*******************************************************************************/
-static char GetKey(void)
-{
-    char key = 0;
-    /* Waiting for user input */
-    while (1)
-    {
-        if (SerialKeyPressed((char*)&key)) break;
-    }
-    return key;
-}
-
-
 /** @cond */ // hide some developer/debug code
 // hack, temp
 extern int Back_EMF_Falling_PhX;
@@ -131,15 +151,8 @@ static void dbg_println(int zrof)
     char sbuf[256] ;                     // am i big enuff?
     char cbuf[8] = { 0, 0 };
 
-// TODO yes probably use DI/EI to do all shared access in one swoop
-// DI
+// globals are accessed (read) outside of CS so be it
     int16_t timing_error = Seq_get_timing_error();
-//  BLDC_PWMDC_Get()
-//  get_commutation_period()
-//  Faultm_get_status
-//  Seq_Get_Vbatt()
-//  Faultm_upd()
-// EI
 
     sbuf[0] = 0;
 
@@ -230,107 +243,97 @@ static void set_ui_speed(void)
 
         UI_Speed = (uint8_t)tmp_sint16;
     }
-#if 0 // this is borken
-// only OFF state is of interest for Throttle-high diagnostic.
-// There is no check for the error condition to go away - the user
-// would need to lower the throttle stick and then the system to reset.
-    if (BLDC_RESET == sm_state)
-    {
-        // require stick to be put down before arming/ready
-        if (Analog_slider > 0)
-        {
-            Faultm_set(THROTTLE_HI);
-            UI_Speed = 0;
-        }
-    }
-    else if (BLDC_RUNNING == sm_state)
-    {
-        if (Analog_slider > 0) //
-        {
-            // don't get to slow or it will stall and throw a low-voltage fault
-            if (UI_Speed < LOW_SPEED_THR)
-            {
-// u8_max to be used as an out-of-band value which can signify "Reset/Stop"
-                UI_Speed = U8_MAX;
-                BL_reset();
-
-                // log some info
-                Log_Level = 10;
-            }
-        }
-    }
-#endif
 }
 
 /**
  * @brief stop the system
  *
+ * This is not particularly ISR safe but stopping the system so what then.
  * needs to be externable to main because the hard-button stop button is polled there
  */
 void UI_Stop(void)
 {
 // reset the machine
-    BL_reset(); //  // ISR safe ... hmmmm
+    BL_reset();
 }
 
 /*
- * check for characters coming in on the debug serial port
+ * handlers for UI events must be short as they are invoked in ISR context
  */
-static void handle_term_inp(void)
+// for development user only
+void comm_plus(void)
 {
+}
+// for development user only
+void comm_minus(void)
+{
+}
+
+// stop key from terminal ... merge w/ UI_stop?
+void m_stop(void)
+{
+    // reset the machine
+    UI_Stop();
+
+    // reset the simulated trim swich between system runs
+    Digital_trim_switch = TRIM_DEFAULT;
+
+    UARTputs("###\r\n");
+
+    Log_Level = 1; // stop the logger output
+    dbg_println(1 /* clear line count */ );
+}
+
+void spd_plus(void)
+{
+    // if fault/throttle-high ... diag msg?
+    if (Digital_trim_switch < S8_MAX)
+    {
+        Digital_trim_switch += 1;
+    }
+//    UARTputs("+++\r\n");               // no not inside CS
+//            Log_Level = 255; // ahow some more info
+}
+void spd_minus(void)
+{
+    // if fault/throttle-high ... diag msg?
+    if (Digital_trim_switch > S8_MIN)
+    {
+        Digital_trim_switch -= 1;
+        Log_Level = 1;
+    }
+//    UARTputs("---\r\n");                // no not inside CS
+}
+
+static ui_handlrp_t handle_term_inp(void)
+{
+    ui_handlrp_t fp = NULL;
     char sbuf[16] = "";
     char cbuf[8] = { 0, 0 };
-    int16_t tmp_sint16;
     char key;
 
     if (SerialKeyPressed(&key))
     {
-        if (key == ' ') // space character
+        int n;
+        for (n = 0; n < _SIZE_K_LUT ; n++)
         {
-// reset the simulated trim swich between system runs
-//    Digital_trim_switch = TRIM_DEFAULT; // hack ... for development
-
-            // reset the machine
-            UI_Stop();
-
-            UARTputs("###\r\n");
-
-            Log_Level = 1; // stop the logger output
-            dbg_println(1 /* clear line count */ );
-
-// reset the simulated trim swtich between system runs
-            Digital_trim_switch = TRIM_DEFAULT;
-        }
-        else if (key == '+')
-        {
-// if fault/throttle-high ... diag msg?
-            if (Digital_trim_switch < S8_MAX)
+            if (key == _GET_KEY_CODE( n ))
             {
-                Digital_trim_switch += 1;
+//any terminal output specific to the key or handelr need to be done here and
+// not in the handler itself because the handler is to be called from w/i the CS
+                fp =_GET_UI_HDLRP( n );
+                break;
             }
-            UARTputs("+++\r\n");
-//            Log_Level = 255; // ahow some more info
         }
-        else if (key == '-')
-        {
-// if fault/throttle-high ... diag msg?
-            if (Digital_trim_switch > S8_MIN)
-            {
-                Digital_trim_switch -= 1;
-                Log_Level = 1;
-            }
-            UARTputs("---\r\n");
-        }
-        else // anykey
-        {
-            Log_Level = 255;// enable continous/verbous log
-        }
-
+// anykey ...
+        Log_Level = 255;// default anykey enable continous/verbous log
+// 1 line output on terminal ... term output does whiles but that ok here (not in CS)
         itoa(UI_Speed, cbuf, 16);
         strcat(sbuf, cbuf);
         strcat(sbuf, "\r\n");
         UARTputs(sbuf);
     }
+    return fp;
 }
 
 /*
@@ -341,14 +344,19 @@ static void Periodic_task(void)
 {
     BL_RUNSTATE_t bl_state;
 
-// invoke the terminal input and ui speed subs, updates from their globals to occur in the CS 
-    handle_term_inp();
+// invoke the terminal input and ui speed subs, updates from their globals to occur in the CS
+    ui_handlrp_t fp = handle_term_inp();
 
     // update the UI speed input slider+trim
     set_ui_speed();
 
 
     disableInterrupts();          // DI
+
+    if (NULL != fp)
+    {
+        fp();
+    }
 
     BLDC_PWMDC_Set(UI_Speed);
 
