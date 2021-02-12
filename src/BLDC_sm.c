@@ -58,14 +58,15 @@
 // the commutation timing constants (TIM3 period) effectively have a factor of
 // 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
 // actual motor commutation frequency.
-#define BLDC_OL_TM_LO_SPD         0x0B00 // start of ramp
+#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // start of ramp
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
-#define LUDICROUS_SPEED         0x006F // 111
+#define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // macro to determine this number from motor numbers?
 
 
 // ramp rate derived from control rate which is derived from overall system rate
-#define BLDC_ONE_RAMP_UNIT    (1 * CTRL_RATEM)   // working range  ??
+// commutation time factor is rolled in there as well
+#define BLDC_ONE_RAMP_UNIT    (1 * CTRL_RATEM * CTIME_SCALAR)
 
 
 /* Private types -----------------------------------------------------------*/
@@ -187,6 +188,8 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
+    static uint8_t cl_timer = 0; // at 1K, 1 byte counter about 1/4 second
+
     if (dc > PWM_DC_SHUTOFF)
     {
         // Update the dc if speed input greater than ramp start, OR if system already running
@@ -197,9 +200,9 @@ void BLDC_PWMDC_Set(uint8_t dc)
             // on speed change, check for condition to transition to closed loopo
             if (FALSE == Control_mode)
             {
-//              if ( Seq_get_timing_error() ... )
+                if ( --cl_timer == 0 )
                 {
-//                  Control_mode = TRUE;
+//                    Control_mode = TRUE;
                 }
             }
         }
@@ -305,8 +308,8 @@ void BLDC_Update(void)
     // too high and it may loses "sync" on the slowdown ...
     static const uint8_t CONTROL_MODULUS  = 32;
     // 1 bit is /2 for sma, 1 bit is /2 for "gain"
- #define SMA_SH  1 // tmp
- #define GAIN_SH  2 // tmp
+#define SMA_SH  1 // tmp
+#define GAIN_SH  2 // tmp
     static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
 
     static  int16_t timing_error ;

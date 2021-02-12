@@ -43,6 +43,19 @@
 #define CTRL_RATEM  SYS_RATE_MULT  // control task rate multiplier
 
 
+// the timer prescalar is to show that fixed timing data must somehow factor in 
+// the timer rate - halving the prescalar to make timer 2x faster means timing 
+// periods are 2x duration relative to the previous scalar of 1
+#define SLOW_CTIMER 1  // define for old TIM3 setup (new T3 is 2x prescaler)
+
+#ifdef SLOW_CTIMER
+ #define CTIME_SCALAR 1
+#else
+// doubles the duration of fixed timing table values
+ #define CTIME_SCALAR 2
+#endif
+
+
 /*
  * (un)comment macro to set PWM 8 Khz or ?
  */

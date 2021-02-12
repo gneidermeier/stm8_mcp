@@ -420,10 +420,26 @@ static void TIM4_setup(void)
  *   Timer Step:
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
-#ifdef CLOCK_16
-#define TIM3_PSCR  0x02  // 2^2 == 4
+
+// the timer prescalar is to show that fixed timing data must somehow factor in 
+// the timer rate - halving the prescalar to make timer 2x faster means timing 
+// periods are 2x duration relative to the previous scalar of 1
+#ifdef SLOW_CTIMER
+
+ #ifdef CLOCK_16
+  #define TIM3_PSCR  0x02  // 2^2 == 4
+ #else
+  #define TIM3_PSCR  0x01  // 2^1 == 2
+ #endif
+
 #else
-#define TIM3_PSCR  0x01  // 2^1 == 2
+
+ #ifdef CLOCK_16
+  #define TIM3_PSCR  0x01  // 2^1 == 2
+ #else
+  #define TIM3_PSCR  0x00  // 2^0 == 1
+ #endif
+
 #endif
 
 /**

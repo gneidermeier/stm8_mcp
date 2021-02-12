@@ -15,8 +15,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include <stdint.h>
-
+#include "system.h" // dependency of motor data on cpu clock specific timer rate
 
 /*
  * The table is indexed by PWM duty cycle counts (i.e. [0:1:250)
@@ -142,6 +141,7 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 
 #define OL_TIMING_TBL_SIZE    ( sizeof(OL_Timing) / sizeof(uint16_t) )
 
+
 /**
  * @brief Table lookup for open-loop commutation timing
  *
@@ -155,7 +155,7 @@ uint16_t Get_OL_Timing(uint16_t index)
     // assert index < OL_TIMING_TBL_SIZE
     if ( index < OL_TIMING_TBL_SIZE )
     {
-        return OL_Timing[ index ];
+        return OL_Timing[ index ] * CTIME_SCALAR;
     }
     return -1; // error
 }
