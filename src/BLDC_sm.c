@@ -200,11 +200,13 @@ void BLDC_PWMDC_Set(uint8_t dc)
             // on speed change, check for condition to transition to closed loopo
             if (FALSE == Control_mode)
             {
-                if ( --cl_timer == 0 )
+                if ( 0 == Seq_get_timing_error_p( ( int16_t * ) (0) )  /* --cl_timer == 0 */ )
                 {
-//                    Control_mode = TRUE;
+                    Control_mode = TRUE;
                 }
             }
+            // else
+            // if dc < THRESHOLD, then unlatch control mode?
         }
     }
     else

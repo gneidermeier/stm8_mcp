@@ -222,6 +222,10 @@ static void sector_5(void)
 
 /* Public functions ---------------------------------------------------------*/
 
+// leading and trailing back-emf area under the curve should meet some minimum
+// level to be measurable .. should be at about the ramp-to speed
+#define  BACK_EMF_PLAUS_THR  0x03F8
+
 /**
  * @brief Accessor for control error.
  *
@@ -231,6 +235,24 @@ static void sector_5(void)
  * @return signed error which at its extreme should be equal to or less than the
  *  range of the initial ADC measurement i.e. 0x0400
  */
+int Seq_get_timing_error_p(int16_t * int16p)
+{
+//    int16_t perror = comm_timing_error; // positive if advanced
+    int err = -1; // report error on measurement plausibility
+
+    if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
+    {
+        err  = 0;
+
+        if ( 0 != int16p)
+        {
+            *int16p = comm_tm_err_ratio;  // positive if advanced
+        }
+    }
+
+    return err;
+}
+// old
 int16_t Seq_get_timing_error(void)
 {
 //    int16_t perror = comm_timing_error; // positive if advanced
