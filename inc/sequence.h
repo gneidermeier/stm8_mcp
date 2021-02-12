@@ -23,6 +23,8 @@
 uint16_t Seq_Get_Vbatt(void);
 int16_t Seq_get_timing_error(void);
 
+int Seq_get_timing_error_p( int16_t * );
+
 void Sequence_Step(void);
 
 
