@@ -397,8 +397,7 @@ static void TIM2_setup(void)
 static void TIM4_setup(void)
 {
 // 32 means nothing other than startingrelative to prevous timer setting of 64
-    const uint8_t T4_Period = (32 * SYS_RATE_MULT) ;    // Period =  0.000512 S  (512 uS) ...
-//    const uint8_t T4_Period = (32 * 4);     // Period =  0.001024 S  (1024 uS) ...
+    const uint8_t T4_Period = (16 * SYS_RATE_MULT); // 32*4 Period = 0.000512 sec  (512 us)
 
 #ifdef CLOCK_16
     TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -424,22 +423,10 @@ static void TIM4_setup(void)
 // the timer prescalar is to show that fixed timing data must somehow factor in 
 // the timer rate - halving the prescalar to make timer 2x faster means timing 
 // periods are 2x duration relative to the previous scalar of 1
-#ifdef SLOW_CTIMER
-
- #ifdef CLOCK_16
-  #define TIM3_PSCR  0x02  // 2^2 == 4
- #else
+#ifdef CLOCK_16
   #define TIM3_PSCR  0x01  // 2^1 == 2
- #endif
-
 #else
-
- #ifdef CLOCK_16
-  #define TIM3_PSCR  0x01  // 2^1 == 2
- #else
   #define TIM3_PSCR  0x00  // 2^0 == 1
- #endif
-
 #endif
 
 /**

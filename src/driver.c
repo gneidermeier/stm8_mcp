@@ -184,15 +184,26 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
-    // rescale table value if needed
+    static const uint8_t UI_UPDATEM  = 16; // mod 16 so @ ~16mS i.e. UI @ 60fps
+    static uint8_t trate = 0;
+
     uint16_t p16 =  get_commutation_period();
+    trate += 1;
 
-    BLDC_Update();
+    // update controller every other (odd) ISR ... theory being to distribute the 
+    // load to update the controller and the UI on alternate frames (doubled the 
+		// timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
+    if ( trate & 0x01)
+    {
+        BLDC_Update();
+    }
 
-    Periodic_Task_Wake();
+    if ( 0 == (trate % UI_UPDATEM))
+    {
+        Periodic_Task_Wake();
+    }
 
-//  update the timer for the OL commutation switch time
-
+    //  update the timer for the OL commutation switch time
     TIM3_setup( p16 );
 }
 
