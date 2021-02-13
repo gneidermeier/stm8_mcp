@@ -306,9 +306,6 @@ BL_RUNSTATE_t BL_get_state(void)
  */
 void BLDC_Update(void)
 {
-    // note: this sub-rate is connected to the control term "gain" or vice-versa
-    // too high and it may loses "sync" on the slowdown ...
-    static const uint8_t CONTROL_MODULUS  = 32;
     // 1 bit is /2 for sma, 1 bit is /2 for "gain"
 #define SMA_SH  1 // tmp
 #define GAIN_SH  2 // tmp
@@ -348,18 +345,15 @@ void BLDC_Update(void)
         }
         else
         {
-            // adjust on the error feedback - controller has to adjust fast enuff to respond to the size of the PWM step but slowed it down be able to use larger proportion of error signal
-            if ( 0 == (ctrl_tick++ % CONTROL_MODULUS) )
-            {
-                uint16_t t16 = BLDC_OL_comm_tm ;
-                timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
-                t16 += timing_error;
+            // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
+            uint16_t t16 = BLDC_OL_comm_tm ;
+            timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
+            t16 += timing_error;
 
 // if this overshoots, the control runs away until the TIM3 becomes so low the system locks up and no faultm can work .. not failsafe!
-                if (t16 > LUDICROUS_SPEED)
-                {
-                    BLDC_OL_comm_tm  = t16;
-                }
+            if (t16 > LUDICROUS_SPEED)
+            {
+                BLDC_OL_comm_tm  = t16;
             }
         }
     }
