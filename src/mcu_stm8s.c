@@ -15,9 +15,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
-//#include <stm8s.h>
-
 // app headers
 #include "system.h" // platform specific delarations
 
@@ -38,13 +35,12 @@
 
 
 /*
- * some of this bulk could be reduced with macros
- * or otherwise would be suitable for STM8 Peripheral Library.
- * Noting the situation regarding unused IO pins ... I am trying to assert the
- * configuration on the few pins needed as GPIO (general purpose IO and noting
- * that the specific module initialization (A/D, TIMx - and these are done
- * mostly with STM8 PL) will handle setting up suitable IO pin behavior.
-
+ * @brief Configures a few pins needed as GPIO.
+ *
+ * Specific peripheral module initialization (e.g. A/D, TIMx) will handle 
+ * setting up suitable IO pin behavior. 
+ * some of this bulk could be reduced by converting registers to STM8 Peripheral Lib.
+ *
  * 11.4 Reset configuration
  *  All I/O pins are generally input floating under reset (i.e. during the reset phase) and at reset
  *  state (i.e. after reset release). However, a few pins may have a different behavior. Refer to
@@ -64,40 +60,25 @@ static void GPIO_Config(void)
     GPIOD->DDR |= (1 << LED); //PD.n as output
     GPIOD->CR1 |= (1 << LED); //push pull output
 
-// Controls the /SD pins of IR2104s on PC5, PC7, PG1
-///////////  // tried E2, E0, D1 but E2 not work as output ... ???
-// C5, C7, and G1 are CN2 pin 6, 8, 12 so 3 leads can go in one connector shell ;)
-#if 0
-    GPIOC->ODR &=  ~(1<<5);
-    GPIOC->DDR |=  (1<<5);
-    GPIOC->CR1 |=  (1<<5);
+// D1 is reserved for SWIM
+//    GPIOD->ODR &=  ~(1<<1);
+//    GPIOD->DDR |=  (1<<1);
+//    GPIOD->CR1 |=  (1<<1);
 
-    GPIOC->ODR &=  ~(1<<7);
-    GPIOC->DDR |=  (1<<7);
-    GPIOC->CR1 |=  (1<<7);
-
-    GPIOG->ODR &=  ~(1<<1);
-    GPIOG->DDR |=  (1<<1);
-    GPIOG->CR1 |=  (1<<1);
-#endif
-
-// SD/A = PD2 SD/B=PD1  SD/C=PA5  .... however D1 not working for me as intended, E0 instead (GN: 10-2)
+// SD/A=PD2
     GPIOD->ODR &=  ~(1<<2);
     GPIOD->DDR |=  (1<<2);
     GPIOD->CR1 |=  (1<<2);
 
-    GPIOD->ODR &=  ~(1<<1); //?
-    GPIOD->DDR |=  (1<<1); //?
-    GPIOD->CR1 |=  (1<<1); //?
-
+// SD/B=PE0
     GPIOE->ODR &=  ~(1<<0); //E0 data
     GPIOE->DDR |=  (1<<0); //E0 dir
     GPIOE->CR1 |=  (1<<0); //E0	cfg
 
+// SD/C=PA5
     GPIOA->ODR &= ~(1 << 5); // set pin off
     GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
     GPIOA->CR1 |= (1 << 5);  // push pull output
-
 
 ////////////
 // use PG0 (CN2-11) as test pins
@@ -106,11 +87,12 @@ static void GPIO_Config(void)
     GPIOG->CR1 |=  (1<<0);
 
 
-    GPIOC->ODR |=  (1<<4);  // PC4 .. tmp test
-    GPIOC->DDR |=  (1<<4);
-    GPIOC->CR1 |=  (1<<4);
-
 // INPUTS
+// C4 set as input (used with TIM1 CC4 to measure servo pulse)
+// PA4 as button input (Stop)
+    GPIOC->DDR &= ~(1 << 4); // PC.4 as input
+    GPIOC->CR1 |= (1 << 4);  // pull up w/o interrupts
+
 // PA4 as button input (Stop)
     GPIOA->DDR &= ~(1 << 4); // PA.4 as input
     GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
@@ -124,14 +106,6 @@ static void GPIO_Config(void)
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
 
-#if 0 // UartX_Init()
-// UART2 D5: Rx, D6: Tx
-    GPIOD->DDR &= ~(1 << 5); // PD.5 as input
-    GPIOD->CR1 |= (1 << 5);  // pull up w/o interrupts
-    GPIOD->DDR |= (1 << 6);  // PD.6 as output
-    GPIOD->CR1 |= (1 << 6);  // push pull output
-    GPIOD->ODR |= (1 << 6);  // use as hi-side of button
-#endif
 
 // PE.6 AIN9
     GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
@@ -249,9 +223,9 @@ uint8_t SerialKeyPressed(char *key)
  * conversion time = 14 * 1/2000000 = 0.0000035 seconds (3.5 us)
  */
 #ifdef CLOCK_16
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 8 -> 16/4 = 4
+#define ADC_DIVIDER ADC1_PRESSEL_FCPU_D4  // 8 -> 16/4 = 4
 #else
- #define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // 4 ->  8/2 = 4
+#define ADC_DIVIDER ADC1_PRESSEL_FCPU_D2  // 4 ->  8/2 = 4
 #endif
 /*
  * https://community.st.com/s/question/0D50X00009XkbA1SAJ/multichannel-adc
@@ -285,63 +259,80 @@ static void ADC1_setup(void)
     ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
+
+// copied from STM8 peripheral library (it is static in there)
+static void _TI3_Config(uint8_t TIM1_ICPolarity,
+                        uint8_t TIM1_ICSelection,
+                        uint8_t TIM1_ICFilter)
+{
+    /* Disable the Channel 3: Reset the CCE Bit */
+    TIM1->CCER2 &=  (uint8_t)(~TIM1_CCER2_CC3E);
+
+    /* Select the Input and set the filter */
+    TIM1->CCMR3 =
+        (uint8_t)((uint8_t)(TIM1->CCMR3 & (uint8_t)(~(uint8_t)( TIM1_CCMR_CCxS | TIM1_CCMR_ICxF)))
+                  | (uint8_t)(( (TIM1_ICSelection)) | ((uint8_t)( TIM1_ICFilter << 4))));
+
+    /* Select the Polarity */
+    if (TIM1_ICPolarity != TIM1_ICPOLARITY_RISING)
+    {
+        TIM1->CCER2 |= TIM1_CCER2_CC3P;
+    }
+    else
+    {
+        TIM1->CCER2 &= (uint8_t)(~TIM1_CCER2_CC3P);
+    }
+    /* Set the CCE Bit */
+    TIM1->CCER2 |=  TIM1_CCER2_CC3E;
+}
+
 /*
- * Timer 1 Setup
- * from:
- *   http://www.emcu.it/STM8/STM8-Discovery/Tim1eTim4/TIM1eTIM4.html
- *
+ * Timer 1 prescaler
 */
 #ifdef CLOCK_16
-#define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#define TIM1_PRESCALER 16 //
 #else
-#define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+#define TIM1_PRESCALER 8  // 1/8Mhz * 16 * 65536 = 0.131072 (about 131ms)
 #endif
 
-#define PWM_MODE  TIM1_OCMODE_PWM1
-
+/**
+ * @brief Timer 1 Setup
+ *
+ * @details
+ * The clock prescaler is used to scale 1ms radio signal pulse measurement to a 
+ * range of just of 0x0300 (exceeds the PWM resolution commanded to the motor).
+ * The timer period is set to maximum and left free running and the capture-compare
+ * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
+ * THis is explained in STM8 Reference Manual RM0016.
+*/
 static void TIM1_setup(void)
 {
-    const uint16_t T1_Period = TIM2_PWM_PD /* TIMx_PWM_PD */ ;  // 16-bit counter  ... 260 test
-
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);  // put this with clocks setup
+    const uint16_t T1_Period = 0xFFFF;
 
     TIM1_DeInit();
 
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0); // ISR at and of "idle" time
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 1);
 
-    /* Channel 2 PWM configuration */
-    TIM1_OC2Init( PWM_MODE,
-                  TIM1_OUTPUTSTATE_ENABLE,
-                  TIM1_OUTPUTNSTATE_ENABLE,
-                  0,
-                  TIM1_OCPOLARITY_HIGH,
-                  TIM1_OCNPOLARITY_HIGH,
-                  TIM1_OCIDLESTATE_RESET,
-                  TIM1_OCNIDLESTATE_RESET);
-    //   TIM2_OC2PreloadConfig(ENABLE); ??
+    TIM1_ICInit(TIM1_CHANNEL_4,
+                TIM1_ICPOLARITY_RISING,
+                TIM1_ICSELECTION_DIRECTTI,
+                TIM1_ICPSC_DIV1, // TIM1_ICPrescaler
+                0x0F // 1  // TIM1_ICFilter maxxd out ... motor noise 
+               );
 
-    /* Channel 3 PWM configuration */
-    TIM1_OC3Init( PWM_MODE,
-                  TIM1_OUTPUTSTATE_ENABLE,
-                  TIM1_OUTPUTNSTATE_ENABLE,
-                  0,
-                  TIM1_OCPOLARITY_HIGH,
-                  TIM1_OCNPOLARITY_HIGH,
-                  TIM1_OCIDLESTATE_RESET,
-                  TIM1_OCNIDLESTATE_RESET);
-// ?  TIM2_OC3PreloadConfig(ENABLE);
+    /* TI3 Configuration set input to TIM1ch4 .. copied from TIM1_ICInit() */
+    _TI3_Config(TIM1_ICPOLARITY_FALLING,
+                TIM1_ICSELECTION_INDIRECTTI, // TIM1 Input 3 is selected to be connected to IC4
+                1);
+    /* Set the Input Capture Prescaler value */
+    TIM1_SetIC3Prescaler(TIM1_ICPSC_DIV1);
 
-    /* Channel 4 PWM configuration */
-    TIM1_OC4Init(PWM_MODE,
-                 TIM1_OUTPUTSTATE_ENABLE,
-                 0,
-                 TIM1_OCPOLARITY_HIGH,
-                 TIM1_OCIDLESTATE_RESET);
-// TIM2_OC4PreloadConfig(ENABLE); // ???
-
-    TIM1_CtrlPWMOutputs(ENABLE);
-
+ // timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
     TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+// enable capture channels 3 & 4
+    TIM1_ITConfig(TIM1_IT_CC4, ENABLE);
+    TIM1_ITConfig(TIM1_IT_CC3, ENABLE);
+
     TIM1_Cmd(ENABLE);
 }
 
@@ -350,9 +341,9 @@ static void TIM1_setup(void)
  * Reference: AN3332
  */
 #ifdef CLOCK_16
- #define TIM2_PRESCALER TIM2_PRESCALER_8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#define TIM2_PRESCALER TIM2_PRESCALER_8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
- #define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+#define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
 #endif
 
 static void TIM2_setup(void)
@@ -420,13 +411,13 @@ static void TIM4_setup(void)
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
 
-// the timer prescalar is to show that fixed timing data must somehow factor in 
-// the timer rate - halving the prescalar to make timer 2x faster means timing 
+// the timer prescalar is to show that fixed timing data must somehow factor in
+// the timer rate - halving the prescalar to make timer 2x faster means timing
 // periods are 2x duration relative to the previous scalar of 1
 #ifdef CLOCK_16
-  #define TIM3_PSCR  0x01  // 2^1 == 2
+#define TIM3_PSCR  0x01  // 2^1 == 2
 #else
-  #define TIM3_PSCR  0x00  // 2^0 == 1
+#define TIM3_PSCR  0x00  // 2^0 == 1
 #endif
 
 /**
@@ -472,8 +463,9 @@ static void Clock_setup(void)
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART1, ENABLE);
-    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER3, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER1, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
+    CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER3, ENABLE);
     CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
@@ -487,7 +479,7 @@ void MCU_Init(void)
     GPIO_Config();
     UART_setup();
     ADC1_setup();
-//    TIM1_setup();
+    TIM1_setup();
     TIM2_setup();
     TIM4_setup();
 }

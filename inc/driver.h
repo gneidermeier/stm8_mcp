@@ -17,7 +17,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "stm8s.h"
+#include "system.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -61,6 +61,12 @@ uint16_t Driver_Get_Back_EMF_Avg(void);
 
 void Driver_on_PWM_edge(void);
 void Driver_on_ADC_conv(void);
+
+void Driver_on_capture_rise(void);
+void Driver_on_capture_fall(void);
+
+uint16_t Driver_get_pulse_perd(void);
+uint16_t Driver_get_pulse_dur(void);
 
 
 #endif // DRIVER_H

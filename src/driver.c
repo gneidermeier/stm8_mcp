@@ -83,6 +83,12 @@ static uint8_t  ph0_adc_tbct;
 
 static uint16_t phase_average;
 
+static uint16_t prev_pulse_start_tm;
+static uint16_t curr_pulse_start_tm;
+
+static uint16_t Pulse_perd;
+static uint16_t Pulse_dur;
+
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -109,6 +115,52 @@ static void udpate_phase_average(void)
 }
 
 /* External functions ---------------------------------------------------------*/
+
+/**
+ * @brief Call from ISR on capture of pulse rise.
+ * 
+ * Range of 1ms pulse:
+ *         $0768 - $044A  = $031E
+ * Pulse period Tx on (rougly 20ms):
+ *         $55C4 
+ * Pulse period Tx off (pulse rate doubles - radio signal lost!):
+ *         $2BAE
+*/
+void Driver_on_capture_rise(void)
+{
+// 16-bit counter setup to wrap at 0xffff so no concern for sign of result
+    prev_pulse_start_tm = curr_pulse_start_tm;
+    curr_pulse_start_tm = TIM1_GetCapture4();
+    Pulse_perd = curr_pulse_start_tm  - prev_pulse_start_tm;
+}
+
+/**
+ * @brief Call from ISR on capture of pulse fall.
+ */
+void Driver_on_capture_fall(void)
+{
+// noise on this signal when motor running
+//    uint16_t t16 =  TIM1_GetCapture3() - TIM1_GetCapture4();
+//    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
+    Pulse_dur = TIM1_GetCapture3() - TIM1_GetCapture4();
+}
+
+/**
+ * @brief Accessor for measured pulse period.
+ */
+uint16_t Driver_get_pulse_perd(void)
+{
+    return Pulse_perd;
+}
+
+/**
+ * @brief Accessor for measured pulse duration.
+ */
+uint16_t Driver_get_pulse_dur(void)
+{
+    return Pulse_dur;
+}
+
 
 /**
  * @brief  Hook for synchronizing to the PWM pulse.
@@ -146,6 +198,7 @@ void Driver_on_ADC_conv(void)
 {
     ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
 
+// assert (buffer should be sized big enough for slowest speed)
     if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
     {
         ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;

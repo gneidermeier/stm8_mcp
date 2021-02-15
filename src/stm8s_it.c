@@ -21,7 +21,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
-#include "parameter.h" //  app defines
+#include "system.h"
 #include "driver.h"
 
 
@@ -219,6 +219,21 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+
+    static int toggle;
+    toggle ^= 1;
+#if 0
+    if ( toggle )
+    {
+        GPIOD->ODR &=  ~(1<<LED); // clear test pin
+    }
+    else    
+    {
+        GPIOD->ODR |=  (1<<LED); // set test pin
+    }
+#endif
+    TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
+    TIM1_ClearFlag(TIM1_FLAG_UPDATE);
 }
 
 /**
@@ -231,6 +246,27 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+
+    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
+    {
+//        GPIOD->ODR &=  ~(1<<LED); // clear test pin
+        Driver_on_capture_fall();
+
+        TIM1_ClearITPendingBit(TIM1_IT_CC3);
+        TIM1_ClearFlag(TIM1_FLAG_CC3);
+    }
+    else
+    {
+//        GPIOD->ODR |=  (1<<LED); // set test pin
+        Driver_on_capture_rise();
+    }
+
+       // no idea why this flag not getting set .. oh well
+//    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC4) )
+    {
+        TIM1_ClearITPendingBit(TIM1_IT_CC4);
+        TIM1_ClearFlag(TIM1_FLAG_CC4);
+    }
 }
 
 #ifdef STM8S903
@@ -316,11 +352,11 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
         GPIOG->ODR &=  ~(1<<0); // clear test pin
     }
 #endif
-    GPIOG->ODR |=  (1<<0); // set test pin
+//    GPIOG->ODR |=  (1<<0); // set test pin
 
     Driver_Step();
 
-    GPIOG->ODR &=  ~(1<<0); // clear test pin
+//    GPIOG->ODR &=  ~(1<<0); // clear test pin
 
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
@@ -502,11 +538,11 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
     }
 #endif
 
-   GPIOD->ODR |=  (1<<LED); // set test pin
+//   GPIOD->ODR |=  (1<<LED); // set test pin
 
     Driver_Update();
 
-   GPIOD->ODR &=  ~(1<<LED); // clear test pin
+//   GPIOD->ODR &=  ~(1<<LED); // clear test pin
 
 // must reset the tmer interrupt flag
     TIM4->SR1 &= ~TIM4_SR1_UIF;
