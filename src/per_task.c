@@ -21,6 +21,7 @@
 #include "sequence.h"
 #include "bldc_sm.h"
 #include "faultm.h"
+#include "driver.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -47,6 +48,9 @@ static void set_ctlm(void);
 
 /* Private types     ---------------------------------------------------------*/
 
+/**
+ * @brief Data type for the key handler function.
+ */
 typedef void (*ui_handlrp_t)( void );
 
 // local enum only for setting enumerated order to UI event dispatcher
@@ -60,15 +64,26 @@ enum
     M_STOP     = ' '  // one space character
 };
 
+/**
+ * @brief Data type for the keycode lookup table.
+ */ 
 typedef char ui_keycode_t;
 
+/**
+ * @brief Data type for the key handler table.
+ */
 typedef struct
 {
-    ui_keycode_t   key_code;
-    ui_handlrp_t   phandler;
+    ui_keycode_t   key_code;  /**< Key code. */
+    ui_handlrp_t   phandler;  /**< Pointer to handler function. */
 } ui_key_handler_t;
 
+
 /* Private variables ---------------------------------------------------------*/
+
+static uint16_t UI_pulse_dc;
+static uint16_t UI_pulse_perd;
+static uint16_t UI_pulse_dur;
 
 static uint16_t Analog_slider; // input var for 10-bit ADC conversions
 static uint8_t UI_Speed;       // speed setting in 8-bits
@@ -138,6 +153,7 @@ static char * itoa(uint16_t u16in, char *sbuf, int base)
 
 /** @cond */ // hide some developer/debug code
 // hack, temp
+extern uint8_t Control_mode;
 extern int Back_EMF_Falling_PhX;
 extern int Back_EMF_Riseing_PhX;
 /** @endcond */
@@ -176,29 +192,34 @@ static void dbg_println(int zrof)
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " DC=");
-    itoa( BLDC_PWMDC_Get(),     cbuf, 16);
+    itoa( BLDC_PWMDC_Get(), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " Vs=");
-    itoa( Vsystem,     cbuf, 16);
+    itoa( Vsystem, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " SF=");
-    itoa( Faultm_get_status(),     cbuf, 16);
+    itoa( Faultm_get_status(), cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " TTE=");
-    itoa( timing_error,     cbuf, 16);
+    itoa( timing_error, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+#if 0
+    strcat(sbuf, " CM=");
+    itoa( Control_mode, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " bRi=");
-    itoa( Back_EMF_Riseing_PhX,     cbuf, 16);
+    itoa( Back_EMF_Riseing_PhX, cbuf, 16);
     strcat(sbuf, cbuf);
 
     strcat(sbuf, " bFi=");
-    itoa( Back_EMF_Falling_PhX,     cbuf, 16);
+    itoa( Back_EMF_Falling_PhX, cbuf, 16);
     strcat(sbuf, cbuf);
-
+#endif
     strcat(sbuf, " UI=");
     itoa(UI_Speed, cbuf, 16);
     strcat(sbuf, cbuf);
@@ -207,11 +228,27 @@ static void dbg_println(int zrof)
     itoa(Analog_slider, cbuf, 16);
     strcat(sbuf, cbuf);
 
+    strcat(sbuf, " RF=");
+    itoa(UI_pulse_dc, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " PPD=");
+    itoa(UI_pulse_perd, cbuf, 16);
+    strcat(sbuf, cbuf);
+
+    strcat(sbuf, " DUR=");
+    itoa(UI_pulse_dur, cbuf, 16);
+    strcat(sbuf, cbuf);
+
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
 }
 
-
+//$0768 - $044A  = $031E
+#define RF_PCNT_ZERO   0x044A
+#define RF_PCNT_100    0x0768
+#define RF_RANGE       (RF_PCNT_100 - RF_PCNT_ZERO) // 0x031E // hardcode range of pulse
+#define RF_NORDO_THR   0x3000 // arbitrary 0x2BB0 -> 0x55C0 when receiving
 /*
  * Service the slider and trim inputs for speed setting.
  * The UI Speed value is a uint8 and represents the adjustment range of e.g. a
@@ -223,11 +260,28 @@ static void dbg_println(int zrof)
  */
 static void set_ui_speed(void)
 {
+    uint16_t tmp_u16;
     int16_t tmp_sint16;
-
-//   svc a UI potentiometer
     uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
     Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
+
+
+    UI_pulse_perd = Driver_get_pulse_perd();
+
+    UI_pulse_dur = Driver_get_pulse_dur();
+// lose 1 bit of precision here ....
+    tmp_u16 = ( UI_pulse_dur - RF_PCNT_ZERO ) >> 1;  //  /2
+
+//   scale factors ...     ( 1/2   +   1/2 )  /     (1/4)
+    UI_pulse_dc = (PWM_100PCNT>>1) * tmp_u16 / (RF_RANGE>>2);
+
+
+// if RF pulse qualified, then use it - needs more thought
+    if (UI_pulse_perd > RF_NORDO_THR)
+    {
+//	Analog_slider = UI_pulse_dc;
+    }
+
 
 // careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
@@ -310,6 +364,7 @@ static void spd_minus(void)
 //    UARTputs("---\r\n");                // no not inside CS
 }
 
+/** @cond */ // hide some developer/debug code
 void BL_set_ctlm(void); // tmp
 
 static void set_ctlm(void)
@@ -317,6 +372,7 @@ static void set_ctlm(void)
 // toggle or rest the ftl state??
     BL_set_ctlm();
 }
+/** @endcond */
 
 
 static ui_handlrp_t handle_term_inp(void)
@@ -361,16 +417,15 @@ static void Periodic_task(void)
 // invoke the terminal input and ui speed subs, updates from their globals to occur in the CS
     ui_handlrp_t fp = handle_term_inp();
 
-    // update the UI speed input slider+trim
-    set_ui_speed();
-
-
-    disableInterrupts();          // DI
+    disableInterrupts();  //////////////// DI
 
     if (NULL != fp)
     {
         fp();
     }
+
+    // update the UI speed input slider+trim
+    set_ui_speed();
 
     BLDC_PWMDC_Set(UI_Speed);
 
@@ -378,7 +433,7 @@ static void Periodic_task(void)
 
     Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
-    enableInterrupts();           // EI EI O
+    enableInterrupts();  ///////////////// EI EI O
 
 
     // update system voltage diagnostic - should be interrupt safe, the status word
