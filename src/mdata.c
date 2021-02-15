@@ -17,6 +17,8 @@
 
 #include "system.h" // dependency of motor data on cpu clock specific timer rate
 
+#define TABLE_SIZE    TIM2_PWM_PD
+
 /*
  * The table is indexed by PWM duty cycle counts (i.e. [0:1:250)
  * The function generates the data in Scilab and imported from csv:
@@ -42,7 +44,7 @@
  * a linear tracking function.
  *
  */
-static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
+static const uint16_t OL_Timing[ TABLE_SIZE ] =
 {
 #if 0
 // leave the old data
@@ -157,7 +159,7 @@ uint16_t Get_OL_Timing(uint16_t index)
     {
         return OL_Timing[ index ] * CTIME_SCALAR;
     }
-    return -1; // error
+    return (U16_MAX); // error
 }
 
 /**@}*/ // defgroup

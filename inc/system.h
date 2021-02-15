@@ -46,14 +46,8 @@
 // the timer prescalar is to show that fixed timing data must somehow factor in 
 // the timer rate - halving the prescalar to make timer 2x faster means timing 
 // periods are 2x duration relative to the previous scalar of 1
-//#define SLOW_CTIMER 1  // define for old TIM3 setup (new T3 is 2x prescaler)
 
-//#ifdef SLOW_CTIMER
-// #define CTIME_SCALAR 1
-//#else
-// doubles the duration of fixed timing table values
 #define CTIME_SCALAR 2
-//#endif
 
 
 /*
@@ -80,6 +74,9 @@
 #else // 12kHz
   #define TIM2_PWM_PD    166   //  83uS
 #endif
+
+#define PWM_100PCNT  TIM2_PWM_PD
+
 
 
 #define LED  0  // STM8-Discovery board built-in LED on PIN D0
