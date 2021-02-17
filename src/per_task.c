@@ -463,6 +463,7 @@ static void Periodic_task(void)
  * Called in non-ISR context - checks the background task ready flag which if !0
  * will invoke the Periodic Task function.
  * @note referred to as Pertask_chk_ready
+ * @return true if task ran (allows caller to also sync w/ the time period)
  */
 uint8_t Task_Ready(void)
 {
@@ -470,8 +471,9 @@ uint8_t Task_Ready(void)
     {
         TaskRdy = FALSE;
         Periodic_task();
+        return TRUE;
     }
-    return TaskRdy;
+    return FALSE;
 }
 
 /**

@@ -22,6 +22,13 @@
 #endif // UNIT_TEST
 
 
+
+//#define SPI_MASTER // SLAVE
+
+
+#define SPI_RX_BUF_SZ  16 // 256 // tmp
+
+
 /*
  * (un)comment macro to set stm8 clock from 8Mhz or 16Mhz
  */

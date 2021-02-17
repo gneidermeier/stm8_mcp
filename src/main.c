@@ -17,10 +17,18 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+#define RX_BUF_SZ 16
+
+/* Private functions ---------------------------------------------------------*/
+
+void spi_write_data_8t( uint8_t *pBuffer, uint8_t WriterAddr);
+void spi_write_data_1t( uint8_t bdata);
+uint8_t spi_tx_bfr[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0 } ;
+
 /**
  * @brief mainly looping
  */
-main()
+void main(int argc, char **argv)
 {
     MCU_Init();
 
@@ -62,9 +70,17 @@ main()
 #endif
         }
 
-        if ( FALSE == Task_Ready() )
+
+        if ( TRUE == Task_Ready() )
         {
-            nop();
+          static uint8_t bdata = 0;
+#ifdef SPI_MASTER
+//        spi_write_data_8t(spi_tx_bfr, 0x40);//Random Address 0x40 for now.
+        spi_write_data_1t( bdata++ );
+#else
+//        spi_write_data_8t("SPISLAVE", 0x40);//Random Address 0x40 for now.
+        spi_write_data_1t( bdata-- );
+#endif
         }
     } // while 1
 }

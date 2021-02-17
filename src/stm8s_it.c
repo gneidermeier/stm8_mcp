@@ -24,6 +24,12 @@
 #include "system.h"
 #include "driver.h"
 
+#define SPI_TX_BUF_SZ SPI_RX_BUF_SZ 
+
+uint8_t	SPI_rxbuf[SPI_RX_BUF_SZ];
+uint8_t	SPI_txbuf[SPI_TX_BUF_SZ];
+uint8_t SPI_rxcnt;
+uint8_t SPI_txcnt;
 
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
@@ -207,6 +213,27 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+    if (SPI->SR & SPI_SR_RXNE)
+    {
+        /* Store the received byte in the RxBuffer */
+        if (++SPI_rxcnt > (SPI_RX_BUF_SZ - 1) )
+        {
+            SPI_rxcnt = 0;
+        }
+// buffer[ nr++ ] = SPI_ReceiveData();
+        SPI_rxbuf[ SPI_rxcnt ] = SPI->DR;
+    }
+#if 0
+    if (SPI->SR & SPI_SR_TXE)
+    {
+        if (++SPI_txcnt > (SPI_TX_BUF_SZ - 1) )
+        {
+            SPI_txcnt = 0;
+        }
+        SPI->DR = SPI_txbuf[ SPI_txcnt ] ;
+    }
+#endif
+    SPI->SR = (uint8_t) 0;
 }
 
 /**
