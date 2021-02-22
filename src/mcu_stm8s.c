@@ -102,7 +102,7 @@ static void GPIO_Config(void)
     GPIOA->DDR &= ~(1 << 6); // PA.6 as input
     GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
 
-// PE5 as button input (B-)
+// PE5 as button input (B-) ^H^H^H^H^H^H^H    SPI CSS  (Input)
     GPIOE->DDR &= ~(1 << 5); // PE.5 as input
     GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
 
@@ -485,7 +485,7 @@ void SPI_setup(void)
     // Enable SPI Clock.
 //    CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, ENABLE);
 #ifdef SPI_MASTER
-spi_mode = SPI_MODE_MASTER;
+    spi_mode = SPI_MODE_MASTER;
     //Set the MOSI, MISO and SCk at high Level.
     GPIO_ExternalPullUpConfig(GPIOC, (GPIO_Pin_TypeDef)(GPIO_PIN_7|GPIO_PIN_6|GPIO_PIN_5),ENABLE);
 #endif
@@ -493,8 +493,8 @@ spi_mode = SPI_MODE_MASTER;
     SPI_Init(SPI_FIRSTBIT_MSB, 
     SPI_BAUDRATEPRESCALER_16, // SPI_BAUDRATEPRESCALER_8, // master not getting 100% of rx?
     spi_mode /* SPI_MODE_MASTER */, 
-    SPI_CLOCKPOLARITY_HIGH, SPI_CLOCKPHASE_2EDGE,
-    SPI_DATADIRECTION_2LINES_FULLDUPLEX, SPI_NSS_SOFT, (uint8_t)0x07);
+    SPI_CLOCKPOLARITY_LOW, SPI_CLOCKPHASE_1EDGE,
+    SPI_DATADIRECTION_2LINES_FULLDUPLEX, SPI_NSS_HARD, (uint8_t)0x07);
 
     SPI_ITConfig(SPI_IT_RXNE, ENABLE); // Interrupt when the Rx buffer is not empty.
 //SPI_ITConfig(SPI_IT_TXE, ENABLE);  // Interrupt when the Tx buffer is empty.

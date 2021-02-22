@@ -27,7 +27,7 @@
 #define SPI_TX_BUF_SZ SPI_RX_BUF_SZ 
 
 uint8_t	SPI_rxbuf[SPI_RX_BUF_SZ];
-uint8_t	SPI_txbuf[SPI_TX_BUF_SZ];
+//uint8_t SPI_txbuf[SPI_TX_BUF_SZ];
 uint8_t SPI_rxcnt;
 uint8_t SPI_txcnt;
 
@@ -213,27 +213,34 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+    static uint8_t spi_tx = 0;
+
+    uint8_t bdata;
+
     if (SPI->SR & SPI_SR_RXNE)
     {
-        /* Store the received byte in the RxBuffer */
-        if (++SPI_rxcnt > (SPI_RX_BUF_SZ - 1) )
+        SPI_rxbuf[ SPI_rxcnt ] = \
+        bdata = SPI->DR;
+
+        if ( ++SPI_rxcnt >=  SPI_RX_BUF_SZ )
         {
             SPI_rxcnt = 0;
         }
-// buffer[ nr++ ] = SPI_ReceiveData();
-        SPI_rxbuf[ SPI_rxcnt ] = SPI->DR;
-    }
-#if 0
-    if (SPI->SR & SPI_SR_TXE)
-    {
-        if (++SPI_txcnt > (SPI_TX_BUF_SZ - 1) )
+
+        spi_tx += 1; // so data returned should be  81 ... 86
+
+// this is for some acceleromter in a SPI tutorial ... 	address |= 0x80  + address |= 0x40 -> multibyte read
+        if ( bdata == 0xF2  /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
         {
-            SPI_txcnt = 0;
+// start a new sequence of dummy data
+            spi_tx = 0x80; // arbitrary value ignored by master on read request
         }
-        SPI->DR = SPI_txbuf[ SPI_txcnt ] ;
+
+        bdata = spi_tx;
+
+        // Clearing the RXNE bit is performed by reading the SPI_DR register
+        SPI->DR = bdata;
     }
-#endif
-    SPI->SR = (uint8_t) 0;
 }
 
 /**
@@ -249,7 +256,7 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 
     static int toggle;
     toggle ^= 1;
-#if 0
+#if 1
     if ( toggle )
     {
         GPIOD->ODR &=  ~(1<<LED); // clear test pin

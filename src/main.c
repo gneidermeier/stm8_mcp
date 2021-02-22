@@ -17,13 +17,12 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define RX_BUF_SZ 16
 
 /* Private functions ---------------------------------------------------------*/
 
 void spi_write_data_8t( uint8_t *pBuffer, uint8_t WriterAddr);
 void spi_write_data_1t( uint8_t bdata);
-uint8_t spi_tx_bfr[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0 } ;
+//uint8_t spi_tx_bfr[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0 } ;
 
 /**
  * @brief mainly looping
@@ -50,26 +49,25 @@ void main(int argc, char **argv)
             enableInterrupts();
         }
 
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
         if (! (( GPIOA->IDR)&(1<<6)))
         {
             while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-#if 1 //  TEST DEV ONLY: manual adjustment of commutation cycle time
             disableInterrupts();
             BLDC_Spd_inc();
             enableInterrupts();
-#endif
         }
+#endif
 
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
         if ( ! (( GPIOE->IDR)&(1<<5)))
         {
             while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
-#if 1 //  TEST DEV ONLY: manual adjustment of commutation cycle time
             disableInterrupts();
             BLDC_Spd_dec();
             enableInterrupts();
-#endif
         }
-
+#endif
 
         if ( TRUE == Task_Ready() )
         {
@@ -79,7 +77,7 @@ void main(int argc, char **argv)
         spi_write_data_1t( bdata++ );
 #else
 //        spi_write_data_8t("SPISLAVE", 0x40);//Random Address 0x40 for now.
-        spi_write_data_1t( bdata-- );
+//        spi_write_data_1t( bdata-- );
 #endif
         }
     } // while 1
