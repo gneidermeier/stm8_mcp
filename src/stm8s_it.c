@@ -213,33 +213,31 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
-    static uint8_t spi_tx = 0;
-
-    uint8_t bdata;
+    uint8_t spi_tx;
 
     if (SPI->SR & SPI_SR_RXNE)
     {
-        SPI_rxbuf[ SPI_rxcnt ] = \
-        bdata = SPI->DR;
+        spi_tx = SPI->DR;
 
         if ( ++SPI_rxcnt >=  SPI_RX_BUF_SZ )
         {
             SPI_rxcnt = 0;
         }
-
-        spi_tx += 1; // so data returned should be  81 ... 86
+        SPI_rxbuf[ SPI_rxcnt ] = spi_tx;
 
 // this is for some acceleromter in a SPI tutorial ... 	address |= 0x80  + address |= 0x40 -> multibyte read
-        if ( bdata == 0xF2  /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
+        if ( spi_tx == 0xF2  /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
         {
 // start a new sequence of dummy data
             spi_tx = 0x80; // arbitrary value ignored by master on read request
+        } 
+        else
+        {
+             spi_tx &= 0x1F; // dummy, test
         }
 
-        bdata = spi_tx;
-
         // Clearing the RXNE bit is performed by reading the SPI_DR register
-        SPI->DR = bdata;
+        SPI->DR = spi_tx;
     }
 }
 
