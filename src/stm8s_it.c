@@ -24,9 +24,10 @@
 #include "system.h"
 #include "driver.h"
 
-#define SPI_TX_BUF_SZ SPI_RX_BUF_SZ 
+#define SPI_TX_BUF_SZ SPI_RX_BUF_SZ
 
-uint8_t	SPI_rxbuf[SPI_RX_BUF_SZ];
+uint8_t	SPI_rxbuf[SPI_RX_BUF_SZ + 8]; // let this be padded up so rx ISR doesn't have to check each at each byte rx
+
 //uint8_t SPI_txbuf[SPI_TX_BUF_SZ];
 uint8_t SPI_rxcnt;
 uint8_t SPI_txcnt;
@@ -217,27 +218,55 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 
     if (SPI->SR & SPI_SR_RXNE)
     {
-        spi_tx = SPI->DR;
-
         if ( ++SPI_rxcnt >=  SPI_RX_BUF_SZ )
         {
             SPI_rxcnt = 0;
         }
-        SPI_rxbuf[ SPI_rxcnt ] = spi_tx;
+
+        // Clearing the RXNE bit is performed by reading the SPI_DR register
+        SPI_rxbuf[ SPI_rxcnt ] = 
+          spi_tx = SPI->DR;
 
 // this is for some acceleromter in a SPI tutorial ... 	address |= 0x80  + address |= 0x40 -> multibyte read
         if ( spi_tx == 0xF2  /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
         {
-// start a new sequence of dummy data
-            spi_tx = 0x80; // arbitrary value ignored by master on read request
-        } 
+            SPI->DR = 0x80; // returns first byte is junk ,start of new sequence
+
+            // expectes to read 6 bytes
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+
+            while (! (SPI->SR & SPI_SR_TXE) ) ;
+            SPI_rxbuf[ ++SPI_rxcnt ] = 
+              spi_tx = SPI->DR;
+            SPI->DR = (spi_tx & 0x1F);
+        }
         else
         {
-             spi_tx &= 0x1F; // dummy, test
+            SPI->DR = spi_tx;
         }
-
-        // Clearing the RXNE bit is performed by reading the SPI_DR register
-        SPI->DR = spi_tx;
     }
 }
 
@@ -259,7 +288,7 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
     {
         GPIOD->ODR &=  ~(1<<LED); // clear test pin
     }
-    else    
+    else
     {
         GPIOD->ODR |=  (1<<LED); // set test pin
     }
