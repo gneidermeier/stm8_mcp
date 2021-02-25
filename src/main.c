@@ -55,6 +55,17 @@ uint8_t SPI_readA( uint8_t address ) {
     return SPI->DR;
 }
 
+uint8_t SPI_read_write(uint8_t data) {
+
+    while (! (SPI->SR & SPI_SR_TXE) );
+
+    SPI->DR = data;
+
+    while ( ! (SPI->SR & SPI_SR_RXNE) );
+
+    return SPI->DR;
+}
+
 
 /**
  * @brief mainly looping
@@ -117,30 +128,33 @@ void main(int argc, char **argv)
                 disableInterrupts();
                 chip_select();
 
-                SPI_write(0xa5);
+                spi_rx_bfr[0] = SPI_read_write(0xa5); // start of sequence
 
                 i = (i + 1) & ~0x80; // clear test  bit
-                data = SPI_readA(i);
+                spi_rx_bfr[1] = SPI_read_write(i);
+//                spi_rx_bfr[1] = SPI_readA(i);
 
                 i+= 1;// test data
-                data = SPI_readA(i);
+                spi_rx_bfr[2] = SPI_read_write(i);
+//                spi_rx_bfr[2] = SPI_readA(i);
 
                 i = (i + 1) | 0x80; // test data mask in a test bit so alignment errors
-                data = SPI_readA(i);
+                spi_rx_bfr[3] = SPI_read_write(i);
+//                spi_rx_bfr[3] = SPI_readA(i);
 
                 chip_deselect();
                 enableInterrupts();
-#if 1 // test
-                buffer_idx = (buffer_idx + 1) % BFR_SZ;
-                spi_rx_bfr[ buffer_idx ] = data; // tmp test
+// tmp dump test SPI test data to UART
+//                buffer_idx = (buffer_idx + 1) % BFR_SZ;
                 sbuf[0] = '>';
-                sbuf[1] = buffer_idx + ' '; // tmp test
-                sbuf[2] = data; // is printable?
-                sbuf[3] = '.';
-                sbuf[4] = 0;
+                sbuf[1] = spi_rx_bfr[0];
+                sbuf[2] = spi_rx_bfr[1];
+                sbuf[3] = spi_rx_bfr[2];
+                sbuf[4] = spi_rx_bfr[3];
+                sbuf[5] = 0;
                 strcat(sbuf, "\r\n");
                 UARTputs(sbuf);
-#endif // test
+// test uart
             }
 #endif // MASTER
         }
