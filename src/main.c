@@ -19,16 +19,51 @@
 
 
 /* Private functions ---------------------------------------------------------*/
+#define BFR_SZ 32
+uint8_t spi_rx_bfr[BFR_SZ] = { 0 } ;
+uint8_t buffer_idx;
 
-void spi_write_data_8t( uint8_t *pBuffer, uint8_t WriterAddr);
-void spi_write_data_1t( uint8_t bdata);
-//uint8_t spi_tx_bfr[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0 } ;
+/*
+ * example codes for SPI functions from
+ * https://lujji.github.io/blog/bare-metal-programming-stm8/#SPI
+ */
+
+/* Chip select */
+#define CS_PIN      5
+
+void chip_select(void) {
+    GPIOE->ODR &= (uint8_t)~(1 << CS_PIN);
+}
+void chip_deselect(void) {
+    GPIOE->ODR |= (1 << CS_PIN);
+}
+
+void SPI_write(uint8_t data) {
+    SPI->DR = data;
+    while (! (SPI->SR & SPI_SR_TXE) );
+}
+
+uint8_t SPI_read( void ) {
+    SPI_write( 0xA5 );
+    while ( ! (SPI->SR & SPI_SR_RXNE) );
+    return SPI->DR;
+}
+
+uint8_t SPI_readA( uint8_t address ) {
+    SPI_write( address );
+    while ( ! (SPI->SR & SPI_SR_RXNE) );
+    return SPI->DR;
+}
+
 
 /**
  * @brief mainly looping
  */
 void main(int argc, char **argv)
 {
+    uint8_t framecount = 0;
+    uint8_t i = 0;
+
     MCU_Init();
 
     BL_reset();
@@ -71,14 +106,43 @@ void main(int argc, char **argv)
 
         if ( TRUE == Task_Ready() )
         {
-          static uint8_t bdata = 0;
-#ifdef SPI_MASTER
-//        spi_write_data_8t(spi_tx_bfr, 0x40);//Random Address 0x40 for now.
-        spi_write_data_1t( bdata++ );
-#else
-//        spi_write_data_8t("SPISLAVE", 0x40);//Random Address 0x40 for now.
-//        spi_write_data_1t( bdata-- );
-#endif
+#ifdef SPI_CONTROLLER
+// periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
+// approximately 2 Hz at which time the master attempts to read a few bytes from SPI
+            if ( ! ((framecount++) % 0x20) )
+            {
+                char sbuf[16]; // am i big enuff?
+                uint8_t data;
+
+                disableInterrupts();
+                chip_select();
+
+                SPI_write(0xa5);
+
+                i = (i + 1) & ~0x80; // clear test  bit
+                data = SPI_readA(i);
+
+                i+= 1;// test data
+                data = SPI_readA(i);
+
+                i = (i + 1) | 0x80; // test data mask in a test bit so alignment errors
+                data = SPI_readA(i);
+
+                chip_deselect();
+                enableInterrupts();
+#if 1 // test
+                buffer_idx = (buffer_idx + 1) % BFR_SZ;
+                spi_rx_bfr[ buffer_idx ] = data; // tmp test
+                sbuf[0] = '>';
+                sbuf[1] = buffer_idx + ' '; // tmp test
+                sbuf[2] = data; // is printable?
+                sbuf[3] = '.';
+                sbuf[4] = 0;
+                strcat(sbuf, "\r\n");
+                UARTputs(sbuf);
+#endif // test
+            }
+#endif // MASTER
         }
     } // while 1
 }
