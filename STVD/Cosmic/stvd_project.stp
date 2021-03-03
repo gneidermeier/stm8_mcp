@@ -579,11 +579,6 @@ Next=Root.Source Files...\..\src\sequence.c
 [Root.Source Files...\..\src\sequence.c]
 ElemType=File
 PathName=..\..\src\sequence.c
-Next=Root.Source Files...\..\src\stm8_interrupt_vector.c
-
-[Root.Source Files...\..\src\stm8_interrupt_vector.c]
-ElemType=File
-PathName=..\..\src\stm8_interrupt_vector.c
 Next=Root.Source Files...\..\src\stm8s_it.c
 
 [Root.Source Files...\..\src\stm8s_it.c]
