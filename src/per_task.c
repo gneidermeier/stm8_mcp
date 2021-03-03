@@ -14,7 +14,8 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include <string.h>
+#include <stddef.h> // NULL
+#include <string.h> // strat
 
 // app headers
 #include "mcu_stm8s.h"
@@ -66,7 +67,7 @@ enum
 
 /**
  * @brief Data type for the keycode lookup table.
- */ 
+ */
 typedef char ui_keycode_t;
 
 /**

@@ -7,7 +7,7 @@
 		<Option compiler="sdcc" />
 		<Build>
 			<Target title="Debug">
-				<Option output="bin/Debug/TestLedder.ihx" prefix_auto="1" extension_auto="0" />
+				<Option output="bin/Debug/stm_mcp.ihx" prefix_auto="1" extension_auto="0" />
 				<Option working_dir="" />
 				<Option object_output="obj/Debug/" />
 				<Option type="5" />
@@ -17,13 +17,23 @@
 				</Compiler>
 			</Target>
 			<Target title="Release">
-				<Option output="bin/Release/TestLedder.ihx" prefix_auto="1" extension_auto="0" />
+				<Option output="bin/Release/stm_mcp.ihx" prefix_auto="1" extension_auto="0" />
 				<Option working_dir="" />
 				<Option object_output="obj/Release/" />
 				<Option type="5" />
 				<Option compiler="sdcc" />
 				<Compiler>
 					<Add option="--opt-code-size" />
+				</Compiler>
+			</Target>
+			<Target title="TestLedder">
+				<Option output="bin/Debug/TestLedder.ihx" prefix_auto="1" extension_auto="0" />
+				<Option working_dir="" />
+				<Option object_output="obj/DebugT/" />
+				<Option type="5" />
+				<Option compiler="sdcc" />
+				<Compiler>
+					<Add option="--debug" />
 				</Compiler>
 			</Target>
 		</Build>
@@ -37,14 +47,90 @@
 		<ExtraCommands>
 			<Add after="packihx &lt;$(TARGET_OUTPUT_DIR)$(TARGET_OUTPUT_BASENAME).ihx &gt;$(TARGET_OUTPUT_DIR)$(TARGET_OUTPUT_BASENAME).hex" />
 		</ExtraCommands>
+		<Unit filename="../src/BLDC_sm.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/driver.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/faultm.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/main.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/mcu_stm8s.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/mdata.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/per_task.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/pwm_stm8s.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/sequence.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/stm8s_it.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_adc1.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
 		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_clk.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_gpio.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_spi.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_tim1.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_tim2.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_uart2.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
 		<Unit filename="main.c">
 			<Option compilerVar="CC" />
+			<Option target="TestLedder" />
 		</Unit>
 		<Extensions>
 			<code_completion />

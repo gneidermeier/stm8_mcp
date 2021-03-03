@@ -41,7 +41,7 @@
  INTERRUPT void NonHandledInterrupt(void);
 #endif /* _COSMIC_ */
 
-#ifndef _RAISONANCE_
+#if !defined(_RAISONANCE_) && !defined(_SDCC_)  // SDCC patch: interrupt keyword required after function
  INTERRUPT void TRAP_IRQHandler(void); /* TRAP */
  INTERRUPT void TLI_IRQHandler(void); /* TLI */
  INTERRUPT void AWU_IRQHandler(void); /* AWU */
