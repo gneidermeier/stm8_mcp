@@ -94,8 +94,7 @@
 		</Unit>
 		<Unit filename="../src/stm8s_it.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug" />
-			<Option target="Release" />
+			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
 		<Unit filename="STM8S_StdPeriph_Driver/src/stm8s_adc1.c">
 			<Option compilerVar="CC" />

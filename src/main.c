@@ -15,6 +15,16 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 
+#ifdef _SDCC_
+// Interrupt vectors must be implemented in the same file that implements main()
+/*
+If you have multiple source files in your project, interrupt service routines can be present in any of them, but a prototype of the isr MUST be present or included in the file that contains the function main.
+*/
+//  #include "stm8s_it.h" // not sure if this works ... enable stm8s_it.c to be built in the build config
+  #include "stm8s_it.c"
+#endif
+
+
 /* Private defines -----------------------------------------------------------*/
 
 
