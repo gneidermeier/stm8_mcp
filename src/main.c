@@ -9,6 +9,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <ctype.h> // isprint
 
 // app headers
 #include "mcu_stm8s.h"
@@ -16,11 +17,9 @@
 #include "per_task.h"
 
 
-
-
-
 extern uint8_t  SPI_rxbuf[]; // tmp
 extern uint8_t  is_SPI_rx;  // tmp
+
 
 #ifdef _SDCC_
 // Interrupt vectors must be implemented in the same file that implements main()
@@ -73,7 +72,6 @@ uint8_t SPI_read_write(uint8_t data) {
 
     return SPI->DR;
 }
-
 
 /**
  * @brief mainly looping
@@ -163,24 +161,25 @@ void main(int argc, char **argv)
 // test uart
             }
 #else
-            if ( is_SPI_rx )
+            if ( 0 != is_SPI_rx )
             {
                 i = (i >= 0x30 && i < 126) ? i+1 : 0x30;
 // tmp dump test SPI test data to UART
                 disableInterrupts();
                 sbuf[0] = '>';
                 sbuf[1] = i;
-                sbuf[2] = '.'; // first on is F2 or something like that, mask off the msb
-                sbuf[3] = SPI_rxbuf[1];
-                sbuf[4] = SPI_rxbuf[2];
-                sbuf[5] = SPI_rxbuf[3];
-                sbuf[6] = '.';
-                sbuf[7] = 0;
-                is_SPI_rx = 0;
+                sbuf[2] = isprint( (int)SPI_rxbuf[0] ) ? SPI_rxbuf[0] : '.' ;
+                sbuf[3] = isprint( (int)SPI_rxbuf[1] ) ? SPI_rxbuf[1] : '.' ;
+                sbuf[4] = isprint( (int)SPI_rxbuf[2] ) ? SPI_rxbuf[2] : '.' ;
+                sbuf[5] = isprint( (int)SPI_rxbuf[3] ) ? SPI_rxbuf[3] : '.' ;
+                sbuf[6] = isprint( (int)SPI_rxbuf[4] ) ? SPI_rxbuf[4] : '.' ;
+                sbuf[7] = '$';
+                sbuf[8] = 0;
+                is_SPI_rx = FALSE;
                 enableInterrupts();
                 strcat(sbuf, "\r\n");
                 UARTputs(sbuf);
-             }
+            }
 #endif // MASTER
         }
     } // while 1
