@@ -15,6 +15,17 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 
+
+/* Private defines -----------------------------------------------------------*/
+
+
+/* Private functions ---------------------------------------------------------*/
+#define BFR_SZ 32
+uint8_t spi_rx_bfr[BFR_SZ] = { 0 } ;
+uint8_t buffer_idx;
+
+
+
 #ifdef _SDCC_
 // Interrupt vectors must be implemented in the same file that implements main()
 /*
@@ -24,14 +35,6 @@ If you have multiple source files in your project, interrupt service routines ca
   #include "stm8s_it.c"
 #endif
 
-
-/* Private defines -----------------------------------------------------------*/
-
-
-/* Private functions ---------------------------------------------------------*/
-#define BFR_SZ 32
-uint8_t spi_rx_bfr[BFR_SZ] = { 0 } ;
-uint8_t buffer_idx;
 
 /*
  * example codes for SPI functions from
@@ -55,12 +58,6 @@ void SPI_write(uint8_t data) {
 
 uint8_t SPI_read( void ) {
     SPI_write( 0xA5 );
-    while ( ! (SPI->SR & SPI_SR_RXNE) );
-    return SPI->DR;
-}
-
-uint8_t SPI_readA( uint8_t address ) {
-    SPI_write( address );
     while ( ! (SPI->SR & SPI_SR_RXNE) );
     return SPI->DR;
 }
@@ -127,12 +124,12 @@ void main(int argc, char **argv)
 
         if ( TRUE == Task_Ready() )
         {
+                char sbuf[16]; // am i big enuff?
 #ifdef SPI_CONTROLLER
 // periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
 // approximately 2 Hz at which time the master attempts to read a few bytes from SPI
             if ( ! ((framecount++) % 0x20) )
             {
-                char sbuf[16]; // am i big enuff?
                 uint8_t data;
 
                 disableInterrupts();
@@ -166,6 +163,25 @@ void main(int argc, char **argv)
                 UARTputs(sbuf);
 // test uart
             }
+#else
+            if ( is_SPI_rx )
+            {
+                i = (i >= 0x30 && i < 126) ? i+1 : 0x30;
+// tmp dump test SPI test data to UART
+                disableInterrupts();
+                sbuf[0] = '>';
+                sbuf[1] = i;
+                sbuf[2] = '.'; // first on is F2 or something like that, mask off the msb
+                sbuf[3] = SPI_rxbuf[1];
+                sbuf[4] = SPI_rxbuf[2];
+                sbuf[5] = SPI_rxbuf[3];
+                sbuf[6] = '.';
+                sbuf[7] = 0;
+                is_SPI_rx = 0;
+                enableInterrupts();
+                strcat(sbuf, "\r\n");
+                UARTputs(sbuf);
+             }
 #endif // MASTER
         }
     } // while 1

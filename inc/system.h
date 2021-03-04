@@ -23,7 +23,7 @@
 
 
 
-//#define SPI_MASTER // SLAVE
+//#define SPI_CONTROLLER
 
 
 #define SPI_RX_BUF_SZ  16 // 256 // tmp
@@ -50,8 +50,8 @@
 #define CTRL_RATEM  SYS_RATE_MULT  // control task rate multiplier
 
 
-// the timer prescalar is to show that fixed timing data must somehow factor in 
-// the timer rate - halving the prescalar to make timer 2x faster means timing 
+// the timer prescalar is to show that fixed timing data must somehow factor in
+// the timer rate - halving the prescalar to make timer 2x faster means timing
 // periods are 2x duration relative to the previous scalar of 1
 
 #define CTIME_SCALAR 2

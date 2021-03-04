@@ -28,9 +28,8 @@
 
 uint8_t	SPI_rxbuf[SPI_RX_BUF_SZ + 8]; // let this be padded up so rx ISR doesn't have to check each at each byte rx
 
-//uint8_t SPI_txbuf[SPI_TX_BUF_SZ];
+uint8_t  is_SPI_rx;
 uint8_t SPI_rxcnt;
-uint8_t SPI_txcnt;
 
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
@@ -211,63 +210,47 @@ INTERRUPT_HANDLER(EXTI_PORTE_IRQHandler, 7)
   */
 INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+    static uint8_t tx_cntr;
+    char spi_tx_buf[] = "ABCD";
     uint8_t spi_tx;
 
     if (SPI->SR & SPI_SR_RXNE)
     {
-        if ( ++SPI_rxcnt >=  SPI_RX_BUF_SZ )
-        {
-            SPI_rxcnt = 0;
-        }
+        is_SPI_rx = TRUE;
+        SPI_rxcnt = 0;
 
         // Clearing the RXNE bit is performed by reading the SPI_DR register
-        SPI_rxbuf[ SPI_rxcnt ] = 
-          spi_tx = SPI->DR;
+        SPI_rxbuf[ SPI_rxcnt++ ] = SPI->DR;
+
+        SPI->DR = spi_tx_buf[0];
 
 // this is for some acceleromter in a SPI tutorial ... 	address |= 0x80  + address |= 0x40 -> multibyte read
-        if ( spi_tx == 0xF2  /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
+        if ( 0xF2 == SPI_rxbuf[ 0 ] /* ( 0x80 & bdata) && (0x40 & bdata) */ ) // data read request
         {
-            SPI->DR = 0x80; // returns first byte is junk ,start of new sequence
+            // start of new sequence - expects to read 3 more bytes
+            while (! (SPI->SR & SPI_SR_RXNE) ) ;
+            SPI_rxbuf[ SPI_rxcnt++ ] = SPI->DR;
 
-            // expectes to read 6 bytes
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
+// load the next tx byte then wait ...
+            SPI->DR = spi_tx_buf[1];
+            while (! (SPI->SR & SPI_SR_RXNE) ) ;
+            SPI_rxbuf[ SPI_rxcnt++ ] = SPI->DR;
 
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
+// load the next tx byte then wait ...
+            SPI->DR = spi_tx_buf[2];
+            while (! (SPI->SR & SPI_SR_RXNE) ) ;
+            SPI_rxbuf[ SPI_rxcnt++ ] = SPI->DR;
 
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
+// load the next tx byte then wait ...
+            SPI->DR = spi_tx_buf[3];
+            while (! (SPI->SR & SPI_SR_RXNE) ) ;
+            SPI_rxbuf[ SPI_rxcnt++ ] = SPI->DR;
 
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
-
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
-
-            while (! (SPI->SR & SPI_SR_TXE) ) ;
-            SPI_rxbuf[ ++SPI_rxcnt ] = 
-              spi_tx = SPI->DR;
-            SPI->DR = (spi_tx & 0x1F);
-        }
-        else
-        {
-            SPI->DR = spi_tx;
+// whatever is left in the data register is the next byte the master will receive
+//            SPI->DR = tx_cntr++;
         }
     }
+    SPI->SR = 0; // seems a reasonable thing to do
 }
 
 /**
