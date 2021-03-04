@@ -16,15 +16,11 @@
 #include "per_task.h"
 
 
-/* Private defines -----------------------------------------------------------*/
 
 
-/* Private functions ---------------------------------------------------------*/
-#define BFR_SZ 32
-uint8_t spi_rx_bfr[BFR_SZ] = { 0 } ;
-uint8_t buffer_idx;
 
-
+extern uint8_t  SPI_rxbuf[]; // tmp
+extern uint8_t  is_SPI_rx;  // tmp
 
 #ifdef _SDCC_
 // Interrupt vectors must be implemented in the same file that implements main()
@@ -36,13 +32,18 @@ If you have multiple source files in your project, interrupt service routines ca
 #endif
 
 
+/* Private defines -----------------------------------------------------------*/
+
+/* Chip select */
+#define CS_PIN      5
+
+
+/* Private functions ---------------------------------------------------------*/
+
 /*
  * example codes for SPI functions from
  * https://lujji.github.io/blog/bare-metal-programming-stm8/#SPI
  */
-
-/* Chip select */
-#define CS_PIN      5
 
 void chip_select(void) {
     GPIOE->ODR &= (uint8_t)~(1 << CS_PIN);
@@ -130,6 +131,8 @@ void main(int argc, char **argv)
 // approximately 2 Hz at which time the master attempts to read a few bytes from SPI
             if ( ! ((framecount++) % 0x20) )
             {
+                uint8_t spi_rx_bfr[8] = { 0 } ;
+
                 uint8_t data;
 
                 disableInterrupts();
@@ -139,20 +142,16 @@ void main(int argc, char **argv)
 
                 i = (i + 1) & ~0x80; // clear test  bit
                 spi_rx_bfr[1] = SPI_read_write(i);
-//                spi_rx_bfr[1] = SPI_readA(i);
 
                 i+= 1;// test data
                 spi_rx_bfr[2] = SPI_read_write(i);
-//                spi_rx_bfr[2] = SPI_readA(i);
 
                 i = (i + 1) | 0x80; // test data mask in a test bit so alignment errors
                 spi_rx_bfr[3] = SPI_read_write(i);
-//                spi_rx_bfr[3] = SPI_readA(i);
 
                 chip_deselect();
                 enableInterrupts();
 // tmp dump test SPI test data to UART
-//                buffer_idx = (buffer_idx + 1) % BFR_SZ;
                 sbuf[0] = '>';
                 sbuf[1] = spi_rx_bfr[0];
                 sbuf[2] = spi_rx_bfr[1];
