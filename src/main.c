@@ -78,7 +78,7 @@ uint8_t SPI_read_write(uint8_t data)
     return SPI->DR;
 }
 
-static void SPI_periph_rx(void)
+static void SPI_periphd(void)
 {
     static int i;
     char sbuf[16]; // am i big enuff?
@@ -98,6 +98,40 @@ static void SPI_periph_rx(void)
     is_SPI_rx = FALSE;
     enableInterrupts();
 
+    strcat(sbuf, "\r\n");
+    UARTputs(sbuf);
+}
+
+static void SPI_controld(void)
+{
+    static int i;
+
+    char sbuf[16]; // am i big enuff?
+    uint8_t spi_rx_bfr[8] = { 0 } ;
+
+    disableInterrupts();
+    chip_select();
+
+    spi_rx_bfr[0] = SPI_read_write(0xa5); // start of sequence
+
+    i = (i + 1) & ~0x80; // clear test  bit
+    spi_rx_bfr[1] = SPI_read_write(i);
+
+    i+= 1;// test data
+    spi_rx_bfr[2] = SPI_read_write(i);
+
+    i = (i + 1) | 0x80; // test data mask in a test bit so alignment errors
+    spi_rx_bfr[3] = SPI_read_write(i);
+
+    chip_deselect();
+    enableInterrupts();
+// tmp dump test SPI test data to UART
+    sbuf[0] = '>';
+    sbuf[1] = spi_rx_bfr[0];
+    sbuf[2] = spi_rx_bfr[1];
+    sbuf[3] = spi_rx_bfr[2];
+    sbuf[4] = spi_rx_bfr[3];
+    sbuf[5] = 0;
     strcat(sbuf, "\r\n");
     UARTputs(sbuf);
 }
@@ -153,7 +187,7 @@ void main(int argc, char **argv)
 #endif
         if ( 0 != is_SPI_rx )
         {
-            SPI_periph_rx();
+            SPI_periphd();
         }
 
         if ( TRUE == Task_Ready() )
@@ -163,35 +197,8 @@ void main(int argc, char **argv)
             if ( ! ((framecount++) % 0x20) )
             {
 #ifdef SPI_CONTROLLER
-                char sbuf[16]; // am i big enuff?
-                uint8_t spi_rx_bfr[8] = { 0 } ;
-
-                disableInterrupts();
-                chip_select();
-
-                spi_rx_bfr[0] = SPI_read_write(0xa5); // start of sequence
-
-                i = (i + 1) & ~0x80; // clear test  bit
-                spi_rx_bfr[1] = SPI_read_write(i);
-
-                i+= 1;// test data
-                spi_rx_bfr[2] = SPI_read_write(i);
-
-                i = (i + 1) | 0x80; // test data mask in a test bit so alignment errors
-                spi_rx_bfr[3] = SPI_read_write(i);
-
-                chip_deselect();
-                enableInterrupts();
-// tmp dump test SPI test data to UART
-                sbuf[0] = '>';
-                sbuf[1] = spi_rx_bfr[0];
-                sbuf[2] = spi_rx_bfr[1];
-                sbuf[3] = spi_rx_bfr[2];
-                sbuf[4] = spi_rx_bfr[3];
-                sbuf[5] = 0;
-                strcat(sbuf, "\r\n");
-                UARTputs(sbuf);
-#endif // SPI CTRLR
+                SPI_controld();
+#endif
             }
         }
     } // while 1
