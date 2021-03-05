@@ -24,10 +24,9 @@ CFLAGS       = -mstm8 --all-callee-saves --debug --verbose --stack-auto --fverbo
 LDFLAGS       = -mstm8 
 
 SOURCE       = main
-SOURCE_DIR   = .
-OUTPUT_DIR   = $(SOURCE_DIR)/build
-#OUTPUT_DIR   = .
-StdPeriph    = $(SOURCE_DIR)/STM8S_StdPeriph_Driver
+SOURCE_DIR   = ../
+OUTPUT_DIR   = ./build
+StdPeriph    = ./STM8S_StdPeriph_Driver
 
 # Add include paths here
 INCLUDEPATH  = -I$(SOURCE_DIR)/
@@ -40,17 +39,45 @@ def: compile flash
 all: clean compile_obj compile
 
 compile:
-	$(SDCC)    $(LDFLAGS) --out-fmt-ihx  -o $(OUTPUT_DIR)/ $(OUTPUT_DIR)/$(SOURCE).rel  $(OUTPUT_DIR)/stm8s_gpio.rel
-#	$(OUTPUT_DIR)/stm8s_clk.rel \
-#	$(OUTPUT_DIR)/stm8s_tim2.rel \
+	$(SDCC)    $(LDFLAGS) --out-fmt-ihx  -o $(OUTPUT_DIR)/ \
+	$(OUTPUT_DIR)/main.rel  \
+	$(OUTPUT_DIR)/BLDC_sm.rel  \
+	$(OUTPUT_DIR)/driver.rel  \
+	$(OUTPUT_DIR)/faultm.rel  \
+	$(OUTPUT_DIR)/mcu_stm8s.rel  \
+	$(OUTPUT_DIR)/mdata.rel  \
+	$(OUTPUT_DIR)/per_task.rel  \
+	$(OUTPUT_DIR)/pwm_stm8s.rel  \
+	$(OUTPUT_DIR)/sequence.rel  \
+	$(OUTPUT_DIR)/stm8s_adc1.rel  \
+	$(OUTPUT_DIR)/stm8s_clk.rel  \
+	$(OUTPUT_DIR)/stm8s_gpio.rel  \
+	$(OUTPUT_DIR)/stm8s_spi.rel  \
+	$(OUTPUT_DIR)/stm8s_tim1.rel  \
+	$(OUTPUT_DIR)/stm8s_tim2.rel  \
+	$(OUTPUT_DIR)/stm8s_uart2.rel
+
 #	--out-fmt-elf --all-callee-saves --debug --verbose --stack-auto --fverbose-asm  --float-reent --no-peep
 
 compile_obj:
 	mkdir -p $(OUTPUT_DIR)
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_adc1.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_clk.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_gpio.c
-	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/$(SOURCE).c	
-#	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_clk.c
-#	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_tim2.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_spi.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_tim1.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_tim2.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_uart2.c
+
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/main.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/BLDC_sm.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/driver.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/faultm.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/mcu_stm8s.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/mdata.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/per_task.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/pwm_stm8s.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/sequence.c
 
 clean:
 	rm -f $(OUTPUT_DIR)/*.rel  $(OUTPUT_DIR)/*.lst $(OUTPUT_DIR)/*.sym $(OUTPUT_DIR)/*.rst $(OUTPUT_DIR)/*.asm
