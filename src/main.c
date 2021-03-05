@@ -27,7 +27,7 @@ extern uint8_t  is_SPI_rx;  // tmp
 If you have multiple source files in your project, interrupt service routines can be present in any of them, but a prototype of the isr MUST be present or included in the file that contains the function main.
 */
 //  #include "stm8s_it.h" // not sure if this works ... enable stm8s_it.c to be built in the build config
-  #include "stm8s_it.c"
+#include "stm8s_it.c"
 #endif
 
 
@@ -44,25 +44,30 @@ If you have multiple source files in your project, interrupt service routines ca
  * https://lujji.github.io/blog/bare-metal-programming-stm8/#SPI
  */
 
-void chip_select(void) {
+void chip_select(void)
+{
     GPIOE->ODR &= (uint8_t)~(1 << CS_PIN);
 }
-void chip_deselect(void) {
+void chip_deselect(void)
+{
     GPIOE->ODR |= (1 << CS_PIN);
 }
 
-void SPI_write(uint8_t data) {
+void SPI_write(uint8_t data)
+{
     SPI->DR = data;
     while (! (SPI->SR & SPI_SR_TXE) );
 }
 
-uint8_t SPI_read( void ) {
+uint8_t SPI_read( void )
+{
     SPI_write( 0xA5 );
     while ( ! (SPI->SR & SPI_SR_RXNE) );
     return SPI->DR;
 }
 
-uint8_t SPI_read_write(uint8_t data) {
+uint8_t SPI_read_write(uint8_t data)
+{
 
     while (! (SPI->SR & SPI_SR_TXE) );
 
@@ -71,6 +76,30 @@ uint8_t SPI_read_write(uint8_t data) {
     while ( ! (SPI->SR & SPI_SR_RXNE) );
 
     return SPI->DR;
+}
+
+static void SPI_periph_rx(void)
+{
+    static int i;
+    char sbuf[16]; // am i big enuff?
+
+    i = (i >= 0x30 && i < 126) ? i+1 : 0x30;
+// tmp dump test SPI test data to UART
+    disableInterrupts();
+    sbuf[0] = '>';
+    sbuf[1] = i;
+    sbuf[2] = isprint( (int)SPI_rxbuf[0] ) ? SPI_rxbuf[0] : '.' ;
+    sbuf[3] = isprint( (int)SPI_rxbuf[1] ) ? SPI_rxbuf[1] : '.' ;
+    sbuf[4] = isprint( (int)SPI_rxbuf[2] ) ? SPI_rxbuf[2] : '.' ;
+    sbuf[5] = isprint( (int)SPI_rxbuf[3] ) ? SPI_rxbuf[3] : '.' ;
+    sbuf[6] = isprint( (int)SPI_rxbuf[4] ) ? SPI_rxbuf[4] : '.' ;
+    sbuf[7] = '$';
+    sbuf[8] = 0;
+    is_SPI_rx = FALSE;
+    enableInterrupts();
+
+    strcat(sbuf, "\r\n");
+    UARTputs(sbuf);
 }
 
 /**
@@ -80,6 +109,8 @@ void main(int argc, char **argv)
 {
     uint8_t framecount = 0;
     uint8_t i = 0;
+    (void) argc;
+    (void) argv;
 
     MCU_Init();
 
@@ -120,18 +151,20 @@ void main(int argc, char **argv)
             enableInterrupts();
         }
 #endif
+        if ( 0 != is_SPI_rx )
+        {
+            SPI_periph_rx();
+        }
 
         if ( TRUE == Task_Ready() )
         {
-                char sbuf[16]; // am i big enuff?
-#ifdef SPI_CONTROLLER
 // periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
 // approximately 2 Hz at which time the master attempts to read a few bytes from SPI
             if ( ! ((framecount++) % 0x20) )
             {
+#ifdef SPI_CONTROLLER
+                char sbuf[16]; // am i big enuff?
                 uint8_t spi_rx_bfr[8] = { 0 } ;
-
-                uint8_t data;
 
                 disableInterrupts();
                 chip_select();
@@ -158,29 +191,8 @@ void main(int argc, char **argv)
                 sbuf[5] = 0;
                 strcat(sbuf, "\r\n");
                 UARTputs(sbuf);
-// test uart
+#endif // SPI CTRLR
             }
-#else
-            if ( 0 != is_SPI_rx )
-            {
-                i = (i >= 0x30 && i < 126) ? i+1 : 0x30;
-// tmp dump test SPI test data to UART
-                disableInterrupts();
-                sbuf[0] = '>';
-                sbuf[1] = i;
-                sbuf[2] = isprint( (int)SPI_rxbuf[0] ) ? SPI_rxbuf[0] : '.' ;
-                sbuf[3] = isprint( (int)SPI_rxbuf[1] ) ? SPI_rxbuf[1] : '.' ;
-                sbuf[4] = isprint( (int)SPI_rxbuf[2] ) ? SPI_rxbuf[2] : '.' ;
-                sbuf[5] = isprint( (int)SPI_rxbuf[3] ) ? SPI_rxbuf[3] : '.' ;
-                sbuf[6] = isprint( (int)SPI_rxbuf[4] ) ? SPI_rxbuf[4] : '.' ;
-                sbuf[7] = '$';
-                sbuf[8] = 0;
-                is_SPI_rx = FALSE;
-                enableInterrupts();
-                strcat(sbuf, "\r\n");
-                UARTputs(sbuf);
-            }
-#endif // MASTER
         }
     } // while 1
 }
