@@ -25,6 +25,7 @@
 #include "driver.h"
 
 uint8_t	SPI_rxbuf[ SPI_RX_BUF_SZ ];
+const uint8_t	SPI_txbuf[ SPI_RX_BUF_SZ ] = "0123456789ABCDEF";
 
 uint8_t  is_SPI_rx;
 uint8_t SPI_rxcnt;
@@ -208,30 +209,42 @@ INTERRUPT_HANDLER(EXTI_PORTE_IRQHandler, 7)
   */
 INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 {
-    static uint8_t tx_cntr;
-    char spi_tx_buf[] = "ABCD5555";
+    static uint8_t tx_cntr = 0;
     uint8_t spi_rx;
+    uint8_t spi_tx;
+
 
     if (SPI->SR & SPI_SR_RXNE)
     {
         // Clearing the RXNE bit is performed by reading the SPI_DR register
         spi_rx = SPI->DR;
+#if 0
+        if (spi_rx < SPI_RX_BUF_SZ) // idfk
+        {
+// address = spi_rx;
+            spi_tx = SPI_txbuf[spi_rx];// this is an address
+            SPI_rxbuf[ address ] = spi_rx;
+        }
+#endif
+//        if (tx_cntr < 4)
+        {
+            spi_tx = SPI_txbuf[ tx_cntr++ ];
+        }
+
 
         while (! (SPI->SR & SPI_SR_TXE) );
 
-        SPI->DR = spi_tx_buf[ ( tx_cntr++ ) % 4  ];
+        SPI->DR = spi_tx;
 
-        if (0xF2 == spi_rx)
+
+        if (spi_rx > 0x80)
         {
-            SPI_rxcnt = 0;
             is_SPI_rx = TRUE; // this is start of new message so this flag is triggering task to go look at data of previous message
             spi_rx = 'X';
+            tx_cntr = 0;
         }
-        else
-        {
-            SPI_rxcnt =  (SPI_rxcnt + 1) % SPI_RX_BUF_SZ;
-        }
-        SPI_rxbuf[ SPI_rxcnt ] = spi_rx;
+
+        SPI_rxbuf[ tx_cntr ] = spi_rx;
     }
 }
 
