@@ -209,6 +209,7 @@ INTERRUPT_HANDLER(EXTI_PORTE_IRQHandler, 7)
   */
 INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 {
+#if 0 // #ifdef SPI_PERPIPH_INT
     static uint8_t tx_cntr = 0;
     uint8_t spi_rx;
     uint8_t spi_tx;
@@ -246,6 +247,7 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
 
         SPI_rxbuf[ tx_cntr ] = spi_rx;
     }
+#endif // SPI_PERPIPH_INT
 }
 
 /**

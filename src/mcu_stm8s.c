@@ -512,7 +512,9 @@ void SPI_setup(void)
       SPI_CLOCKPOLARITY_LOW, SPI_CLOCKPHASE_1EDGE,
       SPI_DATADIRECTION_2LINES_FULLDUPLEX, SPI_NSS_HARD, (uint8_t)0x07);
 
+  #if 0 //  #ifdef SPI_PERPIPH_INT
     SPI_ITConfig(SPI_IT_RXNE, ENABLE); // Interrupt when the Rx buffer is not empty.
+  #endif
 #endif
 
     //Enable SPI.
