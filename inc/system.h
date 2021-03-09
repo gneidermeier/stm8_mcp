@@ -23,7 +23,7 @@
 
 
 
-//#define SPI_CONTROLLER
+#define SPI_CONTROLLER
 
 
 #define SPI_RX_BUF_SZ  16 // 256 // tmp

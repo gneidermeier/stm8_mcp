@@ -235,14 +235,6 @@ uint16_t BLDC_PWMDC_Get(void)
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
-void BL_set_ctlm(void)
-{
-    int16_t timing_error = Seq_get_timing_error();
-
-//    BLDC_OL_comm_tm += timing_error ;
-    Control_mode = TRUE;
-}
-
 void BLDC_Spd_dec()
 {
     Control_mode = TRUE; //tbd

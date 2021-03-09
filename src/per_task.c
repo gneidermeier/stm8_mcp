@@ -23,6 +23,7 @@
 #include "bldc_sm.h"
 #include "faultm.h"
 #include "driver.h"
+#include "spi_stm8s.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -57,7 +58,6 @@ typedef void (*ui_handlrp_t)( void );
 // local enum only for setting enumerated order to UI event dispatcher
 enum
 {
-    SET_CTLM   = 'z',
     COMM_PLUS  = ']',
     COMM_MINUS = '[',
     SPD_PLUS   = '.', //'>',
@@ -98,7 +98,6 @@ static  uint16_t Vsystem; // persistent for averaging
 
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
-    {SET_CTLM,   set_ctlm},
     {COMM_PLUS,  comm_plus},
     {COMM_MINUS, comm_minus},
     {SPD_PLUS,   spd_plus},
@@ -351,9 +350,8 @@ static void spd_plus(void)
     {
         Digital_trim_switch += 1;
     }
-//    UARTputs("+++\r\n");               // no not inside CS
-//            Log_Level = 255; // ahow some more info
 }
+
 static void spd_minus(void)
 {
     // if fault/throttle-high ... diag msg?
@@ -362,18 +360,7 @@ static void spd_minus(void)
         Digital_trim_switch -= 1;
         Log_Level = 1;
     }
-//    UARTputs("---\r\n");                // no not inside CS
 }
-
-/** @cond */ // hide some developer/debug code
-void BL_set_ctlm(void); // tmp
-
-static void set_ctlm(void)
-{
-// toggle or rest the ftl state??
-    BL_set_ctlm();
-}
-/** @endcond */
 
 
 static ui_handlrp_t handle_term_inp(void)
@@ -468,10 +455,23 @@ static void Periodic_task(void)
  */
 uint8_t Task_Ready(void)
 {
+    static uint8_t framecount = 0;
+
     if (0 != TaskRdy)
     {
         TaskRdy = FALSE;
         Periodic_task();
+
+// periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
+// approximately 2 Hz at which time the master attempts to read a few bytes from SPI
+
+        if ( ! ((framecount++) % 0x20) )
+        {
+#ifdef SPI_CONTROLLER
+            SPI_controld();
+#endif
+        }
+
         return TRUE;
     }
     return FALSE;

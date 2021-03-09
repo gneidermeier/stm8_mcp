@@ -16,7 +16,10 @@
 #include "mcu_stm8s.h"
 #include "bldc_sm.h"
 #include "per_task.h"
-#include "spi_stm8s.h"
+
+#ifndef SPI_CONTROLLER
+  #include "spi_stm8s.h"
+#endif
 
 
 #ifdef _SDCC_
@@ -40,7 +43,9 @@ If you have multiple source files in your project, interrupt service routines ca
  */
 void main(int argc, char **argv)
 {
+#ifndef SPI_CONTROLLER
     static const uint8_t tx_buf[RX_BUF_SZ] = "0123456789ABCDEF";
+#endif
     uint8_t linec = 0;
     uint8_t framecount = 0;
     uint8_t i = 0;
@@ -89,13 +94,9 @@ void main(int argc, char **argv)
 
         if ( TRUE == Task_Ready() )
         {
-// periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
-// approximately 2 Hz at which time the master attempts to read a few bytes from SPI
+// this modulus provides a time reference of approximately 2 Hz (debug/test/dev/usage)
             if ( ! ((framecount++) % 0x20) )
             {
-#ifdef SPI_CONTROLLER
-                SPI_controld();
-#endif
             }
         }
 
