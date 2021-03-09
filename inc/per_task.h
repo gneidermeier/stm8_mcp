@@ -11,7 +11,6 @@
 #define PER_TASK_H
 
 /* Includes ------------------------------------------------------------------*/
-#include <string.h>
 
 // app headers
 #include "system.h" // platform specific delarations

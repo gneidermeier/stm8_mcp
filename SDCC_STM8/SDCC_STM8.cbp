@@ -87,6 +87,10 @@
 			<Option target="Debug" />
 			<Option target="Release" />
 		</Unit>
+		<Unit filename="../inc/spi_stm8s.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
 		<Unit filename="../inc/stm8s_conf.h">
 			<Option target="Debug" />
 			<Option target="Release" />
@@ -140,6 +144,11 @@
 			<Option target="Release" />
 		</Unit>
 		<Unit filename="../src/sequence.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="../src/spi_stm8s.c">
 			<Option compilerVar="CC" />
 			<Option target="Debug" />
 			<Option target="Release" />

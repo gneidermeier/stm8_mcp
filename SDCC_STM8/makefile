@@ -41,6 +41,7 @@ all: clean compile_obj compile
 compile:
 	$(SDCC)    $(LDFLAGS) --out-fmt-ihx  -o $(OUTPUT_DIR)/ \
 	$(OUTPUT_DIR)/main.rel  \
+	$(OUTPUT_DIR)/spi_stm8s.rel  \
 	$(OUTPUT_DIR)/BLDC_sm.rel  \
 	$(OUTPUT_DIR)/driver.rel  \
 	$(OUTPUT_DIR)/faultm.rel  \
@@ -70,6 +71,7 @@ compile_obj:
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(StdPeriph)/src/stm8s_uart2.c
 
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/main.c
+	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/spi_stm8s.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/BLDC_sm.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/driver.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/faultm.c

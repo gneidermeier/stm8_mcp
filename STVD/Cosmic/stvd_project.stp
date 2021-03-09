@@ -579,6 +579,11 @@ Next=Root.Source Files...\..\src\sequence.c
 [Root.Source Files...\..\src\sequence.c]
 ElemType=File
 PathName=..\..\src\sequence.c
+Next=Root.Source Files...\..\src\spi_stm8s.c
+
+[Root.Source Files...\..\src\spi_stm8s.c]
+ElemType=File
+PathName=..\..\src\spi_stm8s.c
 Next=Root.Source Files...\..\src\stm8_interrupt_vector.c
 
 [Root.Source Files...\..\src\stm8_interrupt_vector.c]
@@ -706,6 +711,11 @@ Next=Root.Include Files...\..\inc\sequence.h
 [Root.Include Files...\..\inc\sequence.h]
 ElemType=File
 PathName=..\..\inc\sequence.h
+Next=Root.Include Files...\..\inc\spi_stm8s.h
+
+[Root.Include Files...\..\inc\spi_stm8s.h]
+ElemType=File
+PathName=..\..\inc\spi_stm8s.h
 Next=Root.Include Files...\..\inc\stm8s_it.h
 
 [Root.Include Files...\..\inc\stm8s_it.h]

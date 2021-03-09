@@ -24,11 +24,10 @@
 #include "system.h"
 #include "driver.h"
 
-uint8_t	SPI_rxbuf[ SPI_RX_BUF_SZ ];
-const uint8_t	SPI_txbuf[ SPI_RX_BUF_SZ ] = "0123456789ABCDEF";
-
-uint8_t  is_SPI_rx;
-uint8_t SPI_rxcnt;
+//uint8_t	SPI_rxbuf[ SPI_RX_BUF_SZ ];
+//const uint8_t	SPI_txbuf[ SPI_RX_BUF_SZ ] = "0123456789ABCDEF";
+//uint8_t  is_SPI_rx;
+//uint8_t SPI_rxcnt;
 
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
