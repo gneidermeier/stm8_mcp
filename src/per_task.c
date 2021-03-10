@@ -206,12 +206,11 @@ static void dbg_println(int zrof)
     strcat(sbuf, " TTE=");
     itoa( timing_error, cbuf, 16);
     strcat(sbuf, cbuf);
-
 #if 0
     strcat(sbuf, " CM=");
     itoa( Control_mode, cbuf, 16);
     strcat(sbuf, cbuf);
-
+#endif
     strcat(sbuf, " bRi=");
     itoa( Back_EMF_Riseing_PhX, cbuf, 16);
     strcat(sbuf, cbuf);
@@ -219,7 +218,7 @@ static void dbg_println(int zrof)
     strcat(sbuf, " bFi=");
     itoa( Back_EMF_Falling_PhX, cbuf, 16);
     strcat(sbuf, cbuf);
-#endif
+
     strcat(sbuf, " UI=");
     itoa(UI_Speed, cbuf, 16);
     strcat(sbuf, cbuf);
@@ -263,8 +262,11 @@ static void set_ui_speed(void)
     uint16_t tmp_u16;
     int16_t tmp_sint16;
     uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
+#ifdef ANLG_SLIDER
     Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
-
+#else
+    Analog_slider = 0;
+#endif
 
     UI_pulse_perd = Driver_get_pulse_perd();
 
