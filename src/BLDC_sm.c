@@ -35,6 +35,9 @@
 
 #define PWM_DC_SHUTOFF   PWM_X_PCNT( 8.0 )   // stalls below 18 counts (7.4 %)
 
+#define PWM_DC_CTRL_MODE  PWM_DC_RAMPUP
+
+
 /*
  * These constants are the number of timer counts (TIM3) to achieve a given
  *  commutation step period.
@@ -193,7 +196,7 @@ void BLDC_PWMDC_Set(uint8_t dc)
     if (dc > PWM_DC_SHUTOFF)
     {
         // Update the dc if speed input greater than ramp start, OR if system already running
-        if ( dc > PWM_DC_RAMPUP  ||  0 != UI_speed )
+        if ( dc > PWM_DC_CTRL_MODE  ||  0 != UI_speed )
         {
             UI_speed = dc;
 
@@ -202,7 +205,9 @@ void BLDC_PWMDC_Set(uint8_t dc)
             {
                 if ( 0 == Seq_get_timing_error_p( ( int16_t * ) (0) )  /* --cl_timer == 0 */ )
                 {
+#ifdef CLMODE_ENABLED
                     Control_mode = TRUE;
+#endif
                 }
             }
             // else
