@@ -145,7 +145,10 @@ void SPI_controld(void)
 
     n = (uint8_t)((n >= 0x30 && n < 126) ? n + 1 : 0x30);
 
-    disableInterrupts();
+// pretty sure it shouldnot be necessary to DI/EI ... all byte read/writes and
+// SPI is not being run in interrupt mode. Not shared variables. EI/DI
+// will tick the motor if the SPI rate is real low!
+//     disableInterrupts();
     chip_select();
 
     rxbuf[0] = SPI_read_write(0xa5); // start of sequence
@@ -160,7 +163,7 @@ void SPI_controld(void)
     rxbuf[3] = SPI_read_write(i);
 
     chip_deselect();
-    enableInterrupts();
+//    enableInterrupts();
 // tmp dump test SPI test data to UART
     sbuf[0] = '>';
     sbuf[1] = n;
