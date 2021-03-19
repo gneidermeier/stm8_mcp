@@ -139,12 +139,11 @@ uint8_t SPI_read_write(uint8_t data)
 void SPI_controld(void)
 {
     static uint8_t n;
-    uint8_t i = 0;
     char sbuf[16]; // am i big enuff?
     uint8_t rxbuf[8] = { 0, 0, 0, 0 } ;
 
     n = (uint8_t)((n >= 0x30 && n < 126) ? n + 1 : 0x30);
-
+    
 // pretty sure it shouldnot be necessary to DI/EI ... all byte read/writes and
 // SPI is not being run in interrupt mode. Not shared variables. EI/DI
 // will tick the motor if the SPI rate is real low!
@@ -152,15 +151,9 @@ void SPI_controld(void)
     chip_select();
 
     rxbuf[0] = SPI_read_write(0xa5); // start of sequence
-
-    i = (uint8_t)((i + 1) & ~0x80); // clear test  bit
-    rxbuf[1] = SPI_read_write(i);
-
-    i+= 1; // test data
-    rxbuf[2] = SPI_read_write(i);
-
-    i = (uint8_t)((i + 1) | 0x80); // test, mask in a test bit
-    rxbuf[3] = SPI_read_write(i);
+    rxbuf[1] = SPI_read_write( n );
+    rxbuf[2] = SPI_read_write('1');
+    rxbuf[3] = SPI_read_write('2');
 
     chip_deselect();
 //    enableInterrupts();
