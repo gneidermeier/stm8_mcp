@@ -45,10 +45,25 @@
 #define PUTCHAR_PROTOTYPE int putchar (int c)
 #define GETCHAR_PROTOTYPE int getchar (void)
 #endif /* _RAISONANCE_ */
+
 /* Private macro -------------------------------------------------------------*/
+// STM8S003 dev board LED
+#define LED_GPIO_PORT  (GPIOD)
+#define LED_GPIO_PINS  (GPIO_PIN_0)
+
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
+
 /* Private functions ---------------------------------------------------------*/
+
+void Delay(uint16_t nCount)
+{
+  /* Decrement nCount value */
+  while (nCount != 0)
+  {
+    nCount--;
+  }
+}
 /**
   * @brief  Main program.
   * @param  None
@@ -57,9 +72,25 @@
 void main(void)
 {
   char ans;
+  uint8_t i_var =  1;
+  uint8_t io = 255;
+  io++;
+
+#if 0
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+  while (1)
+  {
+    /* Toggles LEDs */
+    i_var++;
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
+    Delay(0xFFFF);
+  }
+#else
   /*High speed internal clock prescaler: 1*/
   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
-    
+
   UART1_DeInit();
   /* UART1 configuration ------------------------------------------------------*/
   /* UART1 configured as follow:
@@ -80,8 +111,12 @@ void main(void)
   while (1)
   {
     ans = getchar();
-    printf("%c", ans);  
+    printf("%c", ans);
+
+    /* Toggles LED */
+//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
   }
+#endif
 }
 
 /**
