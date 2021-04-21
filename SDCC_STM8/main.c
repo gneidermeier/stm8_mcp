@@ -48,8 +48,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 // STM8S003 dev board LED
-#define LED_GPIO_PORT  (GPIOD)
-#define LED_GPIO_PINS  (GPIO_PIN_0)
+#define LED_GPIO_PORT  (GPIOB)
+#define LED_GPIO_PINS  (GPIO_PIN_5)
 
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
@@ -88,6 +88,9 @@ void main(void)
     Delay(0xFFFF);
   }
 #else
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
   /*High speed internal clock prescaler: 1*/
   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
 
@@ -114,7 +117,7 @@ void main(void)
     printf("%c", ans);
 
     /* Toggles LED */
-//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
   }
 #endif
 }
