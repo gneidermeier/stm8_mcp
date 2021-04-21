@@ -1,48 +1,117 @@
+/**
+  ******************************************************************************
+  * @file UART1_Printf\main.c
+  * @brief This file contains the main function for: retarget the C library printf
+  *        /scanf functions to the UART1 example.
+  * @author  MCD Application Team
+  * @version V2.0.4
+  * @date     26-April-2018
+  ******************************************************************************
+  * @attention
+  *
+  * <h2><center>&copy; COPYRIGHT 2014 STMicroelectronics</center></h2>
+  *
+  * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
+  * You may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at:
+  *
+  *        http://www.st.com/software_license_agreement_liberty_v2
+  *
+  * Unless required by applicable law or agreed to in writing, software 
+  * distributed under the License is distributed on an "AS IS" BASIS, 
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  *
+  ******************************************************************************
+  */ 
+
+/* Includes ------------------------------------------------------------------*/
 #include "stm8s.h"
 #include "stdio.h"
-
-//int putchar(int c);
-//int getchar(void);
-
+/**
+  * @addtogroup UART1_Printf
+  * @{
+  */
+/* Private typedef -----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
+#ifdef _RAISONANCE_
+#define PUTCHAR_PROTOTYPE int putchar (char c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#elif defined (_COSMIC_)
+#define PUTCHAR_PROTOTYPE char putchar (char c)
+#define GETCHAR_PROTOTYPE char getchar (void)
+#else /* _IAR_ */
+#define PUTCHAR_PROTOTYPE int putchar (int c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#endif /* _RAISONANCE_ */
+/* Private macro -------------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
+/* Private function prototypes -----------------------------------------------*/
+/* Private functions ---------------------------------------------------------*/
+/**
+  * @brief  Main program.
+  * @param  None
+  * @retval None
+  */
 void main(void)
 {
-
-  char receivedByte;
+  char ans;
+  /*High speed internal clock prescaler: 1*/
+  CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
     
   UART1_DeInit();
-
-  /* UART1 needs some settings:
-  115200 as BAUD, 8 bit wordlength, 1 stopbit and no parity.
-  Syncmode clock disabled, and let's enable both RX and TX so printf and getchar works
+  /* UART1 configuration ------------------------------------------------------*/
+  /* UART1 configured as follow:
+        - BaudRate = 115200 baud  
+        - Word Length = 8 Bits
+        - One Stop Bit
+        - No parity
+        - Receive and transmit enabled
+        - UART1 Clock disabled
   */
   UART1_Init((uint32_t)115200, UART1_WORDLENGTH_8D, UART1_STOPBITS_1, UART1_PARITY_NO,
               UART1_SYNCMODE_CLOCK_DISABLE, UART1_MODE_TXRX_ENABLE);
 
-  printf("Printf with an STM8S is remarably easy :D\n");
-  printf("Now with the added bonus of GDB debugging :D\n");
-  printf("Enter text now and it will be echoed with a newline added\n");
+  /* Output a message on Hyperterminal using printf function */
+  printf("\n\rUART1 Example :retarget the C library printf()/getchar() functions to the UART\n\r");
+  printf("\n\rEnter Text\n\r");
 
   while (1)
   {
-    receivedByte = getchar();
-    printf("%c\n", receivedByte);
+    ans = getchar();
+    printf("%c", ans);  
   }
-
 }
 
-int _putchar(int c) 
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
 {
-  //Write a character and wait till it's done
+  /* Write a character to the UART1 */
   UART1_SendData8(c);
+  /* Loop until the end of transmission */
   while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
-  return 0;
+
+  return (c);
 }
 
-int _getchar(void)
+/**
+  * @brief Retargets the C library scanf function to the USART.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
 {
-
+#ifdef _COSMIC_
+  char c = 0;
+#else
   int c = 0;
-  //Loop until a character can be read
+#endif
+  /* Loop until the Read data register flag is SET */
   while (UART1_GetFlagStatus(UART1_FLAG_RXNE) == RESET);
     c = UART1_ReceiveData8();
   return (c);
@@ -68,3 +137,10 @@ void assert_failed(uint8_t* file, uint32_t line)
   }
 }
 #endif
+
+/**
+  * @}
+  */
+
+
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
