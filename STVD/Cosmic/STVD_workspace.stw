@@ -6,7 +6,11 @@ Keyword=ST7Workspace-V0.7
 [Project0]
 Filename=stvd_project.stp
 Dependencies=
+
+[Project1]
+Filename=stm8s003.stp
+Dependencies=
 [Options]
-ActiveProject=stvd_project
+ActiveProject=stm8s003
 ActiveConfig=Debug
 AddSortedElements=1
