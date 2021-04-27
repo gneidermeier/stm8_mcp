@@ -383,21 +383,18 @@ static void TIM2_setup(void)
  *
  *   https://lujji.github.io/blog/bare-metal-programming-stm8/
  *
- * Setting periodic task for fast-ish rate of A/D acquisition.
- * ISR must set 'TaskRdy' flag and not block on the task since A/D does a blocking wait.
  */
 static void TIM4_setup(void)
 {
-// 32 means nothing other than startingrelative to prevous timer setting of 64
-    const uint8_t T4_Period = (16 * SYS_RATE_MULT); // 32*4 Period = 0.000512 sec  (512 us)
+    const uint8_t Period = (16 * SYS_RATE_MULT);
 
 #ifdef CLOCK_16
-    TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
+    TIM4->PSCR = 0x07; // 1/16M *128 * Period
 #else
-    TIM4->PSCR = 0x06; // PS =  64  -> 0.000000125  *  64 * p
+    TIM4->PSCR = 0x06; // 1/8M * 64 * Period = 512us
 #endif
 
-    TIM4->ARR = T4_Period;
+    TIM4->ARR = Period;
 
     TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
     TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4

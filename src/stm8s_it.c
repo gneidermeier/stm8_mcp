@@ -24,10 +24,7 @@
 #include "system.h"
 #include "driver.h"
 
-//uint8_t	SPI_rxbuf[ SPI_RX_BUF_SZ ];
-//const uint8_t	SPI_txbuf[ SPI_RX_BUF_SZ ] = "0123456789ABCDEF";
-//uint8_t  is_SPI_rx;
-//uint8_t SPI_rxcnt;
+//#define PERIOD_IN_TIM2
 
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
@@ -265,11 +262,11 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 #if 1
     if ( toggle )
     {
-        GPIOD->ODR &=  ~(1<<LED); // clear test pin
+        GPIOD->ODR &=  ~(1 << LED); // clear test pin
     }
     else
     {
-        GPIOD->ODR |=  (1<<LED); // set test pin
+        GPIOD->ODR |=  (1 << LED); // set test pin
     }
 #endif
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
@@ -341,23 +338,18 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
-    /* In order to detect unexpected events during development,
-       it is recommended to set a breakpoint on the following instruction.
-    */
-#if 0 // tmp test
+    static uint8_t frame_counter = 0;
     static uint8_t toggle;
-    if (toggle ^= 1){
-        GPIOD->ODR |= (1 << LED);
-    } else {
-        GPIOD->ODR &= ~(1 << LED);
-    }
-#endif
 
-//GPIOD->ODR |= (1 << LED);
+    if ( ++frame_counter > 3 )
+    {
+        frame_counter  = 0;
+#ifdef PERIOD_IN_TIM2
+        Driver_Update();
+#endif
+    }
 
     Driver_on_PWM_edge();
-
-//GPIOD->ODR &= ~(1 << LED);
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
@@ -580,7 +572,9 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
 
 //   GPIOD->ODR |=  (1<<LED); // set test pin
 
+#ifndef PERIOD_IN_TIM2
     Driver_Update();
+#endif
 
 //   GPIOD->ODR &=  ~(1<<LED); // clear test pin
 
