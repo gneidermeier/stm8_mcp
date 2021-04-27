@@ -246,18 +246,19 @@ void Driver_Update(void)
     // update controller every other (odd) ISR ... theory being to distribute the 
     // load to update the controller and the UI on alternate frames (doubled the 
 		// timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
-    if ( trate & 0x01)
+    if ( 0 != (trate & 0x01) )
     {
         BLDC_Update();
     }
-
-    if ( 0 == (trate % UI_UPDATEM))
+    else if ( 0 == (trate % UI_UPDATEM))
     {
         Periodic_Task_Wake();
     }
 
     //  update the timer for the OL commutation switch time
-    TIM3_setup( p16 );
+//    TIM3_setup( p16 );
+
+    TIM1_setup(p16);
 }
 
 

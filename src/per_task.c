@@ -30,7 +30,7 @@
 
 #define TRIM_DEFAULT  0 //
 
-#define V_SHUTDOWN_THR      0x0340 // experimentally determined!
+#define V_SHUTDOWN_THR      0x0320 // experimentally determined!
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 

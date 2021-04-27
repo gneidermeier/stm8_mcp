@@ -20,6 +20,7 @@
 
 
 /* Private defines -----------------------------------------------------------*/
+#define CT_IN_TIM4 // see PERIOD_IN_TIM2 in stm8s_it.c
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -81,15 +82,15 @@ static void GPIO_Config(void)
     GPIOA->CR1 |= (1 << 5);  // push pull output
 
 ////////////
+#ifdef STM8S105 // GN: STM8s-105 Discovery lets this pin
 // use PG0 (CN2-11) as test pins
     GPIOG->ODR &= ~(1<<0);
     GPIOG->DDR |=  (1<<0);
     GPIOG->CR1 |=  (1<<0);
-
+#endif
 
 // INPUTS
 // C4 set as input (used with TIM1 CC4 to measure servo pulse)
-// PA4 as button input (Stop)
     GPIOC->DDR &= ~(1 << 4); // PC.4 as input
     GPIOC->CR1 |= (1 << 4);  // pull up w/o interrupts
 
@@ -260,7 +261,7 @@ static void ADC1_setup(void)
     ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
-
+#if 0
 // copied from STM8 peripheral library (it is static in there)
 static void _TI3_Config(uint8_t TIM1_ICPolarity,
                         uint8_t TIM1_ICSelection,
@@ -336,6 +337,35 @@ static void TIM1_setup(void)
 
     TIM1_Cmd(ENABLE);
 }
+#else
+
+/**
+ * @brief Sets TIM1 period.
+ * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
+ * @param  period  Value written to auto-reload register
+ */
+#ifdef CLOCK_16
+#define TIM1_PSCR  0x02
+#else
+#define TIM1_PSCR  0x01
+#endif
+
+void TIM1_setup(uint16_t period)
+{
+    const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
+
+    /* Set the Prescaler value */
+    TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
+    TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
+
+    TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+    TIM1->ARRL = (uint8_t)(period & 0xff);
+
+    TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
+    TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
+    TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
+}
+#endif
 
 /*
  * Setup TIM2 PWM
@@ -409,6 +439,7 @@ static void TIM4_setup(void)
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
 
+#ifdef STM8S105 // 003 doesn't have this peripheral instance
 // the timer prescalar is to show that fixed timing data must somehow factor in
 // the timer rate - halving the prescalar to make timer 2x faster means timing
 // periods are 2x duration relative to the previous scalar of 1
@@ -435,6 +466,7 @@ void TIM3_setup(uint16_t period)
     TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
     TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
+#endif // 105
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
@@ -529,7 +561,7 @@ void MCU_Init(void)
     GPIO_Config();
     UART_setup();
     ADC1_setup();
-    TIM1_setup();
+//    TIM1_setup(); // needs to do commutation timing, as there is on TIM3 on 003 and TIM4 only 8-bit
     TIM2_setup();
     TIM4_setup();
     SPI_setup();

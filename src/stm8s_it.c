@@ -24,7 +24,7 @@
 #include "system.h"
 #include "driver.h"
 
-//#define PERIOD_IN_TIM2
+#define PERIOD_IN_TIM2
 
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
@@ -253,10 +253,6 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
-
     static int toggle;
     toggle ^= 1;
 #if 1
@@ -269,6 +265,11 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
         GPIOD->ODR |=  (1 << LED); // set test pin
     }
 #endif
+
+#ifdef PERIOD_IN_TIM2
+    Driver_Step();
+#endif
+
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
     TIM1_ClearFlag(TIM1_FLAG_UPDATE);
 }
@@ -280,9 +281,7 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
   */
 INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+#if 0 // this to be done with input edge transitions interrupt
 
     if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
     {
@@ -304,6 +303,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
         TIM1_ClearITPendingBit(TIM1_IT_CC4);
         TIM1_ClearFlag(TIM1_FLAG_CC4);
     }
+#endif
 }
 
 #ifdef STM8S903
@@ -384,12 +384,9 @@ INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
         GPIOG->ODR &=  ~(1<<0); // clear test pin
     }
 #endif
-//    GPIOG->ODR |=  (1<<0); // set test pin
-
+#ifndef PERIOD_IN_TIM2
     Driver_Step();
-
-//    GPIOG->ODR &=  ~(1<<0); // clear test pin
-
+#endif
     // must reset the tmer interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 }
