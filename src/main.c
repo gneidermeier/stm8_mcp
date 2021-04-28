@@ -1,45 +1,129 @@
 /**
   ******************************************************************************
-  * @file    Project/main.c 
-  * @author  MCD Application Team
-  * @version V2.3.0
-  * @date    16-June-2017
-  * @brief   Main program body
-   ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT 2014 STMicroelectronics</center></h2>
-  *
-  * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
-  * You may not use this file except in compliance with the License.
-  * You may obtain a copy of the License at:
-  *
-  *        http://www.st.com/software_license_agreement_liberty_v2
-  *
-  * Unless required by applicable law or agreed to in writing, software 
-  * distributed under the License is distributed on an "AS IS" BASIS, 
-  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  * See the License for the specific language governing permissions and
-  * limitations under the License.
-  *
+  * @file    main.c
+  * @brief   Application entry point
+  * @author  Neidermeier
+  * @version V2.0.4
+  * @date     26-April-2021
   ******************************************************************************
-  */ 
-
+  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm8s.h"
+//#include "stm8s.h"
+#include "stdio.h"
 
-/* Private defines -----------------------------------------------------------*/
+#include <ctype.h> // isprint
+#include <string.h> // strcat
+
+// app headers
+#include "mcu_stm8s.h"
+#include "bldc_sm.h"
+#include "per_task.h"
+
+#ifndef SPI_CONTROLLER
+#include "spi_stm8s.h"
+#endif
+
+
+#ifdef _SDCC_
+// Interrupt vectors must be implemented in the same file that implements main()
+/*
+If you have multiple source files in your project, interrupt service routines can be present in any of them, but a prototype of the isr MUST be present or included in the file that contains the function main.
+*/
+//  #include "stm8s_it.h" // not sure if this works ... enable stm8s_it.c to be built in the build config
+#include "stm8s_it.c"
+#endif
+
+/**
+  * @addtogroup UART1_Printf
+  * @{
+  */
+/* Private typedef -----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
+#ifdef _RAISONANCE_
+#define PUTCHAR_PROTOTYPE int putchar (char c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#elif defined (_COSMIC_)
+#define PUTCHAR_PROTOTYPE char putchar (char c)
+#define GETCHAR_PROTOTYPE char getchar (void)
+#else /* _IAR_ */
+#define PUTCHAR_PROTOTYPE int putchar (int c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#endif /* _RAISONANCE_ */
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
-void main(void)
+void Delay(uint16_t nCount)
 {
-  /* Infinite loop */
+  /* Decrement nCount value */
+  while (nCount != 0)
+  {
+    nCount--;
+  }
+}
+/**
+  * @brief  Mainly looping.
+  * @param  None
+  * @retval None
+  */
+void main(int argc, char **argv)
+{
+  char ans;
+  uint8_t i_var =  1;
+  uint8_t io = 255;
+  io++;
+
+  MCU_Init();
+
+  /* Output a message on Hyperterminal using printf function */
+  printf("\n\rUART1 Example :retarget the C library printf()/getchar() functions to the UART\n\r");
+  printf("\n\rEnter Text\n\r");
+
   while (1)
   {
+    ans = getchar();
+    printf("%c", ans);
+
+    /* Toggles LED */
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
   }
-  
+}
+
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Write a character to the UART1 */
+  UART1_SendData8(c);
+  /* Loop until the end of transmission */
+  while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+
+  return (c);
+}
+
+/**
+  * @brief Retargets the C library scanf function to the USART.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
+{
+#ifdef _COSMIC_
+  char c = 0;
+#else
+  int c = 0;
+#endif
+  /* Loop until the Read data register flag is SET */
+  while (UART1_GetFlagStatus(UART1_FLAG_RXNE) == RESET);
+  c = UART1_ReceiveData8();
+  return (c);
 }
 
 #ifdef USE_FULL_ASSERT
@@ -49,10 +133,10 @@ void main(void)
   *   where the assert_param error has occurred.
   * @param file: pointer to the source file name
   * @param line: assert_param error line source number
-  * @retval : None
+  * @retval None
   */
-void assert_failed(u8* file, u32 line)
-{ 
+void assert_failed(uint8_t* file, uint32_t line)
+{
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
@@ -63,5 +147,6 @@ void assert_failed(u8* file, u32 line)
 }
 #endif
 
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+/**
+  * @}
+  */

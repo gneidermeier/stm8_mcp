@@ -54,6 +54,13 @@
 */
 static void GPIO_Config(void)
 {
+#ifndef DISCOVERY
+
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+#else
+
 // OUTPUTS
 // built-in LED
   GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
@@ -156,6 +163,7 @@ static void GPIO_Config(void)
   GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
   GPIOB->CR1 &= ~(1 << 0);  // floating input
   GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
+#endif
 }
 
 /**
@@ -331,18 +339,18 @@ static void TIM1_setup(void)
 
 void TIM1_setup(uint16_t period)
 {
-    const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
+  const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
 
-    /* Set the Prescaler value */
-    TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
-    TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
+  /* Set the Prescaler value */
+  TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
+  TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
 
-    TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
-    TIM1->ARRL = (uint8_t)(period & 0xff);
+  TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+  TIM1->ARRL = (uint8_t)(period & 0xff);
 
-    TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
-    TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
-    TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
+  TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
+  TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
+  TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
 }
 #endif
 
@@ -398,7 +406,7 @@ static void TIM2_setup(void)
  */
 static void TIM4_setup(void)
 {
-    const uint8_t Period = (16 * SYS_RATE_MULT);
+  const uint8_t Period = (16 * SYS_RATE_MULT);
 
 #ifdef CLOCK_16
   TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
@@ -406,7 +414,7 @@ static void TIM4_setup(void)
   TIM4->PSCR = 0x06; // PS =  64  -> 0.000000125  *  64 * p
 #endif
 
-    TIM4->ARR = Period;
+  TIM4->ARR = Period;
 
   TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
   TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
@@ -455,7 +463,12 @@ void TIM3_setup(uint16_t period)
 static void Clock_setup(void)
 {
   CLK_DeInit();
-#ifdef INTCLOCK
+
+#if !defined(DISCOVERY) // && defined(INTCLOCK)
+
+  /*High speed internal clock prescaler: 1*/
+  CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
+
 #else
   // Configure Quartz Clock
   CLK_DeInit();
@@ -539,11 +552,11 @@ void MCU_Init(void)
   Clock_setup();
   GPIO_Config();
   UART_setup();
+#ifdef DISCOVERY
   ADC1_setup();
 //  TIM1_setup(); // commutation timing setup is adjusted continuously by CL controller
   TIM2_setup();
   TIM4_setup();
-#if 0  // TODO
   SPI_setup();
 #endif
 }

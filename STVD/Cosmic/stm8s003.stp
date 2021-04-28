@@ -75,7 +75,7 @@ String.6.0=2011,11,16,18,37,0
 String.100.0=$(TargetFName)
 String.101.0=
 String.102.0=
-String.103.0=.\;..\..\..\..\libraries\stm8s_stdperiph_driver\src;..\..;..\..\sdcc_stm8;..\..\src;
+String.103.0=.\;..\..\..\..\libraries\stm8s_stdperiph_driver\src;..\..;..\..\src;
 
 [Root.Config.0.Settings.2]
 String.2.0=
@@ -158,7 +158,7 @@ Int.108=0
 String.6.0=2011,11,16,18,37,0
 String.100.0=$(TargetFName)
 String.101.0=
-String.103.0=.\;..\..\..\..\libraries\stm8s_stdperiph_driver\src;..\..;..\..\sdcc_stm8;..\..\src;
+String.103.0=.\;..\..\..\..\libraries\stm8s_stdperiph_driver\src;..\..;..\..\src;
 
 [Root.Config.1.Settings.2]
 String.2.0=
@@ -220,7 +220,7 @@ String.6.0=2011,11,16,18,37,0
 [Root.Source Files]
 ElemType=Folder
 PathName=Source Files
-Child=Root.Source Files...\..\sdcc_stm8\main.c
+Child=Root.Source Files...\..\src\faultm.c
 Next=Root.StdPeriph_Drivers
 Config.0=Root.Source Files.Config.0
 Config.1=Root.Source Files.Config.1
@@ -291,14 +291,24 @@ String.4.0=
 String.5.0=
 String.6.0=2011,11,16,18,37,0
 
-[Root.Source Files...\..\sdcc_stm8\main.c]
+[Root.Source Files...\..\src\faultm.c]
 ElemType=File
-PathName=..\..\sdcc_stm8\main.c
+PathName=..\..\src\faultm.c
+Next=Root.Source Files...\..\src\main.c
+
+[Root.Source Files...\..\src\main.c]
+ElemType=File
+PathName=..\..\src\main.c
 Next=Root.Source Files...\..\src\mcu_stm8s.c
 
 [Root.Source Files...\..\src\mcu_stm8s.c]
 ElemType=File
 PathName=..\..\src\mcu_stm8s.c
+Next=Root.Source Files...\..\src\pwm_stm8s.c
+
+[Root.Source Files...\..\src\pwm_stm8s.c]
+ElemType=File
+PathName=..\..\src\pwm_stm8s.c
 Next=Root.Source Files...\..\src\stm8s_it.c
 
 [Root.Source Files...\..\src\stm8s_it.c]

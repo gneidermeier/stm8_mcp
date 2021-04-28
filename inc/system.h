@@ -85,8 +85,14 @@
 #define PWM_100PCNT  TIM2_PWM_PD
 
 
-
-#define LED  0  // STM8-Discovery board built-in LED on PIN D0
-
+// on-board LED
+#ifdef DISCOVERY
+  #define LED_GPIO_PORT  (GPIOD)
+  #define LED_GPIO_PINS  (GPIO_PIN_0)
+#else
+// STM8S003 dev board LED
+  #define LED_GPIO_PORT  (GPIOB)
+  #define LED_GPIO_PINS  (GPIO_PIN_5)
+#endif // DISCOVER
 
 #endif // SYSTEM_H
