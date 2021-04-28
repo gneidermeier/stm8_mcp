@@ -8,27 +8,12 @@
   *          This file provides template for all peripherals interrupt service 
   *          routine.
    ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT 2014 STMicroelectronics</center></h2>
-  *
-  * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
-  * You may not use this file except in compliance with the License.
-  * You may obtain a copy of the License at:
-  *
-  *        http://www.st.com/software_license_agreement_liberty_v2
-  *
-  * Unless required by applicable law or agreed to in writing, software 
-  * distributed under the License is distributed on an "AS IS" BASIS, 
-  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  * See the License for the specific language governing permissions and
-  * limitations under the License.
-  *
-  ******************************************************************************
   */ 
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
+#include "system.h"
+#include "driver.h"
 
 /** @addtogroup Template_Project
   * @{
@@ -226,9 +211,10 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+    Driver_Step();
+
+    TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
+    TIM1_ClearFlag(TIM1_FLAG_UPDATE);
 }
 
 /**
@@ -275,11 +261,20 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   * @retval None
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
- {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
- }
+{
+    static uint8_t frame_counter = 0;
+
+    if ( ++frame_counter > 3 )
+    {
+        frame_counter = 0;
+        Driver_Update();
+    }
+
+    Driver_on_PWM_edge(); // starts ADC conversion
+
+    // must reset the tmer interrupt flag
+    TIM2->SR1 &= ~TIM2_SR1_UIF;
+}
 
 /**
   * @brief Timer2 Capture/Compare Interrupt routine.
@@ -460,9 +455,11 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   */
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
  {
-    /* In order to detect unexpected events during development,
-       it is recommended to set a breakpoint on the following instruction.
-    */
+    Driver_on_ADC_conv();
+#if 0
+    GPIOC->ODR &= ~(1 << 4); // what was this for? wiggling a test pin? was supposed to be TIM1 CH4 input capture but we don't have the timer available for that anyway so .. dead code
+#endif
+    ADC1_ClearFlag(ADC1_FLAG_EOC);
  }
 #endif /* (STM8S208) || (STM8S207) || (STM8AF52Ax) || (STM8AF62Ax) */
 
@@ -486,9 +483,8 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
  {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+// must reset the tmer interrupt flag
+    TIM4->SR1 &= ~TIM4_SR1_UIF;
  }
 #endif /* (STM8S903) || (STM8AF622x)*/
 
@@ -507,6 +503,3 @@ INTERRUPT_HANDLER(EEPROM_EEC_IRQHandler, 24)
 /**
   * @}
   */
-
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

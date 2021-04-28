@@ -417,26 +417,34 @@ void MCU_comm_time_cfg(uint16_t period)
 
 static void TIM2_setup(void)
 {
-  /* TIM2 Peripheral Configuration */
+  const uint16_t CCR1_init = 125; // tmp .. 0
+  const uint16_t CCR1_Val = CCR1_init;
+  const uint16_t CCR2_Val = CCR1_init;
+  const uint16_t CCR3_Val = CCR1_init;
+  const uint16_t period = TIM2_PWM_PD;
+  const uint16_t prescaler = TIM2_PRESCALER;
+  const TIM2_OCMode_TypeDef mode = TIM2_OCMODE_PWM2;
+  const TIM2_OCPolarity_TypeDef polarity= TIM2_OCPOLARITY_LOW;
+
+/* TIM2 Peripheral Configuration */
   TIM2_DeInit();
 
   /* Set TIM2 Frequency to 2Mhz */
-  TIM2_TimeBaseInit(TIM2_PRESCALER, TIM2_PWM_PD);
+  TIM2_TimeBaseInit(prescaler, period);
   /* Channel 1 PWM configuration */
-  TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
+  TIM2_OC1Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR1_Val, polarity );
   TIM2_OC1PreloadConfig(ENABLE);
 
   /* Channel 2 PWM configuration */
-  TIM2_OC2Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
+  TIM2_OC2Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR2_Val, polarity );
   TIM2_OC2PreloadConfig(ENABLE);
 
   /* Channel 3 PWM configuration */
-  TIM2_OC3Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
+  TIM2_OC3Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR3_Val, polarity );
   TIM2_OC3PreloadConfig(ENABLE);
 
   /* Enables TIM2 peripheral Preload register on ARR */
   TIM2_ARRPreloadConfig(ENABLE);
-
 
   TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
 
@@ -602,11 +610,11 @@ void MCU_Init(void)
   Clock_setup();
   GPIO_Config();
   UART_setup();
-#ifdef DISCOVERY
-  ADC1_setup();
 //  TIM1_setup(); // commutation timing setup is adjusted continuously by CL controller
   TIM2_setup();
   TIM4_setup();
+#ifdef DISCOVERY
+  ADC1_setup();
   SPI_setup();
 #endif
 }

@@ -32,7 +32,7 @@
 /*
  * (un)comment macro to set stm8 clock from 8Mhz or 16Mhz
  */
-//#define CLOCK_16
+#define CLOCK_16
 
 /*
  * The base system rate multiplier

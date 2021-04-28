@@ -65,6 +65,7 @@ void Delay(uint16_t nCount)
     nCount--;
   }
 }
+
 /**
   * @brief  Mainly looping.
   * @param  None
@@ -73,23 +74,25 @@ void Delay(uint16_t nCount)
 void main(int argc, char **argv)
 {
   char ans;
-  uint8_t i_var =  1;
-  uint8_t io = 255;
-  io++;
 
   MCU_Init();
 
-  /* Output a message on Hyperterminal using printf function */
-  printf("\n\rUART1 Example :retarget the C library printf()/getchar() functions to the UART\n\r");
-  printf("\n\rEnter Text\n\r");
+  printf("\n\rProgram Startup.......\n\r");
+
+  enableInterrupts(); // interrupts are globally disabled by default
 
   while (1)
   {
+#if 0
     ans = getchar();
     printf("%c", ans);
-
-    /* Toggles LED */
-    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
+#else
+    if ( TRUE == Task_Ready() )
+    {
+        GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);			
+    }
+//    Delay(0xFFFF);
+#endif
   }
 }
 
