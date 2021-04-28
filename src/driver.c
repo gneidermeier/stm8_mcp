@@ -27,8 +27,11 @@
 
 #define PH0_ADC_TBUF_SZ  8
 
+/*
+ TODO: resistor divider values must be updated for 3.3v operation
+*/
 
-// half of 10-bit ADC which is also assumed to be exactly half DC thanks to perfectly sized resistor divider, unflinching supply voltage set exactly to 13.8v 
+// half of 10-bit ADC which is also assumed to be exactly half DC thanks to perfectly sized resistor divider, unflinching supply voltage set exactly to 13.8v
 #define MID_ADC 0x0200  // tbd ... DC HALF
 
 // divider: 33k/18k
@@ -75,7 +78,7 @@
 
 static uint16_t ADC_Global;
 
-// Accummulates a string of 10-bit ADC samples for averaging - could reduce 
+// Accummulates a string of 10-bit ADC samples for averaging - could reduce
 // to 8 bits as possibly the 2 lsb's are not that significant anyway.
 static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
 
@@ -99,18 +102,18 @@ static uint16_t Pulse_dur;
  */
 static void udpate_phase_average(void)
 {
-    int n;
+  int n;
 // use midpoint  as initial condition which yields neutral control action
-    phase_average = MID_ADC;
+  phase_average = MID_ADC;
 
-    for(n  = 0 ; n < PH0_ADC_TBUF_SZ; n++)
-    {
-        phase_average = (phase_average  + ph0_adc_fbuf[n]) >> 1;
+  for(n  = 0 ; n < PH0_ADC_TBUF_SZ; n++)
+  {
+    phase_average = (phase_average  + ph0_adc_fbuf[n]) >> 1;
 
-        ph0_adc_fbuf[n] = MID_ADC; // initialize each element to midpoint
-    }
+    ph0_adc_fbuf[n] = MID_ADC; // initialize each element to midpoint
+  }
 
-    ph0_adc_tbct = 0; // reset the sample index
+  ph0_adc_tbct = 0; // reset the sample index
 
 }
 
@@ -118,20 +121,20 @@ static void udpate_phase_average(void)
 
 /**
  * @brief Call from ISR on capture of pulse rise.
- * 
+ *
  * Range of 1ms pulse:
  *         $0768 - $044A  = $031E
  * Pulse period Tx on (rougly 20ms):
- *         $55C4 
+ *         $55C4
  * Pulse period Tx off (pulse rate doubles - radio signal lost!):
  *         $2BAE
 */
 void Driver_on_capture_rise(void)
 {
 // 16-bit counter setup to wrap at 0xffff so no concern for sign of result
-    prev_pulse_start_tm = curr_pulse_start_tm;
-    curr_pulse_start_tm = TIM1_GetCapture4();
-    Pulse_perd = curr_pulse_start_tm  - prev_pulse_start_tm;
+  prev_pulse_start_tm = curr_pulse_start_tm;
+  curr_pulse_start_tm = TIM1_GetCapture4();
+  Pulse_perd = curr_pulse_start_tm  - prev_pulse_start_tm;
 }
 
 /**
@@ -142,7 +145,7 @@ void Driver_on_capture_fall(void)
 // noise on this signal when motor running
 //    uint16_t t16 =  TIM1_GetCapture3() - TIM1_GetCapture4();
 //    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
-    Pulse_dur = TIM1_GetCapture3() - TIM1_GetCapture4();
+  Pulse_dur = TIM1_GetCapture3() - TIM1_GetCapture4();
 }
 
 /**
@@ -150,7 +153,7 @@ void Driver_on_capture_fall(void)
  */
 uint16_t Driver_get_pulse_perd(void)
 {
-    return Pulse_perd;
+  return Pulse_perd;
 }
 
 /**
@@ -158,7 +161,7 @@ uint16_t Driver_get_pulse_perd(void)
  */
 uint16_t Driver_get_pulse_dur(void)
 {
-    return Pulse_dur;
+  return Pulse_dur;
 }
 
 
@@ -170,21 +173,21 @@ uint16_t Driver_get_pulse_dur(void)
  * Called from TIM2 UPD+OVF+BRK IRQ Handler.
  * Initiates ADC sample sequence on start of PWM pulse.
  * ADC may be configured for several (3 phases + throttle input) channels.
- * This may be a limitation as the throttle input may be needed although the 
+ * This may be a limitation as the throttle input may be needed although the
  * TIM2/PWM is disabled.
- * On ADC ISR, call ADCx_GetBufferValue(n) to retrieve ADC Channel n. 
+ * On ADC ISR, call ADCx_GetBufferValue(n) to retrieve ADC Channel n.
  * The ADC is configured to trigger IRQ on converion complete.
  * See ADC setup in MCU init for ADC clock setup.
  */
 void Driver_on_PWM_edge(void)
 {
-    ph0_adc_tbct += 1 ; // advance the buffer index
+  ph0_adc_tbct += 1 ; // advance the buffer index
 
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
-    ADC1_Cmd(ENABLE);
+  ADC1_Cmd(ENABLE);
 
 // ADON = 1 for the 2nd time => starts the ADC conversion
-    ADC1_StartConversion();
+  ADC1_StartConversion();
 }
 
 /**
@@ -196,13 +199,13 @@ void Driver_on_PWM_edge(void)
  */
 void Driver_on_ADC_conv(void)
 {
-    ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
+  ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
 
 // assert (buffer should be sized big enough for slowest speed)
-    if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
-    {
-        ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
-    }
+  if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
+  {
+    ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
+  }
 }
 
 /**
@@ -214,7 +217,7 @@ void Driver_on_ADC_conv(void)
  */
 uint16_t Driver_Get_Back_EMF_Avg(void)
 {
-    return phase_average;
+  return phase_average;
 }
 
 /**
@@ -225,7 +228,7 @@ uint16_t Driver_Get_Back_EMF_Avg(void)
  */
 uint16_t Driver_Get_ADC(void)
 {
-    return ADC_Global;
+  return ADC_Global;
 }
 
 /**
@@ -237,27 +240,26 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
-    static const uint8_t UI_UPDATEM  = 16; // mod 16 so @ ~16mS i.e. UI @ 60fps
-    static uint8_t trate = 0;
+  static const uint8_t UI_UPDATEM  = 16; // mod 16 so @ ~16mS i.e. UI @ 60fps
+  static uint8_t trate = 0;
 
-    uint16_t p16 =  get_commutation_period();
-    trate += 1;
+  uint16_t p16 =  get_commutation_period();
+  trate += 1;
 
-    // update controller every other (odd) ISR ... theory being to distribute the 
-    // load to update the controller and the UI on alternate frames (doubled the 
-		// timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
-    if ( trate & 0x01)
-    {
-        BLDC_Update();
-    }
+  // update controller every other (odd) ISR ... theory being to distribute the
+  // load to update the controller and the UI on alternate frames (doubled the
+  // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
+  if ( 0 != (trate & 0x01) )
+  {
+    BLDC_Update();
+  }
+  else if ( 0 == (trate % UI_UPDATEM))
+  {
+    Periodic_Task_Wake();
+  }
 
-    if ( 0 == (trate % UI_UPDATEM))
-    {
-        Periodic_Task_Wake();
-    }
-
-    //  update the timer for the OL commutation switch time
-    TIM3_setup( p16 );
+  //  update the timer for the OL commutation switch time
+  MCU_comm_time_cfg( p16 );
 }
 
 
@@ -276,29 +278,29 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
-    static int index = 0;
+  static int index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used
 // instead of a MOD (%) to save a few instructions, which is actually significant
 // as this is a very high frequency ISR!
 //    index = (index + 1) % TIM3_RATE_MODULUS;
-    index = (index + 1) & (TIM3_RATE_MODULUS - 1) /* 0x03 */;
+  index = (index + 1) & (TIM3_RATE_MODULUS - 1) /* 0x03 */;
 
 // Distribute the work done in the ISR by partitioning
 //  sequence_step, memcpy,  get_ADC into  separate sub-steps
 // Logically the call to Sequence_Step() occurs following the memcpy()
 
-    switch(index)
-    {
-    case 0:
-        udpate_phase_average(); // average 8 samples from frame buffer
-        Sequence_Step();
-        break;
+  switch(index)
+  {
+  case 0:
+    udpate_phase_average(); // average 8 samples from frame buffer
+    Sequence_Step();
+    break;
 
-    case 1:
-    case 2:
-    case 3:
-        break;
-    }
+  case 1:
+  case 2:
+  case 3:
+    break;
+  }
 }
 /**@}*/ // defgroup

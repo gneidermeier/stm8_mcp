@@ -39,7 +39,7 @@ void UARTputs(char *message);
 
 void MCU_Init(void);
 
-void TIM3_setup(uint16_t u16period);
+void MCU_comm_time_cfg(uint16_t);
 
 
 #endif // MCU_STM8S

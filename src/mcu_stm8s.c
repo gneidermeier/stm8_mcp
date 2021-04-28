@@ -206,6 +206,54 @@ static void UART_setup(void)
 #endif
 }
 
+// TODO: deprecated
+
+#ifdef DISCOVERY
+
+#else
+/**
+ *  @brief Send a message to the debug port (UART2).
+ *  @details
+ *  Sends a variable length, null-terminated string to the UART.
+ *    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
+ *  @param message Pointer to char array, i.e. a null-terminated ASCII string.
+ */
+void UARTputs(char *message)
+{
+  char *ch = message;
+  while (*ch)
+  {
+    UART1->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
+    while ( 0 == (UART1->SR & UART1_SR_TXE) ); //  Wait for transmission to complete.
+    ch++;                                      //  Grab the next character.
+  }
+}
+
+/**
+* @brief  Test to see if a key has been pressed on the terminal.
+*
+* @details Allows reading a character but non-blocking.
+* @param [out]  key  Pointer to byte for receiving character code.
+* @retval  1  a character has been read
+* @retval  0  no character has been read
+*/
+uint8_t SerialKeyPressed(char *key)
+{
+  FlagStatus flag  ;
+  /* First clear Rx buffer */
+  flag = UART1_GetFlagStatus(UART1_FLAG_RXNE);
+  if ( flag == SET)
+  {
+    *key = (char)UART1->DR;
+    return 1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+#endif
+
 /*
  * set ADC clock to 4Mhz  - sample time from the data sheet @ 4Mhz
  * min sample time .75 useconds @ fADC = 4Mhz
@@ -327,9 +375,11 @@ static void TIM1_setup(void)
 #else
 
 /**
- * @brief Sets TIM1 period.
+ * @brief Configure brushless motor commutation timing
+ * @details
+ * Sets period of commutation timer peripheral assigned to commutation timing.
  * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
- * @param  period  Value written to auto-reload register
+ * @param  period  Value written to the timer peripheral auto-reload register
  */
 #ifdef CLOCK_16
 #define TIM1_PSCR  0x02
@@ -337,7 +387,7 @@ static void TIM1_setup(void)
 #define TIM1_PSCR  0x01
 #endif
 
-void TIM1_setup(uint16_t period)
+void MCU_comm_time_cfg(uint16_t period)
 {
   const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
 
