@@ -16,81 +16,80 @@
 #include <stm8s.h>
 
 /* Public defines -----------------------------------------------------------*/
-
 /*
  * re-purpose the TIM2 channel enumeration but disguise it
  */
-#define  BL_PHASE_A  TIM2_CHANNEL_1
-#define  BL_PHASE_B  TIM2_CHANNEL_2
-#define  BL_PHASE_C  TIM2_CHANNEL_3
+//#define  BL_PHASE_A  TIM2_CHANNEL_1
+//#define  BL_PHASE_B  TIM2_CHANNEL_2
+//#define  BL_PHASE_C  TIM2_CHANNEL_3
 
 
-/*
- * bleh yuk erg
- */
+#ifdef STM8S105 // DISCOVERY
+  #define SDa_GPIO_PIN  GPIO_PIN_2 // D2
+  #define SDb_GPIO_PIN  GPIO_PIN_0 // E0
+  #define SDc_GPIO_PIN  GPIO_PIN_5 // A5
+
+  #define SDa_GPIO_PORT  GPIOD
+  #define SDb_GPIO_PORT  GPIOE
+  #define SDc_GPIO_PORT  GPIOA
+
+#else // stm8s003
+  #define SDa_GPIO_PIN  GPIO_PIN_1 // A1
+  #define SDb_GPIO_PIN  GPIO_PIN_2 // A2
+  #define SDc_GPIO_PIN  GPIO_PIN_3 // C3
+
+  #define SDa_GPIO_PORT  GPIOA
+  #define SDb_GPIO_PORT  GPIOA
+  #define SDc_GPIO_PORT  GPIOC
+#endif
+
 // PD4 set LO
 #define PWM_PhA_OUTP_LO( )                   \
-    GPIOD->ODR &= (uint8_t) ( ~(1<<4) );     \
+    GPIOD->ODR &= (uint8_t) ( ~GPIO_PIN_4 );     \
     GPIOD->DDR |=  (1<<4);                   \
     GPIOD->CR1 |=  (1<<4);
 
 // PD3 set LO
 #define PWM_PhB_OUTP_LO( ) \
-    GPIOD->ODR &= (uint8_t) ( ~(1<<3) );     \
+    GPIOD->ODR &= (uint8_t) ( ~GPIO_PIN_3 );     \
     GPIOD->DDR |=  (1<<3);                   \
     GPIOD->CR1 |=  (1<<3);
 
 // PA3 set LO
 #define PWM_PhC_OUTP_LO( )                   \
-    GPIOA->ODR &= (uint8_t) ( ~(1<<3) );     \
+    GPIOA->ODR &= (uint8_t) ( ~GPIO_PIN_3 );     \
     GPIOA->DDR |=  (1<<3);                   \
     GPIOA->CR1 |=  (1<<3);
-
-/*
- * Half-bridge enables ... specific to certain pin
- * as the device specific ... IR2104 is the /SD pin
- *
- * Combine enable/disable using _ARG_ ?
- */
-// D2 D1 A5
-
+// Phase enable (/SD input pin on IR2104)
 #define PWM_PhA_HB_ENABLE( ) \
-    GPIOD->ODR |=   (1<<2);   // set /SD A
+    SDa_GPIO_PORT->ODR |=   SDa_GPIO_PIN;
 
 #define PWM_PhB_HB_ENABLE( ) \
-    GPIOE->ODR |=   (1<<0);   // set  /SD B        E0
+    SDb_GPIO_PORT->ODR |=   SDb_GPIO_PIN;
 
 #define PWM_PhC_HB_ENABLE( ) \
-    GPIOA->ODR |=   (1<<5);   // set  /SD C
+    SDc_GPIO_PORT->ODR |=   SDc_GPIO_PIN;
 
-/*
- * Half-bridge dis-ables ... specific to certain pin
- * as the device specific ... IR2104 is the /SD pin.
- * uint8 casts quash compiler value out of range warning presumably bitwise
- * inverse expression sign extends but the register type is 8 bits
- */
+// Phase disable (/SD input pin on IR2104)
+// casts applied in order to quash warnings (bit inversion causes sign extension to to 16-bit)
 #define PWM_PhA_HB_DISABLE( ) \
-    GPIOD->ODR &=  (uint8_t) ( ~(1<<2) ); // clr  /SD A
+    SDa_GPIO_PORT->ODR &=  (uint8_t) ( ~SDa_GPIO_PIN );
 
 #define PWM_PhB_HB_DISABLE( ) \
-    GPIOE->ODR &=  (uint8_t) ( ~(1<<0) ); // clr  /SD B    E0
+    SDb_GPIO_PORT->ODR &=  (uint8_t) ( ~SDb_GPIO_PIN );
 
 #define PWM_PhC_HB_DISABLE( ) \
-    GPIOA->ODR &=  (uint8_t) ( ~(1<<5) ); // clr  /SD C
+    SDc_GPIO_PORT->ODR &=  (uint8_t) ( ~SDc_GPIO_PIN );
 
 
-
-/* Public types -----------------------------------------------------------*/
-
-
+/* Public types -------------------------------------------------------------*/
 /**
  * @brief  Generic PWM channel type.
  */
 typedef  TIM2_Channel_TypeDef PWM_Channel_Typedef ;
 
 
-/* Public variables  ---------------------------------------------------------*/
-
+/* Public variables ---------------------------------------------------------*/
 
 /* Public function prototypes -----------------------------------------------*/
 
