@@ -32,7 +32,7 @@
 /*
  * (un)comment macro to set stm8 clock from 8Mhz or 16Mhz
  */
-//#define CLOCK_16
+#define CLOCK_16
 
 /*
  * The base system rate multiplier
@@ -85,8 +85,16 @@
 #define PWM_100PCNT  TIM2_PWM_PD
 
 
-
-#define LED  0  // STM8-Discovery board built-in LED on PIN D0
-
+/**
+ * Pin/port for on-board LED
+ */
+#ifdef STM8S105 // DISCOVERY
+  #define LED_GPIO_PORT  (GPIOD)
+  #define LED_GPIO_PINS  (GPIO_PIN_0)
+#else
+// STM8S003 dev board LED
+  #define LED_GPIO_PORT  (GPIOB)
+  #define LED_GPIO_PINS  (GPIO_PIN_5)
+#endif
 
 #endif // SYSTEM_H
