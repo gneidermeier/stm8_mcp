@@ -12,30 +12,22 @@
  * @brief STM8S platform and peripheral configuration.
  * @{
  */
-
 /* Includes ------------------------------------------------------------------*/
-
 // app headers
 #include "system.h" // platform specific delarations
 
-
 /* Private defines -----------------------------------------------------------*/
-
 
 /* Public variables  ---------------------------------------------------------*/
 
-
 /* Private variables ---------------------------------------------------------*/
-
 
 /* Private function prototypes -----------------------------------------------*/
 
-
 /* Private functions ---------------------------------------------------------*/
 
-
 /*
- * @brief Configures a few pins needed as GPIO.
+ * @brief Configure GPIO.
  *
  * Specific peripheral module initialization (e.g. A/D, TIMx) will handle
  * setting up suitable IO pin behavior.
@@ -54,115 +46,96 @@
 */
 static void GPIO_Config(void)
 {
-#ifndef STM8S105 // DISCOVERY
-
-  /* Initialize I/Os in Output Mode */
-  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
-
-#else
-// this is the "legacy" '105 code and it is rather verbose
+#ifdef STM8S105 // DISCOVERY
+// this is the "legacy" '105 code and tended to avoid SPL
 // OUTPUTS
 // built-in LED
   GPIOD->ODR |= LED_GPIO_PINS; // (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
   GPIOD->DDR |= LED_GPIO_PINS; // (1 << LED); //PD.n as output
   GPIOD->CR1 |= LED_GPIO_PINS; // (1 << LED); //push pull output
 
-// D1 is reserved for SWIM
-//    GPIOD->ODR &=  ~(1<<1);
-//    GPIOD->DDR |=  (1<<1);
-//    GPIOD->CR1 |=  (1<<1);
+// PD2 -> SD/A
+  GPIOD->ODR &=  ~GPIO_PIN_2;
+  GPIOD->DDR |=  GPIO_PIN_2;
+  GPIOD->CR1 |=  GPIO_PIN_2;
 
-// SD/A=PD2
-  GPIOD->ODR &=  ~(1<<2);
-  GPIOD->DDR |=  (1<<2);
-  GPIOD->CR1 |=  (1<<2);
+// PE0 -> SD/B
+  GPIOE->ODR &=  ~GPIO_PIN_0;
+  GPIOE->DDR |=  GPIO_PIN_0;
+  GPIOE->CR1 |=  GPIO_PIN_0;
 
-// SD/B=PE0
-  GPIOE->ODR &=  ~(1<<0); //E0 data
-  GPIOE->DDR |=  (1<<0); //E0 dir
-  GPIOE->CR1 |=  (1<<0); //E0	cfg
-
-// SD/C=PA5
-  GPIOA->ODR &= ~(1 << 5); // set pin off
-  GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
-  GPIOA->CR1 |= (1 << 5);  // push pull output
-
-// GN: STM8s-105 Discovery lets this pin
-// use PG0 (CN2-11) as test pins
-  GPIOG->ODR &= ~(1<<0);
-  GPIOG->DDR |=  (1<<0);
-  GPIOG->CR1 |=  (1<<0);
+// PA5 -> SD/C
+  GPIOA->ODR &= ~GPIO_PIN_5; // set pin off
+  GPIOA->DDR |= GPIO_PIN_5;  // OUTPUT
+  GPIOA->CR1 |= GPIO_PIN_5;  // push pull output
 
 // INPUTS
+#if 0
 // C4 set as input (used with TIM1 CC4 to measure servo pulse)
-  GPIOC->DDR &= ~(1 << 4); // PC.4 as input
-  GPIOC->CR1 |= (1 << 4);  // pull up w/o interrupts
+  GPIOC->DDR &= ~GPIO_PIN_4;
+  GPIOC->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
 
 // PA4 as button input (Stop)
-  GPIOA->DDR &= ~(1 << 4); // PA.4 as input
-  GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
-// uses CN2.7 as GND
-
-// PA6 as button input (B+)
-  GPIOA->DDR &= ~(1 << 6); // PA.6 as input
-  GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-
-#if 0
-// PE5 as button input (B-) ^H^H^H^H^H^H^H    SPI CSS  (Input)
-  GPIOE->DDR &= ~(1 << 5); // PE.5 as input
-  GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
+  GPIOA->DDR &= ~GPIO_PIN_4;
+  GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
 #endif
-
-// PE.6 AIN9
-  GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
+#if 0
+// AIN9
+  GPIOE->DDR &= ~(1 << 6);
   GPIOE->CR1 &= ~(1 << 6);  // floating input
   GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
 
-// PE.7 AIN8
-  GPIOE->DDR &= ~(1 << 7);  // PE.7 as input
+// AIN8
+  GPIOE->DDR &= ~(1 << 7);
   GPIOE->CR1 &= ~(1 << 7);  // floating input
   GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
 // AIN7
-  GPIOB->DDR &= ~(1 << 7);  // PB.7 as input
+  GPIOB->DDR &= ~(1 << 7);
   GPIOB->CR1 &= ~(1 << 7);  // floating input
   GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
 
 // AIN6
-  GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
+  GPIOB->DDR &= ~(1 << 6);
   GPIOB->CR1 &= ~(1 << 6);  // floating input
   GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
 
 // AIN5
-  GPIOB->DDR &= ~(1 << 5);  // PB.5 as input
+  GPIOB->DDR &= ~(1 << 5);
   GPIOB->CR1 &= ~(1 << 5);  // floating input
   GPIOB->CR2 &= ~(1 << 5);  // 0: External interrupt disabled   ???
 
 // AIN4
-  GPIOB->DDR &= ~(1 << 4);  // PB.4 as input
+  GPIOB->DDR &= ~(1 << 4);
   GPIOB->CR1 &= ~(1 << 4);  // floating input
   GPIOB->CR2 &= ~(1 << 4);  // 0: External interrupt disabled   ???
 
 // AIN3
-  GPIOB->DDR &= ~(1 << 3);  // PB.3 as input
+  GPIOB->DDR &= ~(1 << 3);
   GPIOB->CR1 &= ~(1 << 3);  // floating input
   GPIOB->CR2 &= ~(1 << 3);  // 0: External interrupt disabled   ???
-
+#endif
 // AIN2
-  GPIOB->DDR &= ~(1 << 2);  // PB.2 as input
-  GPIOB->CR1 &= ~(1 << 2);  // floating input
-  GPIOB->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
+  GPIOB->DDR &= ~GPIO_PIN_2;
+  GPIOB->CR1 &= ~GPIO_PIN_2;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_2;  // 0: External interrupt disabled   ???
 
 // AIN1
-  GPIOB->DDR &= ~(1 << 1);  // PB.1 as input
-  GPIOB->CR1 &= ~(1 << 1);  // floating input
-  GPIOB->CR2 &= ~(1 << 1);  // 0: External interrupt disabled   ???
+  GPIOB->DDR &= ~GPIO_PIN_1;
+  GPIOB->CR1 &= ~GPIO_PIN_1;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_1;  // 0: External interrupt disabled   ???
 
 // AIN0
-  GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
-  GPIOB->CR1 &= ~(1 << 0);  // floating input
-  GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
-#endif
+  GPIOB->DDR &= ~GPIO_PIN_0;
+  GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled   ???
+
+#else  // '003 dev board
+
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+#endif // STM8S105
 }
 
 /*
@@ -293,10 +266,6 @@ uint8_t SerialKeyPressed(char *key)
  */
 static void ADC1_setup(void)
 {
-// Port B[0..7]=floating input no interr
-// STM8 Discovery, all PortB pins are on CN3
-//    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT); // all AIN pins setup explicityly with the GPIO init
-
   ADC1_DeInit();
 
   ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
@@ -530,7 +499,7 @@ void TIM3_setup(uint16_t period)
   TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
   TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
-#endif // 105
+#endif // 4/21 no longer used
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
