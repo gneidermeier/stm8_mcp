@@ -20,31 +20,54 @@
 /*
  * re-purpose the TIM2 channel enumeration but disguise it
  */
-#define  BL_PHASE_A  TIM2_CHANNEL_1
-#define  BL_PHASE_B  TIM2_CHANNEL_2
-#define  BL_PHASE_C  TIM2_CHANNEL_3
+//#define  BL_PHASE_A  TIM2_CHANNEL_1
+//#define  BL_PHASE_B  TIM2_CHANNEL_2
+//#define  BL_PHASE_C  TIM2_CHANNEL_3
 
 
 /*
- * bleh yuk erg
+ * Half-bridge enable/disable signals (/SD input pin on IR2104 HB driver IC)
  */
-// PD4 set LO
-#define PWM_PhA_OUTP_LO( )                   \
-    GPIOD->ODR &= (uint8_t) ( ~(1<<4) );     \
-    GPIOD->DDR |=  (1<<4);                   \
-    GPIOD->CR1 |=  (1<<4);
+#ifdef DISCOVERY
+  #define SDa_GPIO_PIN  GPIO_PIN_2 // D2
+  #define SDb_GPIO_PIN  GPIO_PIN_0 // E0
+  #define SDc_GPIO_PIN  GPIO_PIN_5 // A5
 
-// PD3 set LO
-#define PWM_PhB_OUTP_LO( ) \
-    GPIOD->ODR &= (uint8_t) ( ~(1<<3) );     \
-    GPIOD->DDR |=  (1<<3);                   \
-    GPIOD->CR1 |=  (1<<3);
+  #define SDa_GPIO_PORT  GPIOD
+  #define SDb_GPIO_PORT  GPIOE
+  #define SDc_GPIO_PORT  GPIOA
 
-// PA3 set LO
-#define PWM_PhC_OUTP_LO( )                   \
-    GPIOA->ODR &= (uint8_t) ( ~(1<<3) );     \
-    GPIOA->DDR |=  (1<<3);                   \
-    GPIOA->CR1 |=  (1<<3);
+#else // stm8s003
+  #define SDa_GPIO_PIN  GPIO_PIN_1 // A1
+  #define SDb_GPIO_PIN  GPIO_PIN_2 // A2
+  #define SDc_GPIO_PIN  GPIO_PIN_3 // C3
+
+  #define SDa_GPIO_PORT  GPIOA
+  #define SDb_GPIO_PORT  GPIOA
+  #define SDc_GPIO_PORT  GPIOC
+#endif
+
+
+// Enable
+#define PWM_PhA_HB_ENABLE( ) \
+    SDa_GPIO_PORT->ODR |=   SDa_GPIO_PIN; // /SD A
+
+#define PWM_PhB_HB_ENABLE( ) \
+    SDb_GPIO_PORT->ODR |=   SDb_GPIO_PIN; // /SD B
+
+#define PWM_PhC_HB_ENABLE( ) \
+    SDc_GPIO_PORT->ODR |=   SDc_GPIO_PIN; // /SD C
+
+// Disable (casts applied in order to quash warnings (bit inversion causes sign extension to to 16-bit)
+#define PWM_PhA_HB_DISABLE( ) \
+    SDa_GPIO_PORT->ODR &=  (uint8_t) ( ~SDa_GPIO_PIN ); // /SD A
+
+#define PWM_PhB_HB_DISABLE( ) \
+    SDb_GPIO_PORT->ODR &=  (uint8_t) ( ~SDb_GPIO_PIN ); // /SD B
+
+#define PWM_PhC_HB_DISABLE( ) \
+    SDc_GPIO_PORT->ODR &=  (uint8_t) ( ~SDC_GPIO_PIN ); // /SD C
+
 
 /*
  * Half-bridge enables ... specific to certain pin
