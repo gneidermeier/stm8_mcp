@@ -24,8 +24,6 @@
 #include "system.h"
 #include "driver.h"
 
-#define PERIOD_IN_TIM2
-
 /** @addtogroup STM8S_IT STM8S ISR
   * @brief STM8S ISR Template
   * @{
@@ -210,29 +208,18 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
     uint8_t spi_rx;
     uint8_t spi_tx;
 
-
     if (SPI->SR & SPI_SR_RXNE)
     {
         // Clearing the RXNE bit is performed by reading the SPI_DR register
         spi_rx = SPI->DR;
-#if 0
-        if (spi_rx < SPI_RX_BUF_SZ) // idfk
-        {
-// address = spi_rx;
-            spi_tx = SPI_txbuf[spi_rx];// this is an address
-            SPI_rxbuf[ address ] = spi_rx;
-        }
-#endif
 //        if (tx_cntr < 4)
         {
             spi_tx = SPI_txbuf[ tx_cntr++ ];
         }
 
-
         while (! (SPI->SR & SPI_SR_TXE) );
 
         SPI->DR = spi_tx;
-
 
         if (spi_rx > 0x80)
         {
@@ -253,22 +240,7 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-    static int toggle;
-    toggle ^= 1;
-#if 1
-    if ( toggle )
-    {
-        GPIOD->ODR &=  ~(1 << LED); // clear test pin
-    }
-    else
-    {
-        GPIOD->ODR |=  (1 << LED); // set test pin
-    }
-#endif
-
-#ifdef PERIOD_IN_TIM2
     Driver_Step();
-#endif
 
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
     TIM1_ClearFlag(TIM1_FLAG_UPDATE);
@@ -285,7 +257,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
     if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
     {
-//        GPIOD->ODR &=  ~(1<<LED); // clear test pin
         Driver_on_capture_fall();
 
         TIM1_ClearITPendingBit(TIM1_IT_CC3);
@@ -293,7 +264,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
     else
     {
-//        GPIOD->ODR |=  (1<<LED); // set test pin
         Driver_on_capture_rise();
     }
 
@@ -338,18 +308,19 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
+    static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
-    static uint8_t toggle;
+//  index = (index + 1) & (Frame_count - 1);
 
-    if ( ++frame_counter > 3 )
+// note pre-increment on variable 
+    if ( ++frame_counter >= Frame_count )
     {
-        frame_counter  = 0;
-#ifdef PERIOD_IN_TIM2
+        frame_counter = 0;
+
         Driver_Update();
-#endif
     }
 
-    Driver_on_PWM_edge();
+    Driver_on_PWM_edge();  // starts ADC conversion
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
@@ -376,19 +347,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
 INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
 {
-#if 0 // tmp test
-    static uint8_t toggle;
-    if (toggle ^= 1){
-        GPIOG->ODR |=  (1<<0); // set test pin
-    } else {
-        GPIOG->ODR &=  ~(1<<0); // clear test pin
-    }
-#endif
-#ifndef PERIOD_IN_TIM2
-    Driver_Step();
-#endif
-    // must reset the tmer interrupt flag
-    TIM3->SR1 &= ~TIM3_SR1_UIF;
+//    TIM3->SR1 &= ~TIM3_SR1_UIF; // reset interrupt flag
 }
 
 /**
@@ -516,24 +475,8 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
   */
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
 {
-#if 0 // tmp test
-    static uint8_t toggle;
-    if (toggle ^= 1){
-        GPIOC->ODR |= (1 << 4);
-    } else {
-        GPIOC->ODR &= ~(1 << 4);
-    }
-#endif
-
-GPIOC->ODR |= (1 << 4);
-
     Driver_on_ADC_conv();
 
-GPIOC->ODR &= ~(1 << 4);
-
-    /* In order to detect unexpected events during development,
-       it is recommended to set a breakpoint on the following instruction.
-    */
     ADC1_ClearFlag(ADC1_FLAG_EOC);
 }
 #endif /*STM8S208 or STM8S207 or STM8AF52Ax or STM8AF62Ax */
@@ -558,25 +501,8 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
 {
-#if 0 // tmp test
-    static uint8_t toggle;
-    if (toggle ^= 1){
-        GPIOD->ODR |= (1 << LED);
-    } else {
-        GPIOD->ODR &= ~(1 << LED);
-    }
-#endif
-
-//   GPIOD->ODR |=  (1<<LED); // set test pin
-
-#ifndef PERIOD_IN_TIM2
-    Driver_Update();
-#endif
-
-//   GPIOD->ODR &=  ~(1<<LED); // clear test pin
-
-// must reset the tmer interrupt flag
-    TIM4->SR1 &= ~TIM4_SR1_UIF;
+//  reset the tmer interrupt flag
+//    TIM4->SR1 &= ~TIM4_SR1_UIF;
 }
 #endif /*STM8S903*/
 
@@ -595,5 +521,3 @@ INTERRUPT_HANDLER(EEPROM_EEC_IRQHandler, 24)
 /**
   * @}
   */
-
-/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
