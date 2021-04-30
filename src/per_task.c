@@ -28,9 +28,13 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define TRIM_DEFAULT  0 //
+#define TRIM_DEFAULT  0 // don't quite recall here .. 
 
-#define V_SHUTDOWN_THR      0x0320 // experimentally determined!
+// The value being used here is low enuogh that the machine doesn't stall 
+// thru the lower speed transition into closed-loop control. 
+// An easy test with motor running is to slap into the spinning prop disc
+// with e.g. a 3x5 index card.
+#define V_SHUTDOWN_THR   0x03D0 //   0x0320 // experimentally determined!
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
@@ -298,12 +302,16 @@ void UI_Stop(void)
 // for development user only
 static void comm_plus(void)
 {
+#if 0 // test/dev
   BLDC_Spd_inc();
+#endif
 }
 // for development user only
 static void comm_minus(void)
 {
+#if 0 // test/dev
   BLDC_Spd_dec();
+#endif	
 }
 
 // stop key from terminal ... merge w/ UI_stop?

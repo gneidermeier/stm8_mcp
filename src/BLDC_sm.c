@@ -14,7 +14,7 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-
+#include <stddef.h>  // NULL
 #include "bldc_sm.h" // external types used internally
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
@@ -102,29 +102,29 @@ static uint8_t Control_mode;   // indicates manual commuation buttons are active
  */
 static void timing_ramp_control(uint16_t tgt_commutation_per)
 {
-    const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
+  const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
 
-    uint16_t u16 = BLDC_OL_comm_tm;
+  uint16_t u16 = BLDC_OL_comm_tm;
 
-    // determine signage of error i.e. step increment
+  // determine signage of error i.e. step increment
+  if (u16 > tgt_commutation_per)
+  {
+    u16 -= stepi;
+    if (u16 < tgt_commutation_per)
+    {
+      u16 = tgt_commutation_per;
+    }
+    BLDC_OL_comm_tm  = u16;
+  }
+  else if (u16 < tgt_commutation_per)
+  {
+    u16 += stepi;
     if (u16 > tgt_commutation_per)
     {
-        u16 -= stepi;
-        if (u16 < tgt_commutation_per)
-        {
-            u16 = tgt_commutation_per;
-        }
-        BLDC_OL_comm_tm  = u16;
+      u16 = tgt_commutation_per;
     }
-    else if (u16 < tgt_commutation_per)
-    {
-        u16 += stepi;
-        if (u16 > tgt_commutation_per)
-        {
-            u16 = tgt_commutation_per;
-        }
-        BLDC_OL_comm_tm  = u16;
-    }
+    BLDC_OL_comm_tm  = u16;
+  }
 }
 
 /*
@@ -134,10 +134,10 @@ static void timing_ramp_control(uint16_t tgt_commutation_per)
 static void haltensie(void)
 {
 // have to clear the local UI_speed since that is the transition OFF->RAMP condition
-    UI_speed = 0;
+  UI_speed = 0;
 
-    // kill the driver signals
-    All_phase_stop();
+  // kill the driver signals
+  All_phase_stop();
 }
 
 
@@ -154,22 +154,22 @@ static void haltensie(void)
  */
 void BL_reset(void)
 {
-    // stop the system in case it is already running
-    haltensie();  //  zeros the  UI speed
+  // stop the system in case it is already running
+  haltensie();  //  zeros the  UI speed
 
-    // reset the system
+  // reset the system
 
-    // the commutation period (TIM3) apparantly has to be set to something (not 0)
-    // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
+  // the commutation period (TIM3) apparantly has to be set to something (not 0)
+  // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
 
-    // Set initial commutation timing period upon state transition.
-    BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
+  // Set initial commutation timing period upon state transition.
+  BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
 
-    Faultm_init();
+  Faultm_init();
 
-    Control_mode = FALSE;
-    // eventually it gets around to asserting the timer/PWM reset in the ISR update
-    // but explicitly handled here will be more deterministic
+  Control_mode = FALSE;
+  // eventually it gets around to asserting the timer/PWM reset in the ISR update
+  // but explicitly handled here will be more deterministic
 //    set_dutycycle( PWM_0PCNT );
 }
 
@@ -191,37 +191,42 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    static uint8_t cl_timer = 0; // at 1K, 1 byte counter about 1/4 second
+//    static uint8_t cl_timer = 0; // at 1K, 1 byte counter about 1/4 second
 
-    if (dc > PWM_DC_SHUTOFF)
+  if (dc > PWM_DC_SHUTOFF)
+  {
+    // Update the dc if speed input greater than ramp start, OR if system already running
+    if ( dc > PWM_DC_CTRL_MODE  ||  0 != UI_speed )
     {
-        // Update the dc if speed input greater than ramp start, OR if system already running
-        if ( dc > PWM_DC_CTRL_MODE  ||  0 != UI_speed )
+      UI_speed = dc;
+
+      // on speed change, check for condition to transition to closed loopo
+      if (FALSE == Control_mode)
+      {
+        /*
+         * checks a plausibility condition for transition to closed-loop
+         * control of commutation timing. Also considered imposing a minimum
+         * elapsed run-time but there is apparently no obvious reason to do such a thing.
+        */
+        if ( 0 == Seq_get_timing_error_p( ( int16_t * ) NULL ) )
         {
-            UI_speed = dc;
-
-            // on speed change, check for condition to transition to closed loopo
-            if (FALSE == Control_mode)
-            {
-                if ( 0 == Seq_get_timing_error_p( ( int16_t * ) (0) )  /* --cl_timer == 0 */ )
-                {
 #ifdef CLMODE_ENABLED
-                    Control_mode = TRUE;
+          Control_mode = TRUE;
 #endif
-                }
-            }
-            // else
-            // if dc < THRESHOLD, then unlatch control mode?
         }
+      }
+      // else
+      // if dc < THRESHOLD, then unlatch control mode?
     }
-    else
-    {
-        // reset needed in case system was running, in which case there is no
-        // going back .. has to ramp again to get started.
-        BL_reset(); // asserting this ... so what, system not running anyway!
+  }
+  else
+  {
+    // reset needed in case system was running, in which case there is no
+    // going back .. has to ramp again to get started.
+    BL_reset(); // asserting this ... so what, system not running anyway!
 
-        // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions
-    }
+    // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions
+  }
 }
 
 /**
@@ -231,20 +236,19 @@ void BLDC_PWMDC_Set(uint8_t dc)
  */
 uint16_t BLDC_PWMDC_Get(void)
 {
-    return Commanded_Dutycycle;
+  return Commanded_Dutycycle;
 }
 
-
+#if 0
 /** @cond */ // hide some developer/debug code
-
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_dec()
 {
-    Control_mode = TRUE; //tbd
+  Control_mode = TRUE; //tbd
 
-    BLDC_OL_comm_tm += 1; // slower
+  BLDC_OL_comm_tm += 1; // slower
 }
 
 /*
@@ -252,12 +256,12 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-    Control_mode = TRUE; // tbd
+  Control_mode = TRUE; // tbd
 
-    BLDC_OL_comm_tm -= 1; // faster
+  BLDC_OL_comm_tm -= 1; // faster
 }
 /** @endcond */
-
+#endif
 
 /**
   * @brief Accessor for commutation period.
@@ -266,7 +270,7 @@ void BLDC_Spd_inc()
   */
 uint16_t get_commutation_period(void)
 {
-    return BLDC_OL_comm_tm;
+  return BLDC_OL_comm_tm;
 }
 
 /**
@@ -281,12 +285,12 @@ uint16_t get_commutation_period(void)
  */
 BL_RUNSTATE_t BL_get_state(void)
 {
-    if (UI_speed > PWM_DC_SHUTOFF )
-    {
-        return BL_IS_RUNNING;
-    }
-    // else
-    return BL_NOT_RUNNING;
+  if (UI_speed > PWM_DC_SHUTOFF )
+  {
+    return BL_IS_RUNNING;
+  }
+  // else
+  return BL_NOT_RUNNING;
 }
 
 /**
@@ -303,59 +307,58 @@ BL_RUNSTATE_t BL_get_state(void)
  */
 void BLDC_Update(void)
 {
-    // 1 bit is /2 for sma, 1 bit is /2 for "gain"
+  // 1 bit is /2 for sma, 1 bit is /2 for "gain"
 #define SMA_SH  1 // tmp
 #define GAIN_SH  2 // tmp
-    static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
+  static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
 
-    static  int16_t timing_error ;
-    static uint8_t ctrl_tick = 0; // persistent count for sub-rating the control loop
+  static  int16_t timing_error ;
+  static uint8_t ctrl_tick = 0; // persistent count for sub-rating the control loop
 
 // does it need static previous copy of speed input to check for state transition?
-    uint16_t inp_dutycycle = 0; // intialize to 0
+  uint16_t inp_dutycycle = 0; // intialize to 0
 
-    fault_status_reg_t  fm_status = Faultm_get_status();
+  fault_status_reg_t  fm_status = Faultm_get_status();
 
-    if ( 0 == fm_status )
+  if ( 0 == fm_status )
+  {
+    inp_dutycycle = UI_speed;
+  }
+  else
+  {
+    // do not pass go
+    haltensie(); // sets UI speed 0
+    // assert ... inp_dutycycle = 0;
+  }
+
+  // refresh the duty-cycle and commutation period ... sets the pwm
+  // which will be upated to the PWM timer peripheral at next commutation point.
+  set_dutycycle( inp_dutycycle );
+
+  // there isn't much point in enabling commuation timing contrl if speed is 0
+  // and by leaving it along until the system is actually running, it can set
+  // the initial condition in the global BL_Reset() above.
+  if (inp_dutycycle > 0    &&  ( 0 == fm_status ) )
+  {
+    if (FALSE == Control_mode)
     {
-        inp_dutycycle = UI_speed;
+      timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
     }
     else
     {
-        // do not pass go
-        haltensie(); // sets UI speed 0
-        // assert ... inp_dutycycle = 0;
-    }
-
-    // refresh the duty-cycle and commutation period ... sets the pwm
-    // which will be upated to the PWM timer peripheral at next commutation point.
-    set_dutycycle( inp_dutycycle );
-
-    // there isn't much point in enabling commuation timing contrl if speed is 0
-    // and by leaving it along until the system is actually running, it can set
-    // the initial condition in the global BL_Reset() above.
-    if (inp_dutycycle > 0    &&  ( 0 == fm_status ) )
-    {
-        if (FALSE == Control_mode)
-        {
-            timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
-        }
-        else
-        {
-            // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
-            uint16_t t16 = BLDC_OL_comm_tm ;
-            timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
-            t16 += timing_error;
+      // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
+      uint16_t t16 = BLDC_OL_comm_tm ;
+      timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
+      t16 += timing_error;
 
 // if this overshoots, the control runs away until the TIM3 becomes so low the system locks up and no faultm can work .. not failsafe!
-            if (t16 > LUDICROUS_SPEED)
-            {
-                BLDC_OL_comm_tm  = t16;
-            }
-        }
+      if (t16 > LUDICROUS_SPEED)
+      {
+        BLDC_OL_comm_tm  = t16;
+      }
     }
-
-    Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
+  }
+  Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
 }
 
 /**@}*/ // defgroup

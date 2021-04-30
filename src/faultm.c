@@ -38,7 +38,7 @@
 #define  FAULT_BUCKET_LIM     FAULT_BUCKET_MASK
 
 // INI must be <= Limit
-#define  FAULT_BUCKET_INI    (64 - 1)
+#define  FAULT_BUCKET_INI    (48 - 1)
 
 
 /**

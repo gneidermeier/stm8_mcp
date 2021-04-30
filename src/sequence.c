@@ -14,14 +14,21 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-
+#include <stddef.h> // NULL
 #include "pwm_stm8s.h"
 #include "driver.h"
 #include "bldc_sm.h"
 
 
 /* Private defines -----------------------------------------------------------*/
-
+/**
+ * Plausibility of back-EMF measurement: the threshold (somewhat arbitrary) is
+ * based on taking the average of the latest back-EMF leading-side and trailing-
+ * side measurements, i.e.:
+ * [ (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR ]
+ * The open-loop ramp-to speed should ensure this condition.
+ */
+#define  BACK_EMF_PLAUS_THR  0x03F8
 
 /* Private types -----------------------------------------------------------*/
 
@@ -61,14 +68,13 @@ static uint16_t Vbatt_;
 
 static const step_ptr_t step_ptr_table[] =
 {
-    sector_0,
-    sector_1,
-    sector_2,
-    sector_3,
-    sector_4,
-    sector_5
+  sector_0,
+  sector_1,
+  sector_2,
+  sector_3,
+  sector_4,
+  sector_5
 };
-
 
 /*
  * Timing error term -  magnitude of the "falling"
@@ -76,10 +82,6 @@ static const step_ptr_t step_ptr_table[] =
  * condition is seen when there is greater distribution of back-emf area on the
  * right side.
  */
-//static int16_t comm_timing_error;
-//#define TIMING_ERROR_TERM   (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX)
-
-
 // There isn't a timing control point to use to determine the error - however
 // ratio of the leading and falling slopes (integration) indicates the direction
 // and varies according to the magnitude of the timing error.
@@ -97,22 +99,22 @@ static void sector_0(void)
 //    { DC_OUTP_HI,       DC_OUTP_LO,       DC_OUTP_FLOAT_F,
 
 // previously phase-A was floating-rising transition
-    Back_EMF_Riseing_PhX =
-        ( Back_EMF_Riseing_PhX + Driver_Get_Back_EMF_Avg() ) >> 1 ;
+  Back_EMF_Riseing_PhX =
+    ( Back_EMF_Riseing_PhX + Driver_Get_Back_EMF_Avg() ) >> 1 ;
 
 //PWM OFF: C
-    PWM_PhC_Disable();
+  PWM_PhC_Disable();
 
 //Float: C
-    PWM_PhC_HB_DISABLE();
+  PWM_PhC_HB_DISABLE();
 
 //PWM_LO: B
-    PWM_PhB_OUTP_LO();
-    PWM_PhB_HB_ENABLE();
+  PWM_PhB_OUTP_LO();
+  PWM_PhB_HB_ENABLE();
 
 //PWM_HI: A
-    PWM_PhA_Enable();
-    PWM_PhA_HB_ENABLE();
+  PWM_PhA_Enable();
+  PWM_PhA_HB_ENABLE();
 }
 
 static void sector_1(void)
@@ -123,11 +125,11 @@ static void sector_1(void)
 //        NOP
 
 //Float: B
-    PWM_PhB_HB_DISABLE();
+  PWM_PhB_HB_DISABLE();
 
 //PWM_LO: C
-    PWM_PhC_OUTP_LO();
-    PWM_PhC_HB_ENABLE();
+  PWM_PhC_OUTP_LO();
+  PWM_PhC_HB_ENABLE();
 
 //PWM_HI:
 //      NOP (A)
@@ -135,31 +137,31 @@ static void sector_1(void)
 
 static void sector_2(void)
 {
-    // Phase A was driven pwm, so use the ADC measurement as vbat
-    Vbatt_ = Driver_Get_ADC();
+  // Phase A was driven pwm, so use the ADC measurement as vbat
+  Vbatt_ = Driver_Get_ADC();
 
 //    { DC_OUTP_FLOAT_F,  DC_OUTP_HI,       DC_OUTP_LO,
 
 //PWM OFF: A
-    PWM_PhA_Disable();
+  PWM_PhA_Disable();
 
 //Float: A
-    PWM_PhA_HB_DISABLE();
+  PWM_PhA_HB_DISABLE();
 
 //PWM_LO: C
-    PWM_PhC_OUTP_LO();
-    PWM_PhC_HB_ENABLE();
+  PWM_PhC_OUTP_LO();
+  PWM_PhC_HB_ENABLE();
 
 //PWM_HI: B
-    PWM_PhB_Enable();
-    PWM_PhB_HB_ENABLE();
+  PWM_PhB_Enable();
+  PWM_PhB_HB_ENABLE();
 }
 
 static void sector_3(void)
 {
 // previously phase-A was floating-falling transition
-    Back_EMF_Falling_PhX =
-        ( Back_EMF_Falling_PhX + Driver_Get_Back_EMF_Avg() ) >> 1;
+  Back_EMF_Falling_PhX =
+    ( Back_EMF_Falling_PhX + Driver_Get_Back_EMF_Avg() ) >> 1;
 
 //    { DC_OUTP_LO,       DC_OUTP_HI,       DC_OUTP_FLOAT_R,
 
@@ -167,11 +169,11 @@ static void sector_3(void)
 //        NOP
 
 //Float: C
-    PWM_PhC_HB_DISABLE();
+  PWM_PhC_HB_DISABLE();
 
 //PWM_LO: A
-    PWM_PhA_OUTP_LO();
-    PWM_PhA_HB_ENABLE();
+  PWM_PhA_OUTP_LO();
+  PWM_PhA_HB_ENABLE();
 
 //PWM_HI:
 //      NOP (B)
@@ -182,15 +184,15 @@ static void sector_4(void)
 //    { DC_OUTP_LO,       DC_OUTP_FLOAT_F,  DC_OUTP_HI,
 
 //PWM OFF: B
-    PWM_PhB_Disable();
+  PWM_PhB_Disable();
 //Float: B
-    PWM_PhB_HB_DISABLE();
+  PWM_PhB_HB_DISABLE();
 //PWM_LO: A
-    PWM_PhA_OUTP_LO();
-    PWM_PhA_HB_ENABLE();
+  PWM_PhA_OUTP_LO();
+  PWM_PhA_HB_ENABLE();
 //PWM_HI: C
-    PWM_PhC_Enable();
-    PWM_PhC_HB_ENABLE();
+  PWM_PhC_Enable();
+  PWM_PhC_HB_ENABLE();
 }
 
 static void sector_5(void)
@@ -200,66 +202,70 @@ static void sector_5(void)
 //PWM OFF:
 //        NOP
 //Float: A
-    PWM_PhA_HB_DISABLE();
+  PWM_PhA_HB_DISABLE();
 //PWM_LO: B
-    PWM_PhB_OUTP_LO();
-    PWM_PhB_HB_ENABLE();
+  PWM_PhB_OUTP_LO();
+  PWM_PhB_HB_ENABLE();
 //PWM_HI:
 //        NOP (C)
 
 // update the timing error once per frame
 //  comm_timing_error = (comm_timing_error + TIMING_ERROR_TERM) > 1; // sma
 
-    // signed_error_ratio = ( post / pre ) - 1
-    // Uses scalar of 64 to get most precision from ADC 10-bit terms (assuming max 0x03ff).
-    // ADC 10-bit i.e. 0x03FF << 6 = 0xFFC0
-    // Calculation result gets scaled down in conjunction with factoring in of
-    //  controller gain term(s).
-    comm_tm_err_ratio =
-        (int16_t)( ( Back_EMF_Falling_PhX << SCALE_64_LSH ) / Back_EMF_Riseing_PhX )
-        - (int16_t)SCALE_64_ONE;
+  // signed_error_ratio = ( post / pre ) - 1
+  // Uses scalar of 64 to get most precision from ADC 10-bit terms (assuming max 0x03ff).
+  // ADC 10-bit i.e. 0x03FF << 6 = 0xFFC0
+  // Calculation result gets scaled down in conjunction with factoring in of
+  //  controller gain term(s).
+  comm_tm_err_ratio =
+    (int16_t)( ( Back_EMF_Falling_PhX << SCALE_64_LSH ) / Back_EMF_Riseing_PhX )
+    - (int16_t)SCALE_64_ONE;
 }
 
 /* Public functions ---------------------------------------------------------*/
 
-// leading and trailing back-emf area under the curve should meet some minimum
-// level to be measurable .. should be at about the ramp-to speed
-#define  BACK_EMF_PLAUS_THR  0x03F8
-
 /**
- * @brief Accessor for control error.
+ * @brief  Determine plausibility of Control error term.
  *
  * @details If the motor timing is advanced, the control error should be
  *  positive i.e.  increasing commutation period slows the motor.
  *
+ * @param[in]  p16term
+ *             pointer to the 16-bit integer error term allocated by the caller
+ *
  * @return signed error which at its extreme should be equal to or less than the
  *  range of the initial ADC measurement i.e. 0x0400
  */
-int Seq_get_timing_error_p(int16_t * int16p)
+int Seq_get_timing_error_p(int16_t * p16term)
 {
 //    int16_t perror = comm_timing_error; // positive if advanced
-    int err = -1; // report error on measurement plausibility
+  int err = -1; // report error on measurement plausibility
 
-    if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
+  if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
+  {
+    err = 0;
+// 4/30: turns out there is only one caller, and it is not using the error term (passes in NULL)
+#if 0 
+    if ( NULL != int16p)
     {
-        err  = 0;
-
-        if ( 0 != int16p)
-        {
-            *int16p = comm_tm_err_ratio;  // positive if advanced
-        }
+      *int16p = Seq_get_timing_error(); // comm_tm_err_ratio;  // positive if advanced
     }
-
-    return err;
+#endif
+  }  return err;
 }
-// old
+
+/**
+ * @brief Accessor for control error term
+ *
+ * @details If the motor timing is advanced, the control error should be
+ *  positive i.e. increasing commutation period slows the motor.
+ *
+ * @return signed error which at its extreme should be equal to or less than the
+ *  range of the initial ADC measurement i.e. 0x0400
+ */
 int16_t Seq_get_timing_error(void)
 {
-//    int16_t perror = comm_timing_error; // positive if advanced
-
-    int16_t perror = comm_tm_err_ratio;  // positive if advanced
-
-    return perror;
+  return comm_tm_err_ratio; // positive if advanced
 }
 
 /**
@@ -270,7 +276,7 @@ int16_t Seq_get_timing_error(void)
  */
 uint16_t Seq_Get_Vbatt(void)
 {
-    return Vbatt_;
+  return Vbatt_;
 }
 
 /**
@@ -305,26 +311,26 @@ uint16_t Seq_Get_Vbatt(void)
  */
 void Sequence_Step(void)
 {
-    // note this sizeof and divide done in preprocessor - verified in the assembly
-    const uint8_t N_CSTEPS = sizeof(step_ptr_table) / sizeof(step_ptr_t);
+  // note this sizeof and divide done in preprocessor - verified in the assembly
+  const uint8_t N_CSTEPS = sizeof(step_ptr_table) / sizeof(step_ptr_t);
 
-    static uint8_t s_step;
+  static uint8_t s_step;
 
 // has to cast modulus expression to uint8
-    s_step = (uint8_t)((s_step + 1) % N_CSTEPS);
+  s_step = (uint8_t)((s_step + 1) % N_CSTEPS);
 
 // intentionally letting motor windmill (i.e. not braking) when switched off
 // normally
-    if (BL_IS_RUNNING == BL_get_state() )
-    {
-        // let'er rip!
-        step_ptr_table[s_step]();
-    }
-    else
-    {
-        // intitialize the averages measurements ... doesn't really matter and might go away
-        Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
-    }
+  if (BL_IS_RUNNING == BL_get_state() )
+  {
+    // let'er rip!
+    step_ptr_table[s_step]();
+  }
+  else
+  {
+    // intitialize the averages measurements ... doesn't really matter and might go away
+    Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
+  }
 }
 
 /**@}*/ // defgroup
