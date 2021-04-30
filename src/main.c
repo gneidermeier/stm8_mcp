@@ -7,10 +7,9 @@
   * @date March-2020
   ******************************************************************************
   */
-
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
 #include <ctype.h> // isprint
-#include <string.h> // strcat
 
 // app headers
 #include "mcu_stm8s.h"
@@ -18,7 +17,7 @@
 #include "per_task.h"
 
 #ifndef SPI_CONTROLLER
-  #include "spi_stm8s.h"
+#include "spi_stm8s.h"
 #endif
 
 
@@ -37,88 +36,86 @@ If you have multiple source files in your project, interrupt service routines ca
 
 /* Private functions ---------------------------------------------------------*/
 
-
 /**
  * @brief mainly looping
  */
 void main(int argc, char **argv)
 {
 #ifndef SPI_CONTROLLER
-    static const uint8_t tx_buf[RX_BUF_SZ] = "0123456789ABCDEF";
+  static const uint8_t tx_buf[RX_BUF_SZ] = "0123456789ABCDEF";
 #endif
-    uint8_t linec = 0;
-    uint8_t framecount = 0;
-    uint8_t i = 0;
-    (void) argc;
-    (void) argv;
+  uint8_t linec = 0;
+  uint8_t framecount = 0;
+  uint8_t i = 0;
+  (void) argc;
+  (void) argv;
 
-    MCU_Init();
+  MCU_Init();
 
-    BL_reset();
+  BL_reset();
 
-    enableInterrupts(); // interrupts are globally disabled by default
+  printf("\n\rProgram Startup.......\n\r");
 
-//    UARTputs("\033c"); // sends ANSI code to  clear the serial terminal
-    UARTputs("Program Startup....... \r\n");
+  enableInterrupts(); // interrupts are globally disabled by default
 
-    while(1)
-    {
+  while(1)
+  {
 //  button input either button would transition from OFF->RAMP
-        if (! (( GPIOA->IDR)&(1<<4)))
-        {
+    if (! (( GPIOA->IDR)&(1<<4)))
+    {
 //            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
-            disableInterrupts();
-            UI_Stop();
-            enableInterrupts();
-        }
+      disableInterrupts();
+      UI_Stop();
+      enableInterrupts();
+    }
 
 #if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
-        if (! (( GPIOA->IDR)&(1<<6)))
-        {
-            while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
-            disableInterrupts();
-            BLDC_Spd_inc();
-            enableInterrupts();
-        }
+    if (! (( GPIOA->IDR)&(1<<6)))
+    {
+      while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
+      disableInterrupts();
+      BLDC_Spd_inc();
+      enableInterrupts();
+    }
 #endif
 
 #if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
-        if ( ! (( GPIOE->IDR)&(1<<5)))
-        {
-            while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
-            disableInterrupts();
-            BLDC_Spd_dec();
-            enableInterrupts();
-        }
+    if ( ! (( GPIOE->IDR)&(1<<5)))
+    {
+      while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
+      disableInterrupts();
+      BLDC_Spd_dec();
+      enableInterrupts();
+    }
 #endif
 
-        if ( TRUE == Task_Ready() )
-        {
+    if ( TRUE == Task_Ready() )
+    {
 // this modulus provides a time reference of approximately 2 Hz (debug/test/dev/usage)
-            if ( ! ((framecount++) % 0x20) )
-            {
-            }
-        }
+      if ( ! ((framecount++) % 0x20) )
+      {
+      }
+    }
 
 #ifndef SPI_CONTROLLER
-        if (-1 != SPI_read_write_b(tx_buf, 0xA5, TIME_OUT_0) )
-        {
-            char sbuf[16]; // am i big enuff?
-            // tmp dump test SPI test data to UART
-            linec = (uint8_t)(linec < 126 ? linec++ : 0x30);
-            sbuf[0] = '>';
-            sbuf[1] = linec++;
-            sbuf[2] = isprint( (int)spi_rx_buf[0] ) ? spi_rx_buf[0] : '.' ;
-            sbuf[3] = isprint( (int)spi_rx_buf[1] ) ? spi_rx_buf[1] : '.' ;
-            sbuf[4] = isprint( (int)spi_rx_buf[2] ) ? spi_rx_buf[2] : '.' ;
-            sbuf[5] = isprint( (int)spi_rx_buf[3] ) ? spi_rx_buf[3] : '.' ;
-            sbuf[6] = isprint( (int)spi_rx_buf[4] ) ? spi_rx_buf[4] : '.' ;
-            sbuf[7] = 0;
-            strcat(sbuf, "\r\n");
-            UARTputs(sbuf);
-        }
+    if (-1 != SPI_read_write_b(tx_buf, 0xA5, TIME_OUT_0) )
+    {
+      char sbuf[16]; // am i big enuff?
+      // tmp dump test SPI test data to UART
+      linec = (uint8_t)(linec < 126 ? linec++ : 0x30);
+      sbuf[0] = '>';
+      sbuf[1] = linec++;
+      sbuf[2] = isprint( (int)spi_rx_buf[0] ) ? spi_rx_buf[0] : '.' ;
+      sbuf[3] = isprint( (int)spi_rx_buf[1] ) ? spi_rx_buf[1] : '.' ;
+      sbuf[4] = isprint( (int)spi_rx_buf[2] ) ? spi_rx_buf[2] : '.' ;
+      sbuf[5] = isprint( (int)spi_rx_buf[3] ) ? spi_rx_buf[3] : '.' ;
+      sbuf[6] = isprint( (int)spi_rx_buf[4] ) ? spi_rx_buf[4] : '.' ;
+      sbuf[7] = 0;
+      strcat(sbuf, "\r\n");
+      UARTputs(sbuf);
+    }
 #endif // SPI CONT
-    } // while 1
+  } // while 1
 }
 
 #ifdef USE_FULL_ASSERT
@@ -132,14 +129,12 @@ void main(int argc, char **argv)
   */
 void assert_failed(u8* file, u32 line)
 {
-    /* User can add his own implementation to report the file name and line number,
-       ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
-    /* Infinite loop */
-    while (1)
-    {
-    }
+  /* Infinite loop */
+  while (1)
+  {
+  }
 }
 #endif
-
-/******************* (C) COPYRIGHT 2009 STMicroelectronics *****END OF FILE****/

@@ -16,6 +16,10 @@
 // app headers
 #include "system.h" // platform specific delarations
 
+ // external declarsations used internally
+#include "mcu_stm8s.h"
+
+
 /* Private defines -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
@@ -25,6 +29,23 @@
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @details
+  * // Based on SPL UART example project
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Write a character to the UART1 */
+  UART2_SendData8(c);
+  /* Loop until the end of transmission */
+  while (UART2_GetFlagStatus(UART2_FLAG_TXE) == RESET);
+
+  return (c);
+}
 
 /*
  * @brief Configure GPIO.
@@ -173,17 +194,6 @@ static void UART_setup(void)
 
 #ifdef STM8S105 // DISCOVERY
 
-void UARTputs(char *message)
-{
-  char *ch = message;
-  while (*ch)
-  {
-    UART2->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
-    while ( 0 == (UART2->SR & UART2_SR_TXE) ); //  Wait for transmission to complete.
-    ch++;                                      //  Grab the next character.
-  }
-}
-
 /**
 * @brief  Test to see if a key has been pressed on the terminal.
 *
@@ -208,24 +218,6 @@ uint8_t SerialKeyPressed(char *key)
   }
 }
 #else
-/**
- *  @brief Send a message to the debug port (UART2).
- *  @details
- *  Sends a variable length, null-terminated string to the UART.
- *    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
- *  @param message Pointer to char array, i.e. a null-terminated ASCII string.
- */
-void UARTputs(char *message)
-{
-  char *ch = message;
-  while (*ch)
-  {
-    UART1->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
-    while ( 0 == (UART1->SR & UART1_SR_TXE) ); //  Wait for transmission to complete.
-    ch++;                                      //  Grab the next character.
-  }
-}
-
 /**
 * @brief  Test to see if a key has been pressed on the terminal.
 *
@@ -289,37 +281,6 @@ static void ADC1_setup(void)
   ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
-#if 0
-/**
- * this code is specific to TIM1 - the capture/compare function can be used for the RC 
- * radio servo pulse input capture. However TIM1 is now comm timing so this bit is not used.
- * copied from STM8 peripheral library (it is static in there)
- */
-static void _TI3_Config(uint8_t TIM1_ICPolarity,
-                        uint8_t TIM1_ICSelection,
-                        uint8_t TIM1_ICFilter)
-{
-  /* Disable the Channel 3: Reset the CCE Bit */
-  TIM1->CCER2 &=  (uint8_t)(~TIM1_CCER2_CC3E);
-
-  /* Select the Input and set the filter */
-  TIM1->CCMR3 =
-    (uint8_t)((uint8_t)(TIM1->CCMR3 & (uint8_t)(~(uint8_t)( TIM1_CCMR_CCxS | TIM1_CCMR_ICxF)))
-              | (uint8_t)(( (TIM1_ICSelection)) | ((uint8_t)( TIM1_ICFilter << 4))));
-
-  /* Select the Polarity */
-  if (TIM1_ICPolarity != TIM1_ICPOLARITY_RISING)
-  {
-    TIM1->CCER2 |= TIM1_CCER2_CC3P;
-  }
-  else
-  {
-    TIM1->CCER2 &= (uint8_t)(~TIM1_CCER2_CC3P);
-  }
-  /* Set the CCE Bit */
-  TIM1->CCER2 |=  TIM1_CCER2_CC3E;
-}
-#endif
 #if 0 // setup TIM1 with CC enabled
 /**
  * @brief Timer 1 Setup
@@ -365,7 +326,7 @@ static void TIM1_setup(void)
 #endif // 105
 
 /**
- * @brief Sets TIM1 period.
+ * @brief Sets period of the commutation timer.
  * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
  * @param  period  Value written to auto-reload register
  */
