@@ -22,7 +22,7 @@
 #endif // UNIT_TEST
 
 
-//#define SPI_ENABLED
+#define SPI_ENABLED
 #if defined( SPI_ENABLED )
   #define SPI_CONTROLLER
 #endif
