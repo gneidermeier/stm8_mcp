@@ -86,7 +86,7 @@
 
 
 // on-board LED
-#ifdef DISCOVERY
+#ifdef STM8S105 // DISCOVERY
   #define LED_GPIO_PORT  (GPIOD)
   #define LED_GPIO_PINS  (GPIO_PIN_0)
 #else
