@@ -262,11 +262,14 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
+    static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
 
-    if ( ++frame_counter > 3 )
+// note pre-increment on variable 
+    if ( ++frame_counter >= Frame_count )
     {
         frame_counter = 0;
+
         Driver_Update();
     }
 
@@ -447,18 +450,14 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
  }
 #else /* STM8S105 or STM8S103 or STM8S903 or STM8AF626x or STM8AF622x */
 /**
-  * @brief ADC1 interrupt routine.
-  * @par Parameters:
-  * None
-  * @retval 
-  * None
+  * @brief  ADC1 interrupt routine.
+  * @param  None
+  * @retval None
   */
  INTERRUPT_HANDLER(ADC1_IRQHandler, 22)
  {
     Driver_on_ADC_conv();
-#if 0
-    GPIOC->ODR &= ~(1 << 4); // what was this for? wiggling a test pin? was supposed to be TIM1 CH4 input capture but we don't have the timer available for that anyway so .. dead code
-#endif
+
     ADC1_ClearFlag(ADC1_FLAG_EOC);
  }
 #endif /* (STM8S208) || (STM8S207) || (STM8AF52Ax) || (STM8AF62Ax) */
@@ -483,8 +482,10 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   */
  INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 23)
  {
-// must reset the tmer interrupt flag
-    TIM4->SR1 &= ~TIM4_SR1_UIF;
+  /* In order to detect unexpected events during development,
+     it is recommended to set a breakpoint on the following instruction.
+  */
+
  }
 #endif /* (STM8S903) || (STM8AF622x)*/
 
