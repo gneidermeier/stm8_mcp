@@ -334,6 +334,11 @@ Next=Root.Source Files...\..\src\sequence.c
 [Root.Source Files...\..\src\sequence.c]
 ElemType=File
 PathName=..\..\src\sequence.c
+Next=Root.Source Files...\..\src\spi_stm8s.c
+
+[Root.Source Files...\..\src\spi_stm8s.c]
+ElemType=File
+PathName=..\..\src\spi_stm8s.c
 Next=Root.Source Files...\..\src\stm8s_it.c
 
 [Root.Source Files...\..\src\stm8s_it.c]
@@ -431,6 +436,11 @@ Next=Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm
 [Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_gpio.c]
 ElemType=File
 PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_gpio.c
+Next=Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_spi.c
+
+[Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_spi.c]
+ElemType=File
+PathName=..\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_spi.c
 Next=Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c
 
 [Root.StdPeriph_Drivers...\..\..\..\libraries\stm8s_stdperiph_driver\src\stm8s_tim1.c]
