@@ -17,22 +17,6 @@
 
 /* defines -------------------------------------------------------------------*/
 
-#ifdef STM8S105 // DISCOVERY
-  #define SDA_PORT  (GPIOD)
-  #define SDA_PIN   (GPIO_PIN_2)
-  #define SDB_PORT  (GPIOE)
-  #define SDB_PIN   (GPIO_PIN_0)
-  #define SDC_PORT  (GPIOA)
-  #define SDC_PIN   (GPIO_PIN_5)
-#else // STM8S003 dev board 
-  #define SDA_PORT  (GPIOA)
-  #define SDA_PIN   (GPIO_PIN_1)
-  #define SDB_PORT  (GPIOA)
-  #define SDB_PIN   (GPIO_PIN_2)
-  #define SDC_PORT  (GPIOC)
-  #define SDC_PIN   (GPIO_PIN_3)
-#endif
-
 /**
  * @brief reference: SPL UART example project
  */
