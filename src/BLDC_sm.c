@@ -14,7 +14,7 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-
+#include <stddef.h>  // NULL
 #include "bldc_sm.h" // external types used internally
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
@@ -191,8 +191,6 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-    static uint8_t cl_timer = 0; // at 1K, 1 byte counter about 1/4 second
-
     if (dc > PWM_DC_SHUTOFF)
     {
         // Update the dc if speed input greater than ramp start, OR if system already running
@@ -200,11 +198,16 @@ void BLDC_PWMDC_Set(uint8_t dc)
         {
             UI_speed = dc;
 
-            // on speed change, check for condition to transition to closed loopo
-            if (FALSE == Control_mode)
-            {
-                if ( 0 == Seq_get_timing_error_p( ( int16_t * ) (0) )  /* --cl_timer == 0 */ )
-                {
+      // on speed change, check for condition to transition to closed loopo
+      if (FALSE == Control_mode)
+      {
+        /*
+         * checks a plausibility condition for transition to closed-loop
+         * control of commutation timing. Also considered imposing a minimum
+         * elapsed run-time but there is apparently no obvious reason to do such a thing.
+        */
+        if ( 0 == Seq_get_timing_error_p( ( int16_t * ) NULL ) )
+        {
 #ifdef CLMODE_ENABLED
                     Control_mode = TRUE;
 #endif
@@ -234,7 +237,7 @@ uint16_t BLDC_PWMDC_Get(void)
     return Commanded_Dutycycle;
 }
 
-
+#if 0
 /** @cond */ // hide some developer/debug code
 
 /*
@@ -257,7 +260,7 @@ void BLDC_Spd_inc()
     BLDC_OL_comm_tm -= 1; // faster
 }
 /** @endcond */
-
+#endif
 
 /**
   * @brief Accessor for commutation period.
