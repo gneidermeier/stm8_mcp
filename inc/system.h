@@ -22,9 +22,10 @@
 #endif // UNIT_TEST
 
 
-
-#define SPI_CONTROLLER
-
+//#define SPI_ENABLED
+#if defined( SPI_ENABLED )
+  #define SPI_CONTROLLER
+#endif
 
 #define SPI_RX_BUF_SZ  16 // 256 // tmp
 
@@ -85,7 +86,9 @@
 #define PWM_100PCNT  TIM2_PWM_PD
 
 
-// on-board LED
+/**
+ * Pin/port for on-board LED
+ */
 #ifdef STM8S105 // DISCOVERY
   #define LED_GPIO_PORT  (GPIOD)
   #define LED_GPIO_PINS  (GPIO_PIN_0)
@@ -93,6 +96,6 @@
 // STM8S003 dev board LED
   #define LED_GPIO_PORT  (GPIOB)
   #define LED_GPIO_PINS  (GPIO_PIN_5)
-#endif // DISCOVER
+#endif
 
 #endif // SYSTEM_H
