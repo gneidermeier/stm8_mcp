@@ -404,7 +404,7 @@ static void Periodic_task(void)
   enableInterrupts();  ///////////////// EI EI O
 
   // update system voltage diagnostic - check plausibilty of Vsys
-  if (BL_IS_RUNNING == bl_state /* && Vsystem > 0 */ )
+  if (BL_IS_RUNNING == bl_state  && Vsystem > 0  )
   {
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
