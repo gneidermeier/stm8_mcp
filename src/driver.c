@@ -65,7 +65,7 @@
  *   ... divided by TIM3 base period (0.25 us)  -> 111 counts
  */
 
-#define TIM3_RATE_MODULUS   4 // each commutation sector of 60-degrees spans 4x TIM3 periods
+#define FOUR_SECTORS  4 // each commutation sector of 60-degrees spans 4x TIM3 periods
 
 
 /* Private types -----------------------------------------------------------*/
@@ -240,16 +240,15 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
-  static const uint8_t UI_UPDATEM  = 16; // mod 16 so @ ~16mS i.e. UI @ 60fps
+  static const uint8_t UI_UPDATEM  = 32; // 16 Mhz sysclock
   static uint8_t trate = 0;
 
-  uint16_t p16 =  get_commutation_period();
-  trate += 1;
-
-  // update controller every other (odd) ISR ... theory being to distribute the
-  // load to update the controller and the UI on alternate frames (doubled the
+#ifndef CLOCK_16
+  UI_UPDATEM = 16; // 8 Mhz sysclock
+#endif
+  // the controller and the UI are updated on alternate frames (doubled the
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
-  if ( 0 != (trate & 0x01) )
+  if ( 0 != ( ++trate & 0x01 ) )
   {
     BLDC_Update();
   }
@@ -261,8 +260,8 @@ void Driver_Update(void)
     Periodic_Task_Wake();
   }
 
-  //  update the timer for the OL commutation switch time
-  MCU_comm_time_cfg( p16 );
+  // update the commutation switch timer period
+  MCU_comm_time_cfg( get_commutation_period() );
 }
 
 
@@ -281,13 +280,13 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
+  static const int SectorC = FOUR_SECTORS;
   static int index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used
 // instead of a MOD (%) to save a few instructions, which is actually significant
 // as this is a very high frequency ISR!
-//    index = (index + 1) % TIM3_RATE_MODULUS;
-  index = (index + 1) & (TIM3_RATE_MODULUS - 1) /* 0x03 */;
+  index = (index + 1) & (SectorC - 1);
 
 // Distribute the work done in the ISR by partitioning
 //  sequence_step, memcpy,  get_ADC into  separate sub-steps
