@@ -128,7 +128,7 @@ PUTCHAR_PROTOTYPE
   /* Write a character to the UART1 */
   UART1_SendData8(c);
   /* Loop until the end of transmission */
-  while (UART2_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+  while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
 
   return (c);
 }
