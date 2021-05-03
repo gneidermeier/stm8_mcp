@@ -255,6 +255,9 @@ void Driver_Update(void)
   }
   else if ( 0 == (trate % UI_UPDATEM))
   {
+    /* Toggles LED */
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);
+
     Periodic_Task_Wake();
   }
 
