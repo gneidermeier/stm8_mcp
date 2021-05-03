@@ -12,221 +12,144 @@
  * @brief STM8S platform and peripheral configuration.
  * @{
  */
-
 /* Includes ------------------------------------------------------------------*/
-
 // app headers
 #include "system.h" // platform specific delarations
+
+ // external declarsations used internally
+#include "mcu_stm8s.h"
 
 
 /* Private defines -----------------------------------------------------------*/
 
-
 /* Public variables  ---------------------------------------------------------*/
-
 
 /* Private variables ---------------------------------------------------------*/
 
-
 /* Private function prototypes -----------------------------------------------*/
 
-
 /* Private functions ---------------------------------------------------------*/
-
-
 /*
- * @brief Configures a few pins needed as GPIO.
- *
- * Specific peripheral module initialization (e.g. A/D, TIMx) will handle
- * setting up suitable IO pin behavior.
- * some of this bulk could be reduced by converting registers to STM8 Peripheral Lib.
- *
- * 11.4 Reset configuration
- *  All I/O pins are generally input floating under reset (i.e. during the reset phase) and at reset
- *  state (i.e. after reset release). However, a few pins may have a different behavior. Refer to
- *  the datasheet pinout description for all details.
- * 11.5 Unused I/O pins
- *  Unused I/O pins must not be left floating to avoid extra current consumption. They must be
- *  put into one of the following configurations:
- *  connected to VDD or VSS by external pull-up or pull-down resistor and kept as input
- *  floating (reset state), configured as input with internal pull-up/down resistor,
- *  configured as output push-pull low.
+  * These functions retarget a few C library stdio function to the USART.
+  * Code was copied from the stm8s SPL USART examples
+  *
+  * Concerning getch():
+  * Works satisfactorily  for its intended purpose, however, to me this one 
+  * operates exactly like getch(),  as opposed to getc(stdin).
+  *
+  * The difference between getc() and getchar() is getc() can read from any input
+  * stream, but getchar() reads from standard input. So getchar() is equivalent 
+  * to getc(stdin).
+  *
+  * getch()is a nonstandard function and is present in conio.h header file (MS-DOS 
+  * compilers like Turbo C). It is not part of the C standard library or ISO C, 
+  * nor is it defined by POSIX.
+  * getch() reads a single character from the keyboard. But it does not use any 
+  * buffer, so the entered character is immediately returned without waiting for 
+  * the enter key.
+  *  https://www.geeksforgeeks.org/difference-getchar-getch-getc-getche/
+  *  https://www.geeksforgeeks.org/getch-function-in-c-with-examples/
+  *
+  * SerialKeyPressed() on the other hand, is intended to be non-blocking, and it is
+  * more akin to 
+  */
+
+#ifdef STM8S105 // DISCOVERY
+
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @details
+  * // Based on SPL UART example project
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Write a character to the UART1 */
+  UART2_SendData8(c);
+  /* Loop until the end of transmission */
+  while (UART2_GetFlagStatus(UART2_FLAG_TXE) == RESET);
+
+  return (c);
+}
+
+/**
+  * @brief getch()-like funcction.
+  * @detail  See above.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
+{
+#ifdef _COSMIC_
+  char c = 0;
+#else
+  int c = 0;
+#endif
+  /* Loop until the Read data register flag is SET */
+  while (UART2_GetFlagStatus(UART2_FLAG_RXNE) == RESET);
+    c = UART2_ReceiveData8();
+  return (c);
+}
+
+/**
+* @brief  Test to see if a key has been pressed on the terminal.
+*
+* @details Allows reading a character but non-blocking.
+* @param [out]  key  Pointer to byte for receiving character code.
+* @retval  1  a character has been read
+* @retval  0  no character has been read
 */
-static void GPIO_Config(void)
+uint8_t SerialKeyPressed(char *key)
 {
-#ifndef DISCOVERY
-
-  /* Initialize I/Os in Output Mode */
-  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
-
-#else
-
-// OUTPUTS
-// built-in LED
-  GPIOD->ODR |= (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
-  GPIOD->DDR |= (1 << LED); //PD.n as output
-  GPIOD->CR1 |= (1 << LED); //push pull output
-
-// D1 is reserved for SWIM
-//    GPIOD->ODR &=  ~(1<<1);
-//    GPIOD->DDR |=  (1<<1);
-//    GPIOD->CR1 |=  (1<<1);
-
-// SD/A=PD2
-  GPIOD->ODR &=  ~(1<<2);
-  GPIOD->DDR |=  (1<<2);
-  GPIOD->CR1 |=  (1<<2);
-
-// SD/B=PE0
-  GPIOE->ODR &=  ~(1<<0); //E0 data
-  GPIOE->DDR |=  (1<<0); //E0 dir
-  GPIOE->CR1 |=  (1<<0); //E0	cfg
-
-// SD/C=PA5
-  GPIOA->ODR &= ~(1 << 5); // set pin off
-  GPIOA->DDR |= (1 << 5);  // PA.5 as OUTPUT
-  GPIOA->CR1 |= (1 << 5);  // push pull output
-
-#ifdef DISCOVERY // GN: STM8s-105 Discovery lets this pin
-// use PG0 (CN2-11) as test pins
-  GPIOG->ODR &= ~(1<<0);
-  GPIOG->DDR |=  (1<<0);
-  GPIOG->CR1 |=  (1<<0);
-#endif
-
-// INPUTS
-// C4 set as input (used with TIM1 CC4 to measure servo pulse)
-  GPIOC->DDR &= ~(1 << 4); // PC.4 as input
-  GPIOC->CR1 |= (1 << 4);  // pull up w/o interrupts
-
-// PA4 as button input (Stop)
-  GPIOA->DDR &= ~(1 << 4); // PA.4 as input
-  GPIOA->CR1 |= (1 << 4);  // pull up w/o interrupts
-// uses CN2.7 as GND
-
-// PA6 as button input (B+)
-  GPIOA->DDR &= ~(1 << 6); // PA.6 as input
-  GPIOA->CR1 |= (1 << 6);  // pull up w/o interrupts
-
-#if 0
-// PE5 as button input (B-) ^H^H^H^H^H^H^H    SPI CSS  (Input)
-  GPIOE->DDR &= ~(1 << 5); // PE.5 as input
-  GPIOE->CR1 |= (1 << 5);  // pull up w/o interrupts
-#endif
-
-// PE.6 AIN9
-  GPIOE->DDR &= ~(1 << 6);  // PE.6 as input
-  GPIOE->CR1 &= ~(1 << 6);  // floating input
-  GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
-
-// PE.7 AIN8
-  GPIOE->DDR &= ~(1 << 7);  // PE.7 as input
-  GPIOE->CR1 &= ~(1 << 7);  // floating input
-  GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
-
-// AIN7
-  GPIOB->DDR &= ~(1 << 7);  // PB.7 as input
-  GPIOB->CR1 &= ~(1 << 7);  // floating input
-  GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
-
-// AIN6
-  GPIOB->DDR &= ~(1 << 6);  // PB.6 as input
-  GPIOB->CR1 &= ~(1 << 6);  // floating input
-  GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
-
-// AIN5
-  GPIOB->DDR &= ~(1 << 5);  // PB.5 as input
-  GPIOB->CR1 &= ~(1 << 5);  // floating input
-  GPIOB->CR2 &= ~(1 << 5);  // 0: External interrupt disabled   ???
-
-// AIN4
-  GPIOB->DDR &= ~(1 << 4);  // PB.4 as input
-  GPIOB->CR1 &= ~(1 << 4);  // floating input
-  GPIOB->CR2 &= ~(1 << 4);  // 0: External interrupt disabled   ???
-
-// AIN3
-  GPIOB->DDR &= ~(1 << 3);  // PB.3 as input
-  GPIOB->CR1 &= ~(1 << 3);  // floating input
-  GPIOB->CR2 &= ~(1 << 3);  // 0: External interrupt disabled   ???
-
-// AIN2
-  GPIOB->DDR &= ~(1 << 2);  // PB.2 as input
-  GPIOB->CR1 &= ~(1 << 2);  // floating input
-  GPIOB->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
-
-// AIN1
-  GPIOB->DDR &= ~(1 << 1);  // PB.1 as input
-  GPIOB->CR1 &= ~(1 << 1);  // floating input
-  GPIOB->CR2 &= ~(1 << 1);  // 0: External interrupt disabled   ???
-
-// AIN0
-  GPIOB->DDR &= ~(1 << 0);  // PB.0 as input
-  GPIOB->CR1 &= ~(1 << 0);  // floating input
-  GPIOB->CR2 &= ~(1 << 0);  // 0: External interrupt disabled   ???
-#endif
-}
-
-/**
- *  @brief Configure UART
- *  @details
- *      - BaudRate = 115200 baud
- *      - Word Length = 8 Bits
- *      - One Stop Bit
- *      - No parity
- *      - Receive and transmit enabled
- *      - UART1 Clock disabled
- *  @param none
- */
-static void UART_setup(void)
-{
-#ifdef DISCOVERY
-  UART2_DeInit();
-
-  UART2_Init(115200,
-             UART2_WORDLENGTH_8D,
-             UART2_STOPBITS_1,
-             UART2_PARITY_NO,
-             UART2_SYNCMODE_CLOCK_DISABLE,
-             UART2_MODE_TXRX_ENABLE);
-
-  UART2_Cmd(ENABLE);
-#else
-  UART1_DeInit();
-
-  UART1_Init(
-    (uint32_t)115200,
-    UART1_WORDLENGTH_8D,
-    UART1_STOPBITS_1,
-    UART1_PARITY_NO,
-    UART1_SYNCMODE_CLOCK_DISABLE,
-    UART1_MODE_TXRX_ENABLE);
-
-//    UART1_Cmd(ENABLE); // GN: must enable by default
-//    UART1->CR1 &= (uint8_t)(~UART1_CR1_UARTD);
-#endif
-}
-
-// TODO: deprecated
-
-#ifdef DISCOVERY
-
-#else
-/**
- *  @brief Send a message to the debug port (UART2).
- *  @details
- *  Sends a variable length, null-terminated string to the UART.
- *    (https://blog.mark-stevens.co.uk/2012/08/using-the-uart-on-the-stm8s-2/)
- *  @param message Pointer to char array, i.e. a null-terminated ASCII string.
- */
-void UARTputs(char *message)
-{
-  char *ch = message;
-  while (*ch)
+  FlagStatus flag  ;
+  /* First clear Rx buffer */
+  flag = UART2_GetFlagStatus(UART2_FLAG_RXNE);
+  if ( flag == SET)
   {
-    UART1->DR = (unsigned char) *ch;     //  Put the next character into the data transmission register.
-    while ( 0 == (UART1->SR & UART1_SR_TXE) ); //  Wait for transmission to complete.
-    ch++;                                      //  Grab the next character.
+    *key = (char)UART2->DR;
+    return 1;
   }
+  else
+  {
+    return 0;
+  }
+}
+#else // stm8s003
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @details
+  * // Based on SPL UART example project
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Write a character to the UART1 */
+  UART1_SendData8(c);
+  /* Loop until the end of transmission */
+  while (UART2_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+
+  return (c);
+}
+
+/**
+  * @brief getch()-like funcction.
+	* @detail  See above.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
+{
+#ifdef _COSMIC_
+  char c = 0;
+#else
+  int c = 0;
+#endif
+  /* Loop until the Read data register flag is SET */
+  while (UART1_GetFlagStatus(UART1_FLAG_RXNE) == RESET);
+    c = UART1_ReceiveData8();
+  return (c);
 }
 
 /**
@@ -255,6 +178,167 @@ uint8_t SerialKeyPressed(char *key)
 #endif
 
 /*
+ * @brief Configure GPIO.
+ *
+ * Specific peripheral module initialization (e.g. A/D, TIMx) will handle
+ * setting up suitable IO pin behavior.
+ * some of this bulk could be reduced by converting registers to STM8 Peripheral Lib.
+ *
+ * 11.4 Reset configuration
+ *  All I/O pins are generally input floating under reset (i.e. during the reset phase) and at reset
+ *  state (i.e. after reset release). However, a few pins may have a different behavior. Refer to
+ *  the datasheet pinout description for all details.
+ * 11.5 Unused I/O pins
+ *  Unused I/O pins must not be left floating to avoid extra current consumption. They must be
+ *  put into one of the following configurations:
+ *  connected to VDD or VSS by external pull-up or pull-down resistor and kept as input
+ *  floating (reset state), configured as input with internal pull-up/down resistor,
+ *  configured as output push-pull low.
+*/
+static void GPIO_Config(void)
+{
+#ifdef STM8S105 // DISCOVERY
+// this is the "legacy" '105 code and tended to avoid SPL
+// OUTPUTS
+// built-in LED
+  GPIOD->ODR |= LED_GPIO_PINS; // (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
+  GPIOD->DDR |= LED_GPIO_PINS; // (1 << LED); //PD.n as output
+  GPIOD->CR1 |= LED_GPIO_PINS; // (1 << LED); //push pull output
+
+// PD2 -> SD/A
+  GPIOD->ODR &=  ~GPIO_PIN_2;
+  GPIOD->DDR |=  GPIO_PIN_2;
+  GPIOD->CR1 |=  GPIO_PIN_2;
+
+// PE0 -> SD/B
+  GPIOE->ODR &=  ~GPIO_PIN_0;
+  GPIOE->DDR |=  GPIO_PIN_0;
+  GPIOE->CR1 |=  GPIO_PIN_0;
+
+// PA5 -> SD/C
+  GPIOA->ODR &= ~GPIO_PIN_5; // set pin off
+  GPIOA->DDR |= GPIO_PIN_5;  // OUTPUT
+  GPIOA->CR1 |= GPIO_PIN_5;  // push pull output
+
+// INPUTS
+#if 0
+// C4 set as input (used with TIM1 CC4 to measure servo pulse)
+  GPIOC->DDR &= ~GPIO_PIN_4;
+  GPIOC->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
+
+// PA4 as button input (Stop)
+  GPIOA->DDR &= ~GPIO_PIN_4;
+  GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
+#endif
+#if 0
+// AIN9
+  GPIOE->DDR &= ~(1 << 6);
+  GPIOE->CR1 &= ~(1 << 6);  // floating input
+  GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
+
+// AIN8
+  GPIOE->DDR &= ~(1 << 7);
+  GPIOE->CR1 &= ~(1 << 7);  // floating input
+  GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
+
+// AIN7
+  GPIOB->DDR &= ~(1 << 7);
+  GPIOB->CR1 &= ~(1 << 7);  // floating input
+  GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
+
+// AIN6
+  GPIOB->DDR &= ~(1 << 6);
+  GPIOB->CR1 &= ~(1 << 6);  // floating input
+  GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
+
+// AIN5
+  GPIOB->DDR &= ~(1 << 5);
+  GPIOB->CR1 &= ~(1 << 5);  // floating input
+  GPIOB->CR2 &= ~(1 << 5);  // 0: External interrupt disabled   ???
+
+// AIN4
+  GPIOB->DDR &= ~(1 << 4);
+  GPIOB->CR1 &= ~(1 << 4);  // floating input
+  GPIOB->CR2 &= ~(1 << 4);  // 0: External interrupt disabled   ???
+
+// AIN3
+  GPIOB->DDR &= ~(1 << 3);
+  GPIOB->CR1 &= ~(1 << 3);  // floating input
+  GPIOB->CR2 &= ~(1 << 3);  // 0: External interrupt disabled   ???
+#endif
+// AIN2
+  GPIOB->DDR &= ~GPIO_PIN_2;
+  GPIOB->CR1 &= ~GPIO_PIN_2;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_2;  // 0: External interrupt disabled   ???
+
+// AIN1
+  GPIOB->DDR &= ~GPIO_PIN_1;
+  GPIOB->CR1 &= ~GPIO_PIN_1;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_1;  // 0: External interrupt disabled   ???
+
+// AIN0
+  GPIOB->DDR &= ~GPIO_PIN_0;
+  GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled   ???
+
+#else  // '003 dev board
+
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+// /SD: A1, A2, C3
+  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+#if 0
+// AIN3
+  GPIOD->DDR &= ~(1 << 2);
+  GPIOD->CR1 &= ~(1 << 2);  // floating input
+  GPIOD->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
+#endif
+#endif // STM8S105
+}
+
+/**
+ *  @brief Configure UART
+ *  @details
+ *      - BaudRate = 115200 baud
+ *      - Word Length = 8 Bits
+ *      - One Stop Bit
+ *      - No parity
+ *      - Receive and transmit enabled
+ *      - UART1 Clock disabled
+ *  @param none
+ */
+static void UART_setup(void)
+{
+#ifdef STM8S105 // DISCOVERY
+  UART2_DeInit();
+
+  UART2_Init(115200,
+             UART2_WORDLENGTH_8D,
+             UART2_STOPBITS_1,
+             UART2_PARITY_NO,
+             UART2_SYNCMODE_CLOCK_DISABLE,
+             UART2_MODE_TXRX_ENABLE);
+
+  UART2_Cmd(ENABLE);
+#else
+  UART1_DeInit();
+
+  UART1_Init(
+    (uint32_t)115200,
+    UART1_WORDLENGTH_8D,
+    UART1_STOPBITS_1,
+    UART1_PARITY_NO,
+    UART1_SYNCMODE_CLOCK_DISABLE,
+    UART1_MODE_TXRX_ENABLE);
+
+    UART1_Cmd(ENABLE);
+#endif
+}
+
+/*
  * set ADC clock to 4Mhz  - sample time from the data sheet @ 4Mhz
  * min sample time .75 useconds @ fADC = 4Mhz
  * conversion time = 14 * 1/2000000 = 0.0000035 seconds (3.5 us)
@@ -269,10 +353,6 @@ uint8_t SerialKeyPressed(char *key)
  */
 static void ADC1_setup(void)
 {
-// Port B[0..7]=floating input no interr
-// STM8 Discovery, all PortB pins are on CN3
-//    GPIO_Init(GPIOB, GPIO_PIN_ALL, GPIO_MODE_IN_FL_NO_IT); // all AIN pins setup explicityly with the GPIO init
-
   ADC1_DeInit();
 
   ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
@@ -296,42 +376,7 @@ static void ADC1_setup(void)
   ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
-#ifdef DISCOVERY
-// copied from STM8 peripheral library (it is static in there)
-static void _TI3_Config(uint8_t TIM1_ICPolarity,
-                        uint8_t TIM1_ICSelection,
-                        uint8_t TIM1_ICFilter)
-{
-  /* Disable the Channel 3: Reset the CCE Bit */
-  TIM1->CCER2 &=  (uint8_t)(~TIM1_CCER2_CC3E);
-
-  /* Select the Input and set the filter */
-  TIM1->CCMR3 =
-    (uint8_t)((uint8_t)(TIM1->CCMR3 & (uint8_t)(~(uint8_t)( TIM1_CCMR_CCxS | TIM1_CCMR_ICxF)))
-              | (uint8_t)(( (TIM1_ICSelection)) | ((uint8_t)( TIM1_ICFilter << 4))));
-
-  /* Select the Polarity */
-  if (TIM1_ICPolarity != TIM1_ICPOLARITY_RISING)
-  {
-    TIM1->CCER2 |= TIM1_CCER2_CC3P;
-  }
-  else
-  {
-    TIM1->CCER2 &= (uint8_t)(~TIM1_CCER2_CC3P);
-  }
-  /* Set the CCE Bit */
-  TIM1->CCER2 |=  TIM1_CCER2_CC3E;
-}
-
-/*
- * Timer 1 prescaler
-*/
-#ifdef CLOCK_16
-#define TIM1_PRESCALER 16 //
-#else
-#define TIM1_PRESCALER 8  // 1/8Mhz * 16 * 65536 = 0.131072 (about 131ms)
-#endif
-
+#if 0 // setup TIM1 with CC enabled
 /**
  * @brief Timer 1 Setup
  *
@@ -344,6 +389,7 @@ static void _TI3_Config(uint8_t TIM1_ICPolarity,
 */
 static void TIM1_setup(void)
 {
+  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
   const uint16_t T1_Period = 0xFFFF;
 
   TIM1_DeInit();
@@ -372,14 +418,12 @@ static void TIM1_setup(void)
 
   TIM1_Cmd(ENABLE);
 }
-#else
+#endif // 105
 
 /**
- * @brief Configure brushless motor commutation timing
- * @details
- * Sets period of commutation timer peripheral assigned to commutation timing.
+ * @brief Sets period of the commutation timer.
  * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
- * @param  period  Value written to the timer peripheral auto-reload register
+ * @param  period  Value written to auto-reload register
  */
 #ifdef CLOCK_16
 #define TIM1_PSCR  0x02
@@ -402,8 +446,6 @@ void MCU_comm_time_cfg(uint16_t period)
   TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
   TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
 }
-#endif
-
 
 /*
  * Setup TIM2 PWM
@@ -417,7 +459,7 @@ void MCU_comm_time_cfg(uint16_t period)
 
 static void TIM2_setup(void)
 {
-  const uint16_t CCR1_init = 125; // tmp .. 0
+  const uint16_t CCR1_init = 0;
   const uint16_t CCR1_Val = CCR1_init;
   const uint16_t CCR2_Val = CCR1_init;
   const uint16_t CCR3_Val = CCR1_init;
@@ -445,72 +487,18 @@ static void TIM2_setup(void)
 
   /* Enables TIM2 peripheral Preload register on ARR */
   TIM2_ARRPreloadConfig(ENABLE);
-
+/** 
+ * Enable the ISR - initiates the back-EMF ADC measurement at the starting edge of
+ * the PWM pulse. The timer is required to be left free running as it drives the
+ * the periodic UI and Controller tasks (unless the timer is explicitly stopped or
+ * reset, there is effect from i.e. starting/stopping the PWM output channels as is
+ * done for the motor commutation control).
+ */
   TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
 
   /* Enable TIM2 */
   TIM2_Cmd(ENABLE);
 }
-
-
-/*
- * Configure Timer 4 as general purpose fixed time-base reference
- * Timer 4 & 6 are 8-bit basic timers
- *
- *   https://lujji.github.io/blog/bare-metal-programming-stm8/
- *
- * Setting periodic task for fast-ish rate of A/D acquisition.
- * ISR must set 'TaskRdy' flag and not block on the task since A/D does a blocking wait.
- */
-static void TIM4_setup(void)
-{
-  const uint8_t Period = (16 * SYS_RATE_MULT);
-
-#ifdef CLOCK_16
-  TIM4->PSCR = 0x07; // PS = 128  -> 0.0000000625 * 128 * p
-#else
-  TIM4->PSCR = 0x06; // PS =  64  -> 0.000000125  *  64 * p
-#endif
-
-  TIM4->ARR = Period;
-
-  TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
-  TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
-}
-
-/*
- * Timers 2 3 & 5 are 16-bit general purpose timers
- *  Sets the commutation switching period.
- *
- *  @8Mhz, fMASTER period ==  0.000000125 S
- *   Timer Step:
- *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
- */
-
-#ifdef DISCOVERY // 003 doesn't have this peripheral instance
-#ifdef CLOCK_16
-#define TIM3_PSCR  0x01  // 2^1 == 2
-#else
-#define TIM3_PSCR  0x00  // 2^0 == 1
-#endif
-/**
- * @brief Sets TIM3 period.
- * Sets the TIM3 prescaler, auto-reload register (ARR), enables interrupt.
- * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
- * @param  period  Value written to TIM3 ARR
- */
-void TIM3_setup(uint16_t period)
-{
-  TIM3->PSCR = TIM3_PSCR;
-
-  TIM3->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
-  TIM3->ARRL = (uint8_t)(period & 0xff);
-
-  TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
-  TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
-  TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
-}
-#endif // DISCOVER
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
@@ -522,21 +510,22 @@ static void Clock_setup(void)
 {
   CLK_DeInit();
 
-#if !defined(DISCOVERY) // && defined(INTCLOCK)
-
+#if !defined(STM8S105) // && defined(INTCLOCK)
   /*High speed internal clock prescaler: 1*/
   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
-
 #else
   // Configure Quartz Clock
   CLK_DeInit();
   CLK_HSECmd(ENABLE);
+
 #ifdef CLOCK_16
   CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1); // 16Mhz
 #else
   CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // 8Mhz
 #endif // CLK
-#endif
+
+#endif // '105
+
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, ENABLE);
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
@@ -548,7 +537,7 @@ static void Clock_setup(void)
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
-#ifdef DISCOVERY
+#if defined( SPI_ENABLED )
 /**
 * References:
 *   https://www.programmersought.com/article/34101773427/
@@ -571,7 +560,11 @@ void SPI_setup(void)
   GPIO_Init(GPIOC, GPIO_PIN_7, GPIO_MODE_IN_PU_NO_IT);
 
   SPI_Init(SPI_FIRSTBIT_MSB,
+#ifdef CLOCK_16
            SPI_BAUDRATEPRESCALER_256, // tmp test //      SPI_BAUDRATEPRESCALER_16, // how fast
+#else
+           SPI_BAUDRATEPRESCALER_128, // tmp test //      SPI_BAUDRATEPRESCALER_16, // how fast
+#endif
            SPI_MODE_MASTER,
            SPI_CLOCKPOLARITY_LOW, SPI_CLOCKPHASE_1EDGE,
            SPI_DATADIRECTION_2LINES_FULLDUPLEX, SPI_NSS_SOFT, (uint8_t)0x07);
@@ -594,12 +587,13 @@ void SPI_setup(void)
 #if 0 //  #ifdef SPI_PERPIPH_INT
   SPI_ITConfig(SPI_IT_RXNE, ENABLE); // Interrupt when the Rx buffer is not empty.
 #endif
-#endif
+
+#endif // SPI_CONTROLLER
 
   //Enable SPI.
   SPI_Cmd(ENABLE);
 }
-#endif // DISCOVER
+#endif // SPI_ENABLE
 
 /**
  * @brief  Initialize MCU and peripheral modules
@@ -610,11 +604,12 @@ void MCU_Init(void)
   Clock_setup();
   GPIO_Config();
   UART_setup();
-//  TIM1_setup(); // commutation timing setup is adjusted continuously by CL controller
+//  TIM1_setup(); // if input capture is used (not available on '003)
   TIM2_setup();
-  TIM4_setup();
-#ifdef DISCOVERY
+#ifndef STM8S003             //   resistor divider for 3.3v  TBD
   ADC1_setup();
+#endif
+#if defined( SPI_ENABLED )
   SPI_setup();
 #endif
 }

@@ -12,26 +12,46 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-// stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
-//#include <stm8s.h>
-
 // app headers
 #include "system.h" // platform specific delarations
 
+/* defines -------------------------------------------------------------------*/
 
-/* Private defines -----------------------------------------------------------*/
+#ifdef STM8S105 // DISCOVERY
+  #define SDA_PORT  (GPIOD)
+  #define SDA_PIN   (GPIO_PIN_2)
+  #define SDB_PORT  (GPIOE)
+  #define SDB_PIN   (GPIO_PIN_0)
+  #define SDC_PORT  (GPIOA)
+  #define SDC_PIN   (GPIO_PIN_5)
+#else // STM8S003 dev board 
+  #define SDA_PORT  (GPIOA)
+  #define SDA_PIN   (GPIO_PIN_1)
+  #define SDB_PORT  (GPIOA)
+  #define SDB_PIN   (GPIO_PIN_2)
+  #define SDC_PORT  (GPIOC)
+  #define SDC_PIN   (GPIO_PIN_3)
+#endif
 
-
+/**
+ * @brief reference: SPL UART example project
+ */
+#ifdef _RAISONANCE_
+#define PUTCHAR_PROTOTYPE int putchar (char c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#elif defined (_COSMIC_)
+#define PUTCHAR_PROTOTYPE char putchar (char c)
+#define GETCHAR_PROTOTYPE char getchar (void)
+#else /* _IAR_ */
+#define PUTCHAR_PROTOTYPE int putchar (int c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#endif /* _RAISONANCE_ */
 
 /* Public variables  ---------------------------------------------------------*/
 
-
-
 /* Private variables ---------------------------------------------------------*/
 
-
-
-/* function prototypes -----------------------------------------------*/
+/* function prototypes -------------------------------------------------------*/
 
 uint8_t SerialKeyPressed(char *key);
 
