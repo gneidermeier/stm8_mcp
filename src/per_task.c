@@ -14,8 +14,8 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
 #include <stddef.h> // NULL
-#include <string.h> // strat
 
 // app headers
 #include "mcu_stm8s.h"
@@ -30,6 +30,10 @@
 
 #define TRIM_DEFAULT  0 //
 
+// Threshold is set low enuogh that the machine doesn't stall 
+// thru the lower speed transition into closed-loop control. 
+// The fault can be tested by letting the spinning prop disc strike a flimsy
+// obstacle like a 3x5 index card.
 #define V_SHUTDOWN_THR      0x0340 // experimentally determined!
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
@@ -58,8 +62,10 @@ typedef void (*ui_handlrp_t)( void );
 // local enum only for setting enumerated order to UI event dispatcher
 enum
 {
+#if 0 // tmp?
   COMM_PLUS  = ']',
   COMM_MINUS = '[',
+#endif	
   SPD_PLUS   = '.', //'>',
   SPD_MINUS  = ',', //'<',
   M_STOP     = ' '  // one space character
@@ -98,8 +104,8 @@ static  uint16_t Vsystem; // persistent for averaging
 
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
-  {COMM_PLUS,  comm_plus},
-  {COMM_MINUS, comm_minus},
+//  {COMM_PLUS,  comm_plus},
+//  {COMM_MINUS, comm_minus},
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
   {M_STOP,     m_stop}
@@ -112,44 +118,6 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
 
 
 /* Private functions ---------------------------------------------------------*/
-
-/*
- * home-made itoa function (16-bits only, hex-only)
- * seems Cosmic only provide atoi in stdlib and not itoa
- */
-static char * itoa(uint16_t u16in, char *sbuf, int base)
-{
-  int x;
-  int shift = 16 - 4;	/* 4-bits to 1 nibble */
-  uint16_t n16 = u16in;
-
-  if (16 != base)
-  {
-    return NULL;
-  }
-
-  x = 0;
-  while (x < 4 /* 4 nibbles in 16-bit word */ )
-  {
-    unsigned char c = (uint8_t)( (n16 >> shift) & 0x000F );
-
-    if (c > 9)
-    {
-      c -= 10;
-      c += 'A';
-    }
-    else
-    {
-      c += '0';
-    }
-    sbuf[x++] = c;
-    shift -= 4;
-  }
-  sbuf[x] = 0;
-
-  return sbuf;
-}
-
 
 /** @cond */ // hide some developer/debug code
 // hack, temp
@@ -166,14 +134,14 @@ extern int Back_EMF_Riseing_PhX;
 static void dbg_println(int zrof)
 {
   static uint16_t Line_Count = 0;
+  // whats going on with the prinf format specifiers when lvalues are cast and/or promoted?
+  int faults = (int)Faultm_get_status();
+  int uispd = (int)UI_Speed;
 
-  char sbuf[256] ;                     // am i big enuff?
-  char cbuf[8] = { 0, 0 };
+  char sbuf[80] ;                     // am i big enuff?
 
 // globals are accessed (read) outside of CS so be it
   int16_t timing_error = Seq_get_timing_error();
-
-  sbuf[0] = 0;
 
   if ( 0 != zrof)
   {
@@ -182,6 +150,7 @@ static void dbg_println(int zrof)
 
   Line_Count  += 1;;
 
+#if 0 // #ifdef OLD_PUTS
   strcat(sbuf, "(");
   itoa(Line_Count, cbuf, 16);
   strcat(sbuf, cbuf);
@@ -206,11 +175,11 @@ static void dbg_println(int zrof)
   strcat(sbuf, " TTE=");
   itoa( timing_error, cbuf, 16);
   strcat(sbuf, cbuf);
-#if 0
+
   strcat(sbuf, " CM=");
   itoa( Control_mode, cbuf, 16);
   strcat(sbuf, cbuf);
-#endif
+
   strcat(sbuf, " bRi=");
   itoa( Back_EMF_Riseing_PhX, cbuf, 16);
   strcat(sbuf, cbuf);
@@ -241,6 +210,19 @@ static void dbg_println(int zrof)
 
   strcat(sbuf, "\r\n");
   UARTputs(sbuf);
+#else
+//  tmpi = (int)Faultm_get_status();
+//  uispd = (int)UI_Speed;
+  printf(
+    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X \r\n",
+    Line_Count,
+    uispd,
+    get_commutation_period(),
+    BLDC_PWMDC_Get(),
+    Vsystem,
+    faults
+  );
+#endif
 }
 
 //$0768 - $044A  = $031E
@@ -277,7 +259,6 @@ static void set_ui_speed(void)
 //   scale factors ...     ( 1/2   +   1/2 )  /     (1/4)
   UI_pulse_dc = (PWM_100PCNT>>1) * tmp_u16 / (RF_RANGE>>2);
 
-
 // if RF pulse qualified, then use it - needs more thought
   if (UI_pulse_perd > RF_NORDO_THR)
   {
@@ -299,7 +280,6 @@ static void set_ui_speed(void)
     {
       tmp_sint16 = U8_MAX;
     }
-
     UI_Speed = (uint8_t)tmp_sint16;
   }
 }
@@ -315,7 +295,7 @@ void UI_Stop(void)
 // reset the machine
   BL_reset();
 }
-
+#if 0
 /*
  * handlers for UI events must be short as they are invoked in ISR context
  */
@@ -329,6 +309,7 @@ static void comm_minus(void)
 {
   BLDC_Spd_dec();
 }
+#endif
 
 // stop key from terminal ... merge w/ UI_stop?
 static void m_stop(void)
@@ -339,7 +320,7 @@ static void m_stop(void)
   // reset the simulated trim swich between system runs
   Digital_trim_switch = TRIM_DEFAULT;
 
-  UARTputs("###\r\n");
+  printf("###\r\n");
 
   Log_Level = 1; // stop the logger output
   dbg_println(1 /* clear line count */ );
@@ -364,13 +345,12 @@ static void spd_minus(void)
   }
 }
 
-
 static ui_handlrp_t handle_term_inp(void)
 {
   ui_handlrp_t fp = NULL;
-  char sbuf[16] = "";
-  char cbuf[8] = { 0, 0 };
   char key;
+  // whats going on with the prinf format specifiers when lvalues are cast and/or promoted?
+  int uispd = (int)UI_Speed;
 
   if (SerialKeyPressed(&key))
   {
@@ -387,11 +367,9 @@ static ui_handlrp_t handle_term_inp(void)
     }
 // anykey ...
     Log_Level = 255;// default anykey enable continous/verbous log
-// 1 line output on terminal ... term output does whiles but that ok here (not in CS)
-    itoa(UI_Speed, cbuf, 16);
-    strcat(sbuf, cbuf);
-    strcat(sbuf, "\r\n");
-    UARTputs(sbuf);
+
+// term output is allowed here (not in an ISR or a CS)
+    printf("%X\r\n", uispd);
   }
   return fp;
 }
@@ -425,10 +403,8 @@ static void Periodic_task(void)
 
   enableInterrupts();  ///////////////// EI EI O
 
-
-  // update system voltage diagnostic - should be interrupt safe, the status word
-  // is the only access in ISR context, and it is a byte so shoud be atomic.
-  if (BL_IS_RUNNING == bl_state )
+  // update system voltage diagnostic - check plausibilty of Vsys
+  if (BL_IS_RUNNING == bl_state /* && Vsystem > 0 */ )
   {
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
@@ -469,11 +445,10 @@ uint8_t Task_Ready(void)
 
     if ( ! ((framecount++) % 0x20) )
     {
-#if defined( DESCOVERY ) && defined( SPI_CONTROLLER )
+#if defined( SPI_ENABLED ) && defined( SPI_CONTROLLER )
       SPI_controld();
 #endif
     }
-
     return TRUE;
   }
   return FALSE;

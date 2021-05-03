@@ -8,6 +8,7 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
 #include <ctype.h> // isprint
 #include <string.h> // memset
 
@@ -165,8 +166,7 @@ void SPI_controld(void)
     sbuf[4] = isprint( (int)rxbuf[2] ) ? rxbuf[2] : '.' ;
     sbuf[5] = isprint( (int)rxbuf[3] ) ? rxbuf[3] : '.' ;
     sbuf[6] = 0;
-    strcat(sbuf, "\r\n");
-    UARTputs(sbuf);
+    printf("%s\r\n", sbuf);
 }
 
 

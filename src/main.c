@@ -7,13 +7,9 @@
   * @date     26-April-2021
   ******************************************************************************
   */
-
 /* Includes ------------------------------------------------------------------*/
-//#include "stm8s.h"
-#include "stdio.h"
-
+#include <stdio.h>
 #include <ctype.h> // isprint
-#include <string.h> // strcat
 
 // app headers
 #include "mcu_stm8s.h"
@@ -34,37 +30,11 @@ If you have multiple source files in your project, interrupt service routines ca
 #include "stm8s_it.c"
 #endif
 
-/**
-  * @addtogroup UART1_Printf
-  * @{
-  */
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-#ifdef _RAISONANCE_
-#define PUTCHAR_PROTOTYPE int putchar (char c)
-#define GETCHAR_PROTOTYPE int getchar (void)
-#elif defined (_COSMIC_)
-#define PUTCHAR_PROTOTYPE char putchar (char c)
-#define GETCHAR_PROTOTYPE char getchar (void)
-#else /* _IAR_ */
-#define PUTCHAR_PROTOTYPE int putchar (int c)
-#define GETCHAR_PROTOTYPE int getchar (void)
-#endif /* _RAISONANCE_ */
 
 /* Private macro -------------------------------------------------------------*/
 
-/* Private variables ---------------------------------------------------------*/
-/* Private function prototypes -----------------------------------------------*/
-/* Private functions ---------------------------------------------------------*/
 
-void Delay(uint16_t nCount)
-{
-  /* Decrement nCount value */
-  while (nCount != 0)
-  {
-    nCount--;
-  }
-}
+/* Private functions ---------------------------------------------------------*/
 
 /**
   * @brief  Mainly looping.
@@ -73,60 +43,84 @@ void Delay(uint16_t nCount)
   */
 void main(int argc, char **argv)
 {
-  char ans;
+#ifndef SPI_CONTROLLER
+  static const uint8_t tx_buf[RX_BUF_SZ] = "0123456789ABCDEF";
+#endif
+  uint8_t linec = 0;
+  uint8_t framecount = 0;
+  uint8_t i = 0;
+  (void) argc;
+  (void) argv;
 
   MCU_Init();
+
+  BL_reset();
 
   printf("\n\rProgram Startup.......\n\r");
 
   enableInterrupts(); // interrupts are globally disabled by default
 
-  while (1)
+  while(1)
   {
-#if 0
-    ans = getchar();
-    printf("%c", ans);
-#else
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time	
+//  button input either button would transition from OFF->RAMP
+    if (! (( GPIOA->IDR)&(1<<4)))
+    {
+//            while( ! (( GPIOA->IDR)&(1<<4)) ); // no concern for debounce for a stop switch
+      disableInterrupts();
+      UI_Stop();
+      enableInterrupts();
+    }
+#endif
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
+    if (! (( GPIOA->IDR)&(1<<6)))
+    {
+      while( ! (( GPIOA->IDR)&(1<<6)) ); // wait for debounce (sorta works)
+      disableInterrupts();
+      BLDC_Spd_inc();
+      enableInterrupts();
+    }
+#endif
+
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
+    if ( ! (( GPIOE->IDR)&(1<<5)))
+    {
+      while( ! (( GPIOE->IDR)&(1<<5)) ) {;} // wait for debounce (sorta works)
+      disableInterrupts();
+      BLDC_Spd_dec();
+      enableInterrupts();
+    }
+#endif
+
     if ( TRUE == Task_Ready() )
     {
-        GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS);			
+// this modulus provides a time reference of approximately 2 Hz (debug/test/dev/usage)
+      if ( ! ((framecount++) % 0x20) )
+      {
+      }
     }
-//    Delay(0xFFFF);
-#endif
-  }
-}
 
-/**
-  * @brief Retargets the C library printf function to the UART.
-  * @param c Character to send
-  * @retval char Character sent
-  */
-PUTCHAR_PROTOTYPE
-{
-  /* Write a character to the UART1 */
-  UART1_SendData8(c);
-  /* Loop until the end of transmission */
-  while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
-
-  return (c);
-}
-
-/**
-  * @brief Retargets the C library scanf function to the USART.
-  * @param None
-  * @retval char Character to Read
-  */
-GETCHAR_PROTOTYPE
-{
-#ifdef _COSMIC_
-  char c = 0;
-#else
-  int c = 0;
-#endif
-  /* Loop until the Read data register flag is SET */
-  while (UART1_GetFlagStatus(UART1_FLAG_RXNE) == RESET);
-  c = UART1_ReceiveData8();
-  return (c);
+#if defined( SPI_ENABLED )
+#ifndef SPI_CONTROLLER
+    if (-1 != SPI_read_write_b(tx_buf, 0xA5, TIME_OUT_0) )
+    {
+      char sbuf[16]; // am i big enuff?
+      // tmp dump test SPI test data to UART
+      linec = (uint8_t)(linec < 126 ? linec++ : 0x30);
+      sbuf[0] = '>';
+      sbuf[1] = linec++;
+      sbuf[2] = isprint( (int)spi_rx_buf[0] ) ? spi_rx_buf[0] : '.' ;
+      sbuf[3] = isprint( (int)spi_rx_buf[1] ) ? spi_rx_buf[1] : '.' ;
+      sbuf[4] = isprint( (int)spi_rx_buf[2] ) ? spi_rx_buf[2] : '.' ;
+      sbuf[5] = isprint( (int)spi_rx_buf[3] ) ? spi_rx_buf[3] : '.' ;
+      sbuf[6] = isprint( (int)spi_rx_buf[4] ) ? spi_rx_buf[4] : '.' ;
+      sbuf[7] = 0;
+      strcat(sbuf, "\r\n");
+      UARTputs(sbuf);
+    }
+#endif // SPI CONT
+#endif // SPI_EN
+  } // while 1
 }
 
 #ifdef USE_FULL_ASSERT
