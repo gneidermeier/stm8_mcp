@@ -14,14 +14,21 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-
+#include <stddef.h> // NULL
 #include "pwm_stm8s.h"
 #include "driver.h"
 #include "bldc_sm.h"
 
 
 /* Private defines -----------------------------------------------------------*/
-
+/**
+ * Plausibility of back-EMF measurement: the threshold (somewhat arbitrary) is
+ * based on taking the average of the latest back-EMF leading-side and trailing-
+ * side measurements, i.e.:
+ * [ (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR ]
+ * The open-loop ramp-to speed should ensure this condition.
+ */
+#define  BACK_EMF_PLAUS_THR  0x03F8
 
 /* Private types -----------------------------------------------------------*/
 
@@ -69,17 +76,12 @@ static const step_ptr_t step_ptr_table[] =
     sector_5
 };
 
-
 /*
  * Timing error term -  magnitude of the "falling"
  * (right) side is proportional to the degree of timing advance .. advanced
  * condition is seen when there is greater distribution of back-emf area on the
  * right side.
  */
-//static int16_t comm_timing_error;
-//#define TIMING_ERROR_TERM   (Back_EMF_Falling_PhX - Back_EMF_Riseing_PhX)
-
-
 // There isn't a timing control point to use to determine the error - however
 // ratio of the leading and falling slopes (integration) indicates the direction
 // and varies according to the magnitude of the timing error.
@@ -222,44 +224,48 @@ static void sector_5(void)
 
 /* Public functions ---------------------------------------------------------*/
 
-// leading and trailing back-emf area under the curve should meet some minimum
-// level to be measurable .. should be at about the ramp-to speed
-#define  BACK_EMF_PLAUS_THR  0x03F8
-
 /**
- * @brief Accessor for control error.
+ * @brief  Determine plausibility of Control error term.
  *
  * @details If the motor timing is advanced, the control error should be
  *  positive i.e.  increasing commutation period slows the motor.
  *
+ * @param[in]  p16term
+ *             pointer to the 16-bit integer error term allocated by the caller
+ *
  * @return signed error which at its extreme should be equal to or less than the
  *  range of the initial ADC measurement i.e. 0x0400
  */
-int Seq_get_timing_error_p(int16_t * int16p)
+int Seq_get_timing_error_p(int16_t * p16term)
 {
 //    int16_t perror = comm_timing_error; // positive if advanced
     int err = -1; // report error on measurement plausibility
 
-    if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
+  if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
+  {
+    err = 0;
+// 4/30: turns out there is only one caller, and it is not using the error term (passes in NULL)
+#if 0 
+    if ( NULL != int16p)
     {
-        err  = 0;
-
-        if ( 0 != int16p)
-        {
-            *int16p = comm_tm_err_ratio;  // positive if advanced
-        }
+      *int16p = Seq_get_timing_error(); // comm_tm_err_ratio;  // positive if advanced
     }
-
-    return err;
+#endif
+  }  return err;
 }
-// old
+
+/**
+ * @brief Accessor for control error term
+ *
+ * @details If the motor timing is advanced, the control error should be
+ *  positive i.e. increasing commutation period slows the motor.
+ *
+ * @return signed error which at its extreme should be equal to or less than the
+ *  range of the initial ADC measurement i.e. 0x0400
+ */
 int16_t Seq_get_timing_error(void)
 {
-//    int16_t perror = comm_timing_error; // positive if advanced
-
-    int16_t perror = comm_tm_err_ratio;  // positive if advanced
-
-    return perror;
+  return comm_tm_err_ratio; // positive if advanced
 }
 
 /**
