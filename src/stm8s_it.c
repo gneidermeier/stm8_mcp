@@ -211,10 +211,12 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
+#if !defined ( COMMSTEP_ON_TIM3 )
     Driver_Step();
-
+    // reset interrupt flag
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
     TIM1_ClearFlag(TIM1_FLAG_UPDATE);
+#endif
 }
 
 /**
@@ -262,6 +264,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
+#if 1 // #if defined ( S103_DEV )
     static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
 
@@ -277,6 +280,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 
     // must reset the tmer interrupt flag
     TIM2->SR1 &= ~TIM2_SR1_UIF;
+#endif
 }
 
 /**
@@ -301,9 +305,11 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
  {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+#if defined ( COMMSTEP_ON_TIM3 )
+    Driver_Step();
+    // reset interrupt flag
+    TIM3->SR1 &= ~TIM3_SR1_UIF;
+#endif
  }
 
 /**

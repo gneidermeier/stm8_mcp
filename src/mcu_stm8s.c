@@ -397,35 +397,10 @@ static void TIM1_setup(void)
 }
 #endif // 105
 
-/**
- * @brief Sets period of the commutation timer.
- * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
- * @param  period  Value written to auto-reload register
+/*
+ * commutation timer on TIM1 or TIM3 depending on the specific stm8s part
  */
-#ifdef CLOCK_16
-#define TIM1_PSCR  0x02
-#else
-#define TIM1_PSCR  0x01
-#endif
-
-void MCU_comm_time_cfg(uint16_t period)
-{
-  const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
-
-  /* Set the Prescaler value */
-  TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
-  TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
-
-  TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
-  TIM1->ARRL = (uint8_t)(period & 0xff);
-
-  TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
-  TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
-  TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
-}
-
-#if 0 // commutation timer may need to be on TIM3 depndeing on the dev board
-
+#if defined ( COMMSTEP_ON_TIM3 )
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
  *  Sets the commutation switching period.
@@ -446,7 +421,7 @@ void MCU_comm_time_cfg(uint16_t period)
  * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
  * @param  period  Value written to TIM3 ARR
  */
-void TIM3_setup(uint16_t period)
+void MCU_set_comm_timer(uint16_t period)
 {
   TIM3->PSCR = TIM3_PSCR;
 
@@ -457,7 +432,33 @@ void TIM3_setup(uint16_t period)
   TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
   TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
+#else // uses TIM1 which is not preferred
+/**
+ * @brief Sets period of the commutation timer.
+ * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
+ * @param  period  Value written to auto-reload register
+ */
+#ifdef CLOCK_16
+#define TIM1_PSCR  0x02
+#else
+#define TIM1_PSCR  0x01
+#endif
 
+void MCU_set_comm_timer(uint16_t period)
+{
+  const uint16_t TIM1_Prescaler = TIM1_PSCR - 1;
+
+  /* Set the Prescaler value */
+  TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
+  TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
+
+  TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+  TIM1->ARRL = (uint8_t)(period & 0xff);
+
+  TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
+  TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
+  TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
+}
 #endif // 5/5 no longer used ?
 
 /*
@@ -566,8 +567,6 @@ void MCU_Init(void)
   Clock_setup();
   GPIO_Config();
   UART_setup();
-//  TIM1_setup(); // if input capture is used (not available on '003)
-
   PWM_setup();
 
 #ifndef STM8S003             //   resistor divider for 3.3v  TBD

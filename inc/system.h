@@ -22,6 +22,19 @@
 #endif // UNIT_TEST
 
 
+#if defined ( S105_DEV )
+
+  #define COMMSTEP_ON_TIM3
+
+#elif defined ( S003_DEV )
+
+#else //S105_DISCOVERY 
+
+  #define COMMSTEP_ON_TIM3
+
+#endif
+
+
 #define SPI_ENABLED
 #if defined( SPI_ENABLED )
   #define SPI_CONTROLLER

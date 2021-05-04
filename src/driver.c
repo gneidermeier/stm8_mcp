@@ -261,7 +261,7 @@ void Driver_Update(void)
   }
 
   // update the commutation switch timer period
-  MCU_comm_time_cfg( get_commutation_period() );
+  MCU_set_comm_timer( get_commutation_period() );
 }
 
 

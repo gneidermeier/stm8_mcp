@@ -67,7 +67,7 @@ void UARTputs(char *message);
 
 void MCU_Init(void);
 
-void MCU_comm_time_cfg(uint16_t);
+void MCU_set_comm_timer(uint16_t);
 
 
 #endif // MCU_STM8S
