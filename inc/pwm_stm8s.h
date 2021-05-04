@@ -105,5 +105,6 @@ void PWM_PhC_Enable(void);
 
 void set_dutycycle(uint16_t);
 
+void PWM_setup(void);
 
 #endif // PWM_STM_S_H

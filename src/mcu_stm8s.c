@@ -18,6 +18,7 @@
 
  // external declarsations used internally
 #include "mcu_stm8s.h"
+#include "pwm_stm8s.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -423,60 +424,6 @@ void MCU_comm_time_cfg(uint16_t period)
   TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
 }
 
-/*
- * Setup TIM2 PWM
- * Reference: AN3332
- */
-#ifdef CLOCK_16
-#define TIM2_PRESCALER TIM2_PRESCALER_8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
-#else
-#define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
-#endif
-
-static void TIM2_setup(void)
-{
-  const uint16_t CCR1_init = 0;
-  const uint16_t CCR1_Val = CCR1_init;
-  const uint16_t CCR2_Val = CCR1_init;
-  const uint16_t CCR3_Val = CCR1_init;
-  const uint16_t period = TIM2_PWM_PD;
-  const uint16_t prescaler = TIM2_PRESCALER;
-  const TIM2_OCMode_TypeDef mode = TIM2_OCMODE_PWM2;
-  const TIM2_OCPolarity_TypeDef polarity= TIM2_OCPOLARITY_LOW;
-
-/* TIM2 Peripheral Configuration */
-  TIM2_DeInit();
-
-  /* Set TIM2 Frequency to 2Mhz */
-  TIM2_TimeBaseInit(prescaler, period);
-  /* Channel 1 PWM configuration */
-  TIM2_OC1Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR1_Val, polarity );
-  TIM2_OC1PreloadConfig(ENABLE);
-
-  /* Channel 2 PWM configuration */
-  TIM2_OC2Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR2_Val, polarity );
-  TIM2_OC2PreloadConfig(ENABLE);
-
-  /* Channel 3 PWM configuration */
-  TIM2_OC3Init(mode, TIM2_OUTPUTSTATE_ENABLE, CCR3_Val, polarity );
-  TIM2_OC3PreloadConfig(ENABLE);
-
-  /* Enables TIM2 peripheral Preload register on ARR */
-  TIM2_ARRPreloadConfig(ENABLE);
-/** 
- * Enable the ISR - initiates the back-EMF ADC measurement at the starting edge of
- * the PWM pulse. The timer is required to be left free running as it drives the
- * the periodic UI and Controller tasks (unless the timer is explicitly stopped or
- * reset, there is effect from i.e. starting/stopping the PWM output channels as is
- * done for the motor commutation control).
- */
-  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
-
-  /* Enable TIM2 */
-  TIM2_Cmd(ENABLE);
-}
-
-
 #if 0 // commutation timer may need to be on TIM3 depndeing on the dev board
 
 /*
@@ -620,7 +567,9 @@ void MCU_Init(void)
   GPIO_Config();
   UART_setup();
 //  TIM1_setup(); // if input capture is used (not available on '003)
-  TIM2_setup();
+
+  PWM_setup();
+
 #ifndef STM8S003             //   resistor divider for 3.3v  TBD
   ADC1_setup();
 #endif
