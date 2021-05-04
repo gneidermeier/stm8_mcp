@@ -501,7 +501,7 @@ static void TIM2_setup(void)
 }
 
 
-3if 0 // commutation timer may need to be on TIM3 depndeing on the dev board
+#if 0 // commutation timer may need to be on TIM3 depndeing on the dev board
 
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
@@ -511,8 +511,6 @@ static void TIM2_setup(void)
  *   Timer Step:
  *     step = 1 / 8Mhz * prescaler = 0.000000125 * (2^1) = 0.000000250 S
  */
-
-#ifdef STM8S105 // '003 doesn't have this peripheral instance
 #ifdef CLOCK_16
 #define TIM3_PSCR  0x01  // 2^1 == 2
 #else
