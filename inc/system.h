@@ -87,15 +87,19 @@
 
 
 /**
- * Pin/port for on-board LED
+ * Pin/port for on-board LED (move to mcu.h?)
  */
-#ifdef STM8S105 // DISCOVERY
-  #define LED_GPIO_PORT  (GPIOD)
-  #define LED_GPIO_PINS  (GPIO_PIN_0)
-#else
-// STM8S003 dev board LED
+#if defined ( S105_DEV )
+  #define LED_GPIO_PORT  (GPIOE)
+  #define LED_GPIO_PINS  (GPIO_PIN_5)
+
+#elif defined ( S003_DEV ) // STM8S003 dev board 
   #define LED_GPIO_PORT  (GPIOB)
   #define LED_GPIO_PINS  (GPIO_PIN_5)
+
+#else // S105_DISCOVERY
+  #define LED_GPIO_PORT  (GPIOD)
+  #define LED_GPIO_PINS  (GPIO_PIN_0)
 #endif
 
 #endif // SYSTEM_H

@@ -10,6 +10,10 @@ Dependencies=
 [Project1]
 Filename=stm8s003.stp
 Dependencies=
+
+[Project2]
+Filename=stm8s105_devblk.stp
+Dependencies=
 [Options]
 ActiveProject=stm8s105
 ActiveConfig=Debug

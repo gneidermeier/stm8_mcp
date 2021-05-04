@@ -197,7 +197,35 @@ uint8_t SerialKeyPressed(char *key)
 */
 static void GPIO_Config(void)
 {
-#ifdef STM8S105 // DISCOVERY
+
+#if defined ( S105_DEV )
+
+// built-in LED
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+// /SD: A1, A2, C3
+  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+
+// AIN0
+
+#elif ( defined S003_DEV )
+  /* Initialize I/Os in Output Mode */
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+
+// /SD: A1, A2, C3
+  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+#if 0
+// AIN3
+  GPIOD->DDR &= ~(1 << 2);
+  GPIOD->CR1 &= ~(1 << 2);  // floating input
+  GPIOD->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
+#endif
+
+#else // if defined ( S105_DISCOVERY )
 // this is the "legacy" '105 code and tended to avoid SPL
 // OUTPUTS
 // built-in LED
@@ -230,42 +258,6 @@ static void GPIO_Config(void)
   GPIOA->DDR &= ~GPIO_PIN_4;
   GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
 #endif
-#if 0
-// AIN9
-  GPIOE->DDR &= ~(1 << 6);
-  GPIOE->CR1 &= ~(1 << 6);  // floating input
-  GPIOE->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
-
-// AIN8
-  GPIOE->DDR &= ~(1 << 7);
-  GPIOE->CR1 &= ~(1 << 7);  // floating input
-  GPIOE->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
-
-// AIN7
-  GPIOB->DDR &= ~(1 << 7);
-  GPIOB->CR1 &= ~(1 << 7);  // floating input
-  GPIOB->CR2 &= ~(1 << 7);  // 0: External interrupt disabled   ???
-
-// AIN6
-  GPIOB->DDR &= ~(1 << 6);
-  GPIOB->CR1 &= ~(1 << 6);  // floating input
-  GPIOB->CR2 &= ~(1 << 6);  // 0: External interrupt disabled   ???
-
-// AIN5
-  GPIOB->DDR &= ~(1 << 5);
-  GPIOB->CR1 &= ~(1 << 5);  // floating input
-  GPIOB->CR2 &= ~(1 << 5);  // 0: External interrupt disabled   ???
-
-// AIN4
-  GPIOB->DDR &= ~(1 << 4);
-  GPIOB->CR1 &= ~(1 << 4);  // floating input
-  GPIOB->CR2 &= ~(1 << 4);  // 0: External interrupt disabled   ???
-
-// AIN3
-  GPIOB->DDR &= ~(1 << 3);
-  GPIOB->CR1 &= ~(1 << 3);  // floating input
-  GPIOB->CR2 &= ~(1 << 3);  // 0: External interrupt disabled   ???
-#endif
 // AIN2
   GPIOB->DDR &= ~GPIO_PIN_2;
   GPIOB->CR1 &= ~GPIO_PIN_2;  // floating input
@@ -280,23 +272,7 @@ static void GPIO_Config(void)
   GPIOB->DDR &= ~GPIO_PIN_0;
   GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
   GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled   ???
-
-#else  // '003 dev board
-
-  /* Initialize I/Os in Output Mode */
-  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
-
-// /SD: A1, A2, C3
-  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-#if 0
-// AIN3
-  GPIOD->DDR &= ~(1 << 2);
-  GPIOD->CR1 &= ~(1 << 2);  // floating input
-  GPIOD->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
 #endif
-#endif // STM8S105
 }
 
 /**
@@ -547,21 +523,19 @@ static void Clock_setup(void)
 {
   CLK_DeInit();
 
-#if !defined(STM8S105) // && defined(INTCLOCK)
+#if defined ( S105_DEV ) || defined (S003_DEV )
   /*High speed internal clock prescaler: 1*/
   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
-#else
+#else  // S105_DISCOVERY
   // Configure Quartz Clock
-  CLK_DeInit();
   CLK_HSECmd(ENABLE);
+#endif
 
 #ifdef CLOCK_16
   CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV1); // 16Mhz
 #else
   CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // 8Mhz
 #endif // CLK
-
-#endif // '105
 
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, ENABLE);
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
@@ -589,7 +563,11 @@ void SPI_setup(void)
 #ifdef SPI_CONTROLLER
 
   // Set GPIO pins to output push-pull high level.
-  GPIO_Init(GPIOE, GPIO_PIN_5, GPIO_MODE_OUT_PP_HIGH_SLOW); // CS
+
+// S105_BLACK ... LED on E5	
+// CS not required for single master/slave pair
+//   GPIO_Init(GPIOE, GPIO_PIN_5, GPIO_MODE_OUT_PP_HIGH_SLOW); // CS
+
   GPIO_Init(GPIOC, GPIO_PIN_5, GPIO_MODE_OUT_PP_HIGH_SLOW); // SCLK
   GPIO_Init(GPIOC, GPIO_PIN_6, GPIO_MODE_OUT_PP_HIGH_SLOW); // MOSI
 
