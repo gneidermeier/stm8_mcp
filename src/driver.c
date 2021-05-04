@@ -173,6 +173,8 @@ uint16_t Driver_get_pulse_dur(void)
  * Called from TIM2 UPD+OVF+BRK IRQ Handler.
  * Initiates ADC sample sequence on start of PWM pulse.
  * ADC may be configured for several (3 phases + throttle input) channels.
+ * This may be a limitation as the throttle input may be needed although the
+ * TIM2/PWM is disabled.
  * On ADC ISR, call ADCx_GetBufferValue(n) to retrieve ADC Channel n.
  * The ADC is configured to trigger IRQ on converion complete.
  * See ADC setup in MCU init for ADC clock setup.
@@ -232,23 +234,21 @@ uint16_t Driver_Get_ADC(void)
 /**
  * @brief  Update background task and system state.
  *
- * @details  
- *  Called from TIM2 ISR (MOD4). 
- *  Periodic_Task_Wake() frequency is rate of Driver_Update() MOD 32.
- * There UI is called every ~16ms:
- *  (1/8kHz) * 4 * 32 = 16  (~60fps)
+ * @details  Called from TIM4 ISR. The commutation time is updated each time the
+ * control task is updated, and in turn the TIM3 reload register value is refreshed
+ * from latest calculated commutation time period.
  */
 void Driver_Update(void)
 {
-  static const uint8_t UI_UPDATEM  = 32;
+  static const uint8_t UI_UPDATEM  = 32; // 16 Mhz sysclock
   static uint8_t trate = 0;
 
 #ifndef CLOCK_16
-  UI_UPDATEM = 16;
+  UI_UPDATEM = 16; // 8 Mhz sysclock
 #endif
   // the controller and the UI are updated on alternate frames (doubled the
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
-  if ( 0 != (++trate & 0x01) )
+  if ( 0 != ( ++trate & 0x01 ) )
   {
     BLDC_Update();
   }
@@ -280,7 +280,7 @@ void Driver_Update(void)
  */
 void Driver_Step(void)
 {
-static const int SectorC = FOUR_SECTORS;
+  static const int SectorC = FOUR_SECTORS;
   static int index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used

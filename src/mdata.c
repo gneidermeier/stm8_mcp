@@ -18,19 +18,12 @@
 #include "system.h" // dependency of motor data on cpu clock specific timer rate
 
 /*
- * The open-loop commutation timing table is indexed by PWM duty cycle counts 
- * (i.e. [0:1:250). However, it is not expected that the motor could even run
- * open-loop into the higher operating speed, so the table only covers the lower
- * 50% of PWM duty-cycle range.
- * See "src/model.c" which is actully a Scilab script.
+ * The table is indexed by PWM duty cycle counts (i.e. [0:1:250)
  * The function generates the data in Scilab and imported from csv:
  *
  *   y =  ( 4000 * EXP( -t/25 ) ) + 150
  *
- * Excel was used to find initial parameters using some data obtained 
- * experimentally by running the motor and manually syncing it using the
- * butttons and terminal inputs for ocmmutiation timing and PWM DC.
- *
+ * Excel was used  to find initial parameters using some data obtained experimentally
  * sync range seems to be [32-68] (duty-cycle) with parameters roughly in these ranges:
  *  A     = [ 1800 : 2000 ]
  *  TAU   = [ 38 : 34 ]
@@ -39,6 +32,7 @@
  *
  *  (32-80)/(788-268) =  -0.0923077
  *
+ * The range that needs to be synced is between "Idle" (DC=32) and some higher speed where b-emf is measureable.
  * The exponential seems to do a better job at tracking over the needed
  * interval. Taking the coordinates at the start and end of the range over which
  * the motor is able to stay in sync would give the slope that could be tried for
@@ -47,7 +41,8 @@
  */
 static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 {
-#if 1
+#if 1 // unfortunately it is not possibly to eliminate this table at this time
+// from model.h
 1500, //   0, 0, 0, 5DC
 1470, //   1, 1, 1, 5BE
 1441, //   2, 1, 2, 5A1
@@ -177,13 +172,67 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 188, //   126, 70, 7E, BC
 185, //   127, 71, 7F, B9
 182, //   128, 71, 80, B6
+179, //   129, 72, 81, B3
+176, //   130, 72, 82, B0
+173, //   131, 73, 83, AD
+170, //   132, 73, 84, AA
+167, //   133, 74, 85, A7
+164, //   134, 74, 86, A4
+161, //   135, 75, 87, A1
+158, //   136, 76, 88, 9E
+155, //   137, 76, 89, 9B
+152, //   138, 77, 8A, 98
+149, //   139, 77, 8B, 95
+146, //   140, 78, 8C, 92
+143, //   141, 78, 8D, 8F
+140, //   142, 79, 8E, 8C
+137, //   143, 79, 8F, 89
+//134, //   144, 80, 90, 86
+//131, //   145, 81, 91, 83
+//128, //   146, 81, 92, 80
+//125, //   147, 82, 93, 7D
+//122, //   148, 82, 94, 7A
+//119, //   149, 83, 95, 77
+//116, //   150, 83, 96, 74
+//113, //   151, 84, 97, 71
+//110, //   152, 84, 98, 6E
+//107, //   153, 85, 99, 6B
+//104, //   154, 86, 9A, 68
+//101, //   155, 86, 9B, 65
+//98, //   156, 87, 9C, 62
+//95, //   157, 87, 9D, 5F
+//92, //   158, 88, 9E, 5C
+//89, //   159, 88, 9F, 59
+//86, //   160, 89, A0, 56
+//83, //   161, 89, A1, 53
+//80, //   162, 90, A2, 50
+//77, //   163, 91, A3, 4D
+//74, //   164, 91, A4, 4A
+//71, //   165, 92, A5, 47
+//68, //   166, 92, A6, 44
+//65, //   167, 93, A7, 41
+//62, //   168, 93, A8, 3E
+//59, //   169, 94, A9, 3B
+//56, //   170, 94, AA, 38
+//53, //   171, 95, AB, 35
+//50, //   172, 96, AC, 32
+//47, //   173, 96, AD, 2F
+//44, //   174, 97, AE, 2C
+//41, //   175, 97, AF, 29
+//38, //   176, 98, B0, 26
+//35, //   177, 98, B1, 23
+//32, //   178, 99, B2, 20
+//29, //   179, 99, B3, 1D
+//// [1:74]  f(x) = 1500 * e ^ -x/50
+// [75:TBLSZ]  f(x) = 3x + 565
+// 10.0 * (   dtable(:, //   2)  +60 )  + 1700
 #else
 #include "model.h" // hack   headers are horrible
 #endif
 };
 
-// move this into header file if needed publicly
 #define OL_TIMING_TBL_SIZE    ( sizeof(OL_Timing) / sizeof(uint16_t) )
+
 
 /**
  * @brief Table lookup for open-loop commutation timing

@@ -28,13 +28,13 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define TRIM_DEFAULT  0 // don't quite recall here .. 
+#define TRIM_DEFAULT  0 //
 
-// The value being used here is low enuogh that the machine doesn't stall 
+// Threshold is set low enuogh that the machine doesn't stall 
 // thru the lower speed transition into closed-loop control. 
-// An easy test with motor running is to slap into the spinning prop disc
-// with e.g. a 3x5 index card.
-#define V_SHUTDOWN_THR   0x03D0 //   0x0320 // experimentally determined!
+// The fault can be tested by letting the spinning prop disc strike a flimsy
+// obstacle like a 3x5 index card.
+#define V_SHUTDOWN_THR      0x0340    // experimentally determined!
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
@@ -62,8 +62,10 @@ typedef void (*ui_handlrp_t)( void );
 // local enum only for setting enumerated order to UI event dispatcher
 enum
 {
+#if 0 // tmp?
   COMM_PLUS  = ']',
   COMM_MINUS = '[',
+#endif
   SPD_PLUS   = '.', //'>',
   SPD_MINUS  = ',', //'<',
   M_STOP     = ' '  // one space character
@@ -102,8 +104,8 @@ static  uint16_t Vsystem; // persistent for averaging
 
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
-  {COMM_PLUS,  comm_plus},
-  {COMM_MINUS, comm_minus},
+//  {COMM_PLUS,  comm_plus},
+//  {COMM_MINUS, comm_minus},
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
   {M_STOP,     m_stop}
@@ -257,7 +259,6 @@ static void set_ui_speed(void)
 //   scale factors ...     ( 1/2   +   1/2 )  /     (1/4)
   UI_pulse_dc = (PWM_100PCNT>>1) * tmp_u16 / (RF_RANGE>>2);
 
-
 // if RF pulse qualified, then use it - needs more thought
   if (UI_pulse_perd > RF_NORDO_THR)
   {
@@ -279,7 +280,6 @@ static void set_ui_speed(void)
     {
       tmp_sint16 = U8_MAX;
     }
-
     UI_Speed = (uint8_t)tmp_sint16;
   }
 }
@@ -295,24 +295,21 @@ void UI_Stop(void)
 // reset the machine
   BL_reset();
 }
-
+#if 0
 /*
  * handlers for UI events must be short as they are invoked in ISR context
  */
 // for development user only
 static void comm_plus(void)
 {
-#if 0 // test/dev
   BLDC_Spd_inc();
-#endif
 }
 // for development user only
 static void comm_minus(void)
 {
-#if 0 // test/dev
   BLDC_Spd_dec();
-#endif	
 }
+#endif
 
 // stop key from terminal ... merge w/ UI_stop?
 static void m_stop(void)
@@ -406,10 +403,8 @@ static void Periodic_task(void)
 
   enableInterrupts();  ///////////////// EI EI O
 
-
-  // update system voltage diagnostic - should be interrupt safe, the status word
-  // is the only access in ISR context, and it is a byte so shoud be atomic.
-  if (BL_IS_RUNNING == bl_state )
+  // update system voltage diagnostic - check plausibilty of Vsys
+  if (BL_IS_RUNNING == bl_state  && Vsystem > 0  )
   {
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
@@ -450,7 +445,7 @@ uint8_t Task_Ready(void)
 
     if ( ! ((framecount++) % 0x20) )
     {
-#if defined( STM8S105 ) && defined( SPI_CONTROLLER )
+#if defined( SPI_ENABLED ) && defined( SPI_CONTROLLER )
       SPI_controld();
 #endif
     }

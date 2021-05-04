@@ -22,9 +22,10 @@
 #endif // UNIT_TEST
 
 
-
-#define SPI_CONTROLLER
-
+#define SPI_ENABLED
+#if defined( SPI_ENABLED )
+  #define SPI_CONTROLLER
+#endif
 
 #define SPI_RX_BUF_SZ  16 // 256 // tmp
 

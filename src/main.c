@@ -1,10 +1,10 @@
 /**
   ******************************************************************************
-  * @file main.c
-  * @brief This file contains the main function for the BLDC motor control
-  * @author Neidermeier
-  * @version
-  * @date March-2020
+  * @file    main.c
+  * @brief   Application entry point
+  * @author  Neidermeier
+  * @version V2.0.4
+  * @date     26-April-2021
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
@@ -31,14 +31,16 @@ If you have multiple source files in your project, interrupt service routines ca
 #endif
 
 
-/* Private defines -----------------------------------------------------------*/
+/* Private macro -------------------------------------------------------------*/
 
 
 /* Private functions ---------------------------------------------------------*/
 
 /**
- * @brief mainly looping
- */
+  * @brief  Mainly looping.
+  * @param  None
+  * @retval None
+  */
 void main(int argc, char **argv)
 {
 #ifndef SPI_CONTROLLER
@@ -60,6 +62,7 @@ void main(int argc, char **argv)
 
   while(1)
   {
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time	
 //  button input either button would transition from OFF->RAMP
     if (! (( GPIOA->IDR)&(1<<4)))
     {
@@ -68,7 +71,7 @@ void main(int argc, char **argv)
       UI_Stop();
       enableInterrupts();
     }
-
+#endif
 #if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
     if (! (( GPIOA->IDR)&(1<<6)))
     {
@@ -97,6 +100,7 @@ void main(int argc, char **argv)
       }
     }
 
+#if defined( SPI_ENABLED )
 #ifndef SPI_CONTROLLER
     if (-1 != SPI_read_write_b(tx_buf, 0xA5, TIME_OUT_0) )
     {
@@ -115,6 +119,7 @@ void main(int argc, char **argv)
       UARTputs(sbuf);
     }
 #endif // SPI CONT
+#endif // SPI_EN
   } // while 1
 }
 
@@ -125,9 +130,9 @@ void main(int argc, char **argv)
   *   where the assert_param error has occurred.
   * @param file: pointer to the source file name
   * @param line: assert_param error line source number
-  * @retval : None
+  * @retval None
   */
-void assert_failed(u8* file, u32 line)
+void assert_failed(uint8_t* file, uint32_t line)
 {
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
@@ -138,3 +143,7 @@ void assert_failed(u8* file, u32 line)
   }
 }
 #endif
+
+/**
+  * @}
+  */

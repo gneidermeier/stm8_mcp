@@ -29,6 +29,32 @@
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+/*
+  * These functions retarget a few C library stdio function to the USART.
+  * Code was copied from the stm8s SPL USART examples
+  *
+  * Concerning getch():
+  * Works satisfactorily  for its intended purpose, however, to me this one 
+  * operates exactly like getch(),  as opposed to getc(stdin).
+  *
+  * The difference between getc() and getchar() is getc() can read from any input
+  * stream, but getchar() reads from standard input. So getchar() is equivalent 
+  * to getc(stdin).
+  *
+  * getch()is a nonstandard function and is present in conio.h header file (MS-DOS 
+  * compilers like Turbo C). It is not part of the C standard library or ISO C, 
+  * nor is it defined by POSIX.
+  * getch() reads a single character from the keyboard. But it does not use any 
+  * buffer, so the entered character is immediately returned without waiting for 
+  * the enter key.
+  *  https://www.geeksforgeeks.org/difference-getchar-getch-getc-getche/
+  *  https://www.geeksforgeeks.org/getch-function-in-c-with-examples/
+  *
+  * SerialKeyPressed() on the other hand, is intended to be non-blocking, and it is
+  * more akin to 
+  */
+
+#ifdef STM8S105 // DISCOVERY
 
 /**
   * @brief Retargets the C library printf function to the UART.
@@ -46,6 +72,110 @@ PUTCHAR_PROTOTYPE
 
   return (c);
 }
+
+/**
+  * @brief getch()-like funcction.
+  * @detail  See above.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
+{
+#ifdef _COSMIC_
+  char c = 0;
+#else
+  int c = 0;
+#endif
+  /* Loop until the Read data register flag is SET */
+  while (UART2_GetFlagStatus(UART2_FLAG_RXNE) == RESET);
+    c = UART2_ReceiveData8();
+  return (c);
+}
+
+/**
+* @brief  Test to see if a key has been pressed on the terminal.
+*
+* @details Allows reading a character but non-blocking.
+* @param [out]  key  Pointer to byte for receiving character code.
+* @retval  1  a character has been read
+* @retval  0  no character has been read
+*/
+uint8_t SerialKeyPressed(char *key)
+{
+  FlagStatus flag  ;
+  /* First clear Rx buffer */
+  flag = UART2_GetFlagStatus(UART2_FLAG_RXNE);
+  if ( flag == SET)
+  {
+    *key = (char)UART2->DR;
+    return 1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+#else // stm8s003
+/**
+  * @brief Retargets the C library printf function to the UART.
+  * @param c Character to send
+  * @details
+  * // Based on SPL UART example project
+  * @retval char Character sent
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Write a character to the UART1 */
+  UART1_SendData8(c);
+  /* Loop until the end of transmission */
+  while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+
+  return (c);
+}
+
+/**
+  * @brief getch()-like funcction.
+	* @detail  See above.
+  * @param None
+  * @retval char Character to Read
+  */
+GETCHAR_PROTOTYPE
+{
+#ifdef _COSMIC_
+  char c = 0;
+#else
+  int c = 0;
+#endif
+  /* Loop until the Read data register flag is SET */
+  while (UART1_GetFlagStatus(UART1_FLAG_RXNE) == RESET);
+    c = UART1_ReceiveData8();
+  return (c);
+}
+
+/**
+* @brief  Test to see if a key has been pressed on the terminal.
+*
+* @details Allows reading a character but non-blocking.
+* @param [out]  key  Pointer to byte for receiving character code.
+* @retval  1  a character has been read
+* @retval  0  no character has been read
+*/
+uint8_t SerialKeyPressed(char *key)
+{
+  FlagStatus flag  ;
+  /* First clear Rx buffer */
+  flag = UART1_GetFlagStatus(UART1_FLAG_RXNE);
+  if ( flag == SET)
+  {
+    *key = (char)UART1->DR;
+    return 1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+#endif
 
 /*
  * @brief Configure GPIO.
@@ -156,11 +286,29 @@ static void GPIO_Config(void)
   /* Initialize I/Os in Output Mode */
   GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
 
+// /SD: A1, A2, C3
+  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+#if 0
+// AIN3
+  GPIOD->DDR &= ~(1 << 2);
+  GPIOD->CR1 &= ~(1 << 2);  // floating input
+  GPIOD->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
+#endif
 #endif // STM8S105
 }
 
-/*
- * http://embedded-lab.com/blog/starting-stm8-microcontrollers/24/
+/**
+ *  @brief Configure UART
+ *  @details
+ *      - BaudRate = 115200 baud
+ *      - Word Length = 8 Bits
+ *      - One Stop Bit
+ *      - No parity
+ *      - Receive and transmit enabled
+ *      - UART1 Clock disabled
+ *  @param none
  */
 static void UART_setup(void)
 {
@@ -189,59 +337,6 @@ static void UART_setup(void)
     UART1_Cmd(ENABLE);
 #endif
 }
-
-// TODO: deprecated
-
-#ifdef STM8S105 // DISCOVERY
-
-/**
-* @brief  Test to see if a key has been pressed on the terminal.
-*
-* @details Allows reading a character but non-blocking.
-* @param [out]  key  Pointer to byte for receiving character code.
-* @retval  1  a character has been read
-* @retval  0  no character has been read
-*/
-uint8_t SerialKeyPressed(char *key)
-{
-  FlagStatus flag  ;
-  /* First clear Rx buffer */
-  flag = UART2_GetFlagStatus(UART2_FLAG_RXNE);
-  if ( flag == SET)
-  {
-    *key = (char)UART2->DR;
-    return 1;
-  }
-  else
-  {
-    return 0;
-  }
-}
-#else
-/**
-* @brief  Test to see if a key has been pressed on the terminal.
-*
-* @details Allows reading a character but non-blocking.
-* @param [out]  key  Pointer to byte for receiving character code.
-* @retval  1  a character has been read
-* @retval  0  no character has been read
-*/
-uint8_t SerialKeyPressed(char *key)
-{
-  FlagStatus flag  ;
-  /* First clear Rx buffer */
-  flag = UART1_GetFlagStatus(UART1_FLAG_RXNE);
-  if ( flag == SET)
-  {
-    *key = (char)UART1->DR;
-    return 1;
-  }
-  else
-  {
-    return 0;
-  }
-}
-#endif
 
 /*
  * set ADC clock to 4Mhz  - sample time from the data sheet @ 4Mhz
@@ -373,7 +468,7 @@ static void TIM2_setup(void)
   const TIM2_OCMode_TypeDef mode = TIM2_OCMODE_PWM2;
   const TIM2_OCPolarity_TypeDef polarity= TIM2_OCPOLARITY_LOW;
 
-  /* TIM2 Peripheral Configuration */
+/* TIM2 Peripheral Configuration */
   TIM2_DeInit();
 
   /* Set TIM2 Frequency to 2Mhz */
@@ -405,27 +500,8 @@ static void TIM2_setup(void)
   TIM2_Cmd(ENABLE);
 }
 
-#if 0 // 4/21 no longer used
-/*
- * Configure Timer 4 as general purpose fixed time-base reference
- * Timer 4 & 6 are 8-bit basic timers
- */
-static void TIM4_setup(void)
-{
-  const uint8_t Period = (16 * SYS_RATE_MULT);
 
-#ifdef CLOCK_16
-  TIM4->PSCR = 0x07; // 1/16M *128 * Period
-#else
-  TIM4->PSCR = 0x06; // 1/8M * 64 * Period = 512us
-#endif
-
-  TIM4->ARR = Period;
-
-  TIM4->IER |= TIM4_IER_UIE; // Enable Update Interrupt
-  TIM4->CR1 |= TIM4_CR1_CEN; // Enable TIM4
-}
-#endif // not used
+3if 0 // commutation timer may need to be on TIM3 depndeing on the dev board
 
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
@@ -460,7 +536,8 @@ void TIM3_setup(uint16_t period)
   TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
   TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
-#endif // 4/21 no longer used
+
+#endif // 5/5 no longer used ?
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
@@ -499,7 +576,7 @@ static void Clock_setup(void)
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
-#ifdef STM8S105
+#if defined( SPI_ENABLED )
 /**
 * References:
 *   https://www.programmersought.com/article/34101773427/
@@ -555,7 +632,7 @@ void SPI_setup(void)
   //Enable SPI.
   SPI_Cmd(ENABLE);
 }
-#endif // S105
+#endif // SPI_ENABLE
 
 /**
  * @brief  Initialize MCU and peripheral modules
@@ -568,11 +645,10 @@ void MCU_Init(void)
   UART_setup();
 //  TIM1_setup(); // if input capture is used (not available on '003)
   TIM2_setup();
-
-#ifdef STM8S105 // DISCOVERY
-
-  ADC1_setup(); // TODO
-
+#ifndef STM8S003             //   resistor divider for 3.3v  TBD
+  ADC1_setup();
+#endif
+#if defined( SPI_ENABLED )
   SPI_setup();
 #endif
 }
