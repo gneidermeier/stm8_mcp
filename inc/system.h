@@ -25,12 +25,14 @@
 #if defined ( S105_DEV )
 
   #define COMMSTEP_ON_TIM3
+  #define CNTRLLER_ON_TIM2 // PWM timer and control loop
 
 #elif defined ( S003_DEV )
 
 #else //S105_DISCOVERY 
 
   #define COMMSTEP_ON_TIM3
+  #define CNTRLLER_ON_TIM2 // PWM timer and control loop
 
 #endif
 

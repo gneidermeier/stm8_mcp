@@ -211,7 +211,8 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-#if !defined ( COMMSTEP_ON_TIM3 )
+#if ! defined ( COMMSTEP_ON_TIM3 )  &&  ! defined ( CNTRLLER_ON_TIM2 )
+
     Driver_Step();
     // reset interrupt flag
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
@@ -264,7 +265,9 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
-#if 1 // #if defined ( S103_DEV )
+// stm8s003 dev board
+#if defined ( CNTRLLER_ON_TIM2 )
+
     static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
 
