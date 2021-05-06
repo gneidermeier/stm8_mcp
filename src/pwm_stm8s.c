@@ -91,7 +91,8 @@ void set_dutycycle(uint16_t global_dutycycle)
 /*
  * The S105 dev board unfortunately does not let the TIM2 CH3 pin (unless by alt. fundtion)
  */
-#if defined ( S003_DEV ) || defined ( S105_DISCOVERY )
+#if (CONTRLLR_TIMER == 2) //  S003 DEV or S105 DISCOVERY
+
 /*
  * Setup TIM2 PWM
  * Reference: AN3332
@@ -101,6 +102,11 @@ void set_dutycycle(uint16_t global_dutycycle)
 #else
 #define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
 #endif
+
+// this is not wonderful ... could get out of sync with "#if (CONTRLLR_TIMER == 1)" etc. in pwm_stm8s.h
+#define PWM_TIMER_CHAN_A  TIM2_CHANNEL_1
+#define PWM_TIMER_CHAN_B  TIM2_CHANNEL_2
+#define PWM_TIMER_CHAN_C  TIM2_CHANNEL_3
 
 void PWM_setup(void)
 {
@@ -141,38 +147,38 @@ void PWM_setup(void)
  */
 void PWM_PhA_Disable(void)
 {
-    TIM2_CCxCmd( TIM2_CHANNEL_1, DISABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_A, DISABLE );
 }
 
 void PWM_PhB_Disable(void)
 {
-    TIM2_CCxCmd( TIM2_CHANNEL_2, DISABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_B, DISABLE );
 }
 
 void PWM_PhC_Disable(void)
 {
-    TIM2_CCxCmd( TIM2_CHANNEL_3, DISABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_C, DISABLE );
 }
 
 void PWM_PhA_Enable(void)
 {
     TIM2_SetCompare1( global_uDC );
-    TIM2_CCxCmd( TIM2_CHANNEL_1, ENABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_A, ENABLE );
 }
 
 void PWM_PhB_Enable(void)
 {
     TIM2_SetCompare2( global_uDC );
-    TIM2_CCxCmd( TIM2_CHANNEL_2, ENABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_B, ENABLE );
 }
 
 void PWM_PhC_Enable(void)
 {
     TIM2_SetCompare3( global_uDC );
-    TIM2_CCxCmd( TIM2_CHANNEL_3, ENABLE );
+    TIM2_CCxCmd( PWM_TIMER_CHAN_C, ENABLE );
 }
 
-#elif defined ( S105_DEV ) //   || defined ( S105_DISCOVERY )
+#else // S003 Dev Board 
 
 /*
  * Timer 1 Setup
@@ -187,6 +193,11 @@ void PWM_PhC_Enable(void)
 
 #define PWM_MODE  TIM1_OCMODE_PWM2
 
+// this is not wonderful ... could get out of sync with "#if (CONTRLLR_TIMER == 1)" etc. in pwm_stm8s.h
+#define PWM_TIMER_CHAN_A  TIM1_CHANNEL_2
+#define PWM_TIMER_CHAN_B  TIM1_CHANNEL_3
+#define PWM_TIMER_CHAN_C  TIM1_CHANNEL_4
+
 void PWM_setup(void)
 {
     const uint16_t T1_Period = TIM2_PWM_PD /* TIMx_PWM_PD */ ;  // 16-bit counter
@@ -198,6 +209,8 @@ void PWM_setup(void)
  * The counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)  (RM0016)
  */
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0); // ISR at and of "idle" time
+
+// BAH fixed names of functions specific to specific channel designation 
 
     /* Channel 2 PWM configuration */
     TIM1_OC2Init( PWM_MODE,
@@ -238,35 +251,38 @@ void PWM_setup(void)
  */
 void PWM_PhA_Disable(void)
 {
-    TIM1_CCxCmd( TIM1_CHANNEL_1, DISABLE );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_A, DISABLE );
 }
 
 void PWM_PhB_Disable(void)
 {
-    TIM1_CCxCmd( TIM1_CHANNEL_2, DISABLE );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_B, DISABLE );
 }
 
 void PWM_PhC_Disable(void)
 {
-    TIM1_CCxCmd( TIM1_CHANNEL_3, DISABLE );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_C, DISABLE );
 }
 
+/*
+ * BAH these are specific to the Timer channels used ... grrrrr
+ */
 void PWM_PhA_Enable(void)
 {
-    TIM1_SetCompare1( global_uDC );
-    TIM1_CCxCmd( TIM1_CHANNEL_1, ENABLE );
+    TIM1_SetCompare2( global_uDC );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_A, ENABLE );
 }
 
 void PWM_PhB_Enable(void)
 {
-    TIM1_SetCompare2( global_uDC );
-    TIM1_CCxCmd( TIM1_CHANNEL_2, ENABLE );
+    TIM1_SetCompare3( global_uDC );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_B, ENABLE );
 }
 
 void PWM_PhC_Enable(void)
 {
-    TIM1_SetCompare3( global_uDC );
-    TIM1_CCxCmd( TIM1_CHANNEL_3, ENABLE );
+    TIM1_SetCompare4( global_uDC );
+    TIM1_CCxCmd( PWM_TIMER_CHAN_C, ENABLE );
 }
 
 #endif // S105

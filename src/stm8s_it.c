@@ -211,9 +211,27 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-#if ! defined ( COMMSTEP_ON_TIM3 )  &&  ! defined ( CNTRLLER_ON_TIM2 )
-
+#if (COMMSTEP_TIMER == 1) // S105 Dev Board or S105 Discovery
     Driver_Step();
+
+    // reset interrupt flag
+    TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
+    TIM1_ClearFlag(TIM1_FLAG_UPDATE);
+
+#elif (CONTRLLR_TIMER == 1)
+
+    static const int Frame_count = 4;
+    static uint8_t frame_counter = 0;
+
+// note pre-increment on variable 
+    if ( ++frame_counter >= Frame_count )
+    {
+        frame_counter = 0;
+
+        Driver_Update();
+    }
+    Driver_on_PWM_edge(); // starts ADC conversion
+
     // reset interrupt flag
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
     TIM1_ClearFlag(TIM1_FLAG_UPDATE);
@@ -266,7 +284,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
 // stm8s003 dev board
-#if defined ( CNTRLLER_ON_TIM2 )
+#if (CONTRLLR_TIMER == 2)
 
     static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
@@ -308,7 +326,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
  {
-#if defined ( COMMSTEP_ON_TIM3 )
+#if (COMMSTEP_TIMER == 3)
     Driver_Step();
     // reset interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;

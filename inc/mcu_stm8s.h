@@ -14,32 +14,25 @@
 
 // app headers
 #include "system.h" // platform specific delarations
+#include "pwm_stm8s.h"
 
 /* defines -------------------------------------------------------------------*/
 
-#if defined ( S105_DEV )
-  #define SDA_PORT  (GPIOC)
-  #define SDA_PIN   (GPIO_PIN_5)
-  #define SDB_PORT  (GPIOC)
-  #define SDB_PIN   (GPIO_PIN_6)
-  #define SDC_PORT  (GPIOC)
-  #define SDC_PIN   (GPIO_PIN_7)
+#include "stm8s_gpio.h"
 
-#elif defined ( S003_DEV )
-  #define SDA_PORT  (GPIOA)
-  #define SDA_PIN   (GPIO_PIN_1)
-  #define SDB_PORT  (GPIOA)
-  #define SDB_PIN   (GPIO_PIN_2)
-  #define SDC_PORT  (GPIOC)
-  #define SDC_PIN   (GPIO_PIN_3)
-#else //S105_DISCOVERY 
-  #define SDA_PORT  (GPIOD)
-  #define SDA_PIN   (GPIO_PIN_2)
-  #define SDB_PORT  (GPIOE)
-  #define SDB_PIN   (GPIO_PIN_0)
-  #define SDC_PORT  (GPIOA)
-  #define SDC_PIN   (GPIO_PIN_5)
-#endif
+/**
+ * GPIO definitions are neeeded to drive the SD signals.
+ * (PWM Timer channel pins need no such explicit GPIO initialization)
+ */
+// Phase A
+#define SDA_PORT  SDa_SD_PORT
+#define SDA_PIN   SDa_SD_PIN
+// Phase B
+#define SDB_PORT  SDb_SD_PORT
+#define SDB_PIN   SDb_SD_PIN
+// Phase C
+#define SDC_PORT  SDc_SD_PORT
+#define SDC_PIN   SDc_SD_PIN
 
 /**
  * @brief reference: SPL UART example project

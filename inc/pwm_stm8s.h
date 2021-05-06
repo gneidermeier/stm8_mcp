@@ -14,72 +14,115 @@
 
 // stm8s header is provided by the tool chain and is needed for typedefs of uint etc.
 #include <stm8s.h>
+#include "system.h" // system/build configuration
 
 /* Public defines -----------------------------------------------------------*/
-/*
- * re-purpose the TIM2 channel enumeration but disguise it
+
+/**
+ * The MCU drives 3 GPIO as output to IR2104 /SD pins. There is no significance 
+ * to their pin assignment or pin configuration other than setting the internal
+ * pullup (not open-collector) 
  */
-//#define  BL_PHASE_A  TIM2_CHANNEL_1
-//#define  BL_PHASE_B  TIM2_CHANNEL_2
-//#define  BL_PHASE_C  TIM2_CHANNEL_3
+#if defined ( S105_DISCOVERY )
 
+  #define SDa_SD_PIN  GPIO_PIN_2  // D2
+  #define SDb_SD_PIN  GPIO_PIN_0  // E0
+  #define SDc_SD_PIN  GPIO_PIN_5  // A5
 
-#ifdef STM8S105 // DISCOVERY
-  #define SDa_GPIO_PIN  GPIO_PIN_2 // D2
-  #define SDb_GPIO_PIN  GPIO_PIN_0 // E0
-  #define SDc_GPIO_PIN  GPIO_PIN_5 // A5
+  #define SDa_SD_PORT  GPIOD
+  #define SDb_SD_PORT  GPIOE
+  #define SDc_SD_PORT  GPIOA
 
-  #define SDa_GPIO_PORT  GPIOD
-  #define SDb_GPIO_PORT  GPIOE
-  #define SDc_GPIO_PORT  GPIOA
+#elif defined ( S105_DEV )
 
-#else // stm8s003
-  #define SDa_GPIO_PIN  GPIO_PIN_1 // A1
-  #define SDb_GPIO_PIN  GPIO_PIN_2 // A2
-  #define SDc_GPIO_PIN  GPIO_PIN_3 // C3
+  #define SDa_SD_PIN  GPIO_PIN_2  // D2
+  #define SDb_SD_PIN  GPIO_PIN_3  // D3
+  #define SDc_SD_PIN  GPIO_PIN_4  // D4
 
-  #define SDa_GPIO_PORT  GPIOA
-  #define SDb_GPIO_PORT  GPIOA
-  #define SDc_GPIO_PORT  GPIOC
+  #define SDa_SD_PORT  GPIOD
+  #define SDb_SD_PORT  GPIOD
+  #define SDc_SD_PORT  GPIOD
+
+#elif defined ( S003_DEV )
+  #define SDa_SD_PIN  GPIO_PIN_1 // A1
+  #define SDb_SD_PIN  GPIO_PIN_2 // A2
+  #define SDc_SD_PIN  GPIO_PIN_3 // C3
+
+  #define SDa_SD_PORT  GPIOA
+  #define SDb_SD_PORT  GPIOA
+  #define SDc_SD_PORT  GPIOC
+#endif
+
+/**
+ * The PWM pins used depend on the Timer instance, which may likely be either TIM1 or TIM2
+ */
+#if (CONTRLLR_TIMER == 1)
+// s105 DEV board TIM1 CH1 shares pin with UART2_CK on pin PC1 (not used, but maybe it would be)
+  #define SDa_PWM_PIN  GPIO_PIN_2 // C1
+  #define SDb_PWM_PIN  GPIO_PIN_3 // C2
+  #define SDc_PWM_PIN  GPIO_PIN_4 // C3
+
+  #define SDa_PWM_PORT  GPIOC
+  #define SDb_PWM_PORT  GPIOC
+  #define SDc_PWM_PORT  GPIOC
+
+#elif (CONTRLLR_TIMER == 2)
+  #define SDa_PWM_PIN  GPIO_PIN_4 // D4
+  #define SDb_PWM_PIN  GPIO_PIN_3 // D3
+  #define SDc_PWM_PIN  GPIO_PIN_3 // A3
+
+  #define SDa_PWM_PORT  GPIOD
+  #define SDb_PWM_PORT  GPIOD
+  #define SDc_PWM_PORT  GPIOA
+
+#else 
+// #pragma controller/pwm timer not defined
+asdg
 #endif
 
 // PD4 set LO
-#define PWM_PhA_OUTP_LO( )                   \
-    GPIOD->ODR &= (uint8_t) ( ~GPIO_PIN_4 );     \
-    GPIOD->DDR |=  (1<<4);                   \
-    GPIOD->CR1 |=  (1<<4);
+#define PWM_PhA_OUTP_LO( )                              \
+    SDc_PWM_PORT->ODR &= (uint8_t) ( ~SDa_PWM_PIN );    \
+    SDc_PWM_PORT->DDR |=  SDa_PWM_PIN;                   \
+    SDc_PWM_PORT->CR1 |=  SDa_PWM_PIN;
 
 // PD3 set LO
-#define PWM_PhB_OUTP_LO( ) \
-    GPIOD->ODR &= (uint8_t) ( ~GPIO_PIN_3 );     \
-    GPIOD->DDR |=  (1<<3);                   \
-    GPIOD->CR1 |=  (1<<3);
+#define PWM_PhB_OUTP_LO( )                              \
+    SDc_PWM_PORT->ODR &= (uint8_t) ( ~SDb_PWM_PIN );    \
+    SDc_PWM_PORT->DDR |=  SDb_PWM_PIN;                   \
+    SDc_PWM_PORT->CR1 |=  SDb_PWM_PIN;
 
 // PA3 set LO
-#define PWM_PhC_OUTP_LO( )                   \
-    GPIOA->ODR &= (uint8_t) ( ~GPIO_PIN_3 );     \
-    GPIOA->DDR |=  (1<<3);                   \
-    GPIOA->CR1 |=  (1<<3);
-// Phase enable (/SD input pin on IR2104)
+#define PWM_PhC_OUTP_LO( )                              \
+    SDc_PWM_PORT->ODR &= (uint8_t) ( ~SDc_PWM_PIN );    \
+    SDc_PWM_PORT->DDR |=  SDc_PWM_PIN;                   \
+    SDc_PWM_PORT->CR1 |=  SDc_PWM_PIN;
+
+
+/**
+ * Phase enable (/SD input pin on IR2104)
+ */
 #define PWM_PhA_HB_ENABLE( ) \
-    SDa_GPIO_PORT->ODR |=   SDa_GPIO_PIN;
+    SDa_SD_PORT->ODR |=   SDa_SD_PIN;
 
 #define PWM_PhB_HB_ENABLE( ) \
-    SDb_GPIO_PORT->ODR |=   SDb_GPIO_PIN;
+    SDb_SD_PORT->ODR |=   SDb_SD_PIN;
 
 #define PWM_PhC_HB_ENABLE( ) \
-    SDc_GPIO_PORT->ODR |=   SDc_GPIO_PIN;
+    SDc_SD_PORT->ODR |=   SDc_SD_PIN;
 
-// Phase disable (/SD input pin on IR2104)
+/**
+ * Phase disable (/SD input pin on IR2104)
+ */
 // casts applied in order to quash warnings (bit inversion causes sign extension to to 16-bit)
 #define PWM_PhA_HB_DISABLE( ) \
-    SDa_GPIO_PORT->ODR &=  (uint8_t) ( ~SDa_GPIO_PIN );
+    SDa_SD_PORT->ODR &=  (uint8_t) ( ~SDa_SD_PIN );
 
 #define PWM_PhB_HB_DISABLE( ) \
-    SDb_GPIO_PORT->ODR &=  (uint8_t) ( ~SDb_GPIO_PIN );
+    SDb_SD_PORT->ODR &=  (uint8_t) ( ~SDb_SD_PIN );
 
 #define PWM_PhC_HB_DISABLE( ) \
-    SDc_GPIO_PORT->ODR &=  (uint8_t) ( ~SDc_GPIO_PIN );
+    SDc_SD_PORT->ODR &=  (uint8_t) ( ~SDc_SD_PIN );
 
 
 /* Public types -------------------------------------------------------------*/

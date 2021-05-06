@@ -55,7 +55,7 @@
   * more akin to 
   */
 
-#ifdef STM8S105 // DISCOVERY
+#ifdef STM8S105 // S105 Dev board or DISCOVERY
 
 /**
   * @brief Retargets the C library printf function to the UART.
@@ -289,7 +289,8 @@ static void GPIO_Config(void)
  */
 static void UART_setup(void)
 {
-#ifdef STM8S105 // DISCOVERY
+#if !defined( S003_DEV ) // S105 Dev, or 105S DISCOVERY
+
   UART2_DeInit();
 
   UART2_Init(115200,
@@ -300,7 +301,7 @@ static void UART_setup(void)
              UART2_MODE_TXRX_ENABLE);
 
   UART2_Cmd(ENABLE);
-#else
+#else  // S003 Dev board 
   UART1_DeInit();
 
   UART1_Init(
@@ -400,7 +401,7 @@ static void TIM1_setup(void)
 /*
  * commutation timer on TIM1 or TIM3 depending on the specific stm8s part
  */
-#if defined ( COMMSTEP_ON_TIM3 )
+#if (COMMSTEP_TIMER == 3)
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
  *  Sets the commutation switching period.
@@ -568,10 +569,8 @@ void MCU_Init(void)
   GPIO_Config();
   UART_setup();
   PWM_setup();
-
-#ifndef STM8S003             //   resistor divider for 3.3v  TBD
   ADC1_setup();
-#endif
+
 #if defined( SPI_ENABLED )
   SPI_setup();
 #endif

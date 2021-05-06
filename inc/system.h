@@ -21,19 +21,46 @@
 #include <stm8s.h>
 #endif // UNIT_TEST
 
-
+// STM8 timers for control/pwm task
+#define MCP_CTRL_TIMER_1  (1)
+#define MCP_CTRL_TIMER_2  (1)
+// STM8 timers for commutation step
+#define MCP_COMM_TIMER_1  (1)
+#define MCP_COMM_TIMER_3  (3)
+/**
+ * the STM8 variant is defined in the project file, along with the appropriate 
+ * compiler settings for the particular MCU (memory model etc.)
+ * Here is defined the particular platform, where the particular MCU and pin
+ * routing determines how the peripherals and GPIO pins are allocated.
+ */
 #if defined ( S105_DEV )
-
-  #define COMMSTEP_ON_TIM3
-  #define CNTRLLER_ON_TIM2 // PWM timer and control loop
+/*
+ * S105 Dev Board only has TIM2 Ch3 on Alt pin mapping, therefore, TIM1 drives  
+ * PWM/control, while either TIM2 or TIM3 can driver commutation step as they 
+ * are both 16-bit timers. TIM2 remains available for other purpose (servo input?).
+ */
+  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_1
+  #define COMMSTEP_TIMER  MCP_COMM_TIMER_3
 
 #elif defined ( S003_DEV )
+/*
+ * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
+ */
+  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
+  #define COMMSTEP_TIMER  MCP_COMM_TIMER_1
 
-#else //S105_DISCOVERY 
+#elif defined ( S105_DISCOVERY )
+/*
+ * S105 Discovery board can't use TIM1 for PWM (unless solder bridges connecting the
+ * touch sensor are removed). Therefore, TIM2 drives PWM/controller, and TIM3 to
+ * drive the commutation step, leaving TIM1 unnused (TIM1 input capture/compare 
+ * might be used capture servo signal from R/C radio or flight controller).
+ */
+  #define CONTRLLR_TIMER  2
+  #define COMMSTEP_TIMER  3
 
-  #define COMMSTEP_ON_TIM3
-  #define CNTRLLER_ON_TIM2 // PWM timer and control loop
-
+#else
+// #pragma error no platform defined
 #endif
 
 
