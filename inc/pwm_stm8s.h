@@ -34,10 +34,10 @@
   #define SDc_SD_PORT  GPIOA
 
 #elif defined ( S105_DEV )
-
-  #define SDa_SD_PIN  GPIO_PIN_2  // D2
-  #define SDb_SD_PIN  GPIO_PIN_3  // D3
-  #define SDc_SD_PIN  GPIO_PIN_4  // D4
+// leave D4 available for servo pulse input capture (TIM2_CH1)
+  #define SDa_SD_PIN  GPIO_PIN_0  // D0
+  #define SDb_SD_PIN  GPIO_PIN_2  // D2
+  #define SDc_SD_PIN  GPIO_PIN_3  // D3
 
   #define SDa_SD_PORT  GPIOD
   #define SDb_SD_PORT  GPIOD
