@@ -217,8 +217,8 @@ void PWM_setup(void)
                   TIM1_OUTPUTSTATE_ENABLE,
                   TIM1_OUTPUTNSTATE_ENABLE,
                   0,
-                  TIM1_OCPOLARITY_HIGH,
-                  TIM1_OCNPOLARITY_HIGH,
+                  TIM1_OCPOLARITY_LOW,
+                  TIM1_OCNPOLARITY_LOW,
                   TIM1_OCIDLESTATE_RESET,
                   TIM1_OCNIDLESTATE_RESET);
     //   TIM2_OC2PreloadConfig(ENABLE); ??
@@ -228,8 +228,8 @@ void PWM_setup(void)
                   TIM1_OUTPUTSTATE_ENABLE,
                   TIM1_OUTPUTNSTATE_ENABLE,
                   0,
-                  TIM1_OCPOLARITY_HIGH,
-                  TIM1_OCNPOLARITY_HIGH,
+                  TIM1_OCPOLARITY_LOW,
+                  TIM1_OCNPOLARITY_LOW,
                   TIM1_OCIDLESTATE_RESET,
                   TIM1_OCNIDLESTATE_RESET);
 // ?  TIM2_OC3PreloadConfig(ENABLE);
@@ -238,7 +238,7 @@ void PWM_setup(void)
     TIM1_OC4Init(PWM_MODE,
                  TIM1_OUTPUTSTATE_ENABLE,
                  0,
-                 TIM1_OCPOLARITY_HIGH,
+                 TIM1_OCPOLARITY_LOW,
                  TIM1_OCIDLESTATE_RESET);
 
     TIM1_CtrlPWMOutputs(ENABLE);
