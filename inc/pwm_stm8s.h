@@ -23,7 +23,17 @@
  * to their pin assignment or pin configuration other than setting the internal
  * pullup (not open-collector) 
  */
-#if defined ( S105_DISCOVERY )
+#if defined ( S105_DEV )
+// leave D3 and D4 available for servo pulse input capture (TIM2 CH1 and CH2)
+  #define SDa_SD_PIN  GPIO_PIN_0  // D0
+  #define SDb_SD_PIN  GPIO_PIN_2  // D2
+  #define SDc_SD_PIN  GPIO_PIN_7  // D7
+
+  #define SDa_SD_PORT  GPIOD
+  #define SDb_SD_PORT  GPIOD
+  #define SDc_SD_PORT  GPIOD
+
+#elif defined ( S105_DISCOVERY )
 
   #define SDa_SD_PIN  GPIO_PIN_2  // D2
   #define SDb_SD_PIN  GPIO_PIN_0  // E0
@@ -32,16 +42,6 @@
   #define SDa_SD_PORT  GPIOD
   #define SDb_SD_PORT  GPIOE
   #define SDc_SD_PORT  GPIOA
-
-#elif defined ( S105_DEV )
-// leave D4 available for servo pulse input capture (TIM2_CH1)
-  #define SDa_SD_PIN  GPIO_PIN_0  // D0
-  #define SDb_SD_PIN  GPIO_PIN_2  // D2
-  #define SDc_SD_PIN  GPIO_PIN_3  // D3
-
-  #define SDa_SD_PORT  GPIOD
-  #define SDb_SD_PORT  GPIOD
-  #define SDc_SD_PORT  GPIOD
 
 #elif defined ( S003_DEV )
   #define SDa_SD_PIN  GPIO_PIN_1 // A1
