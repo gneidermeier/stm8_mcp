@@ -15,6 +15,8 @@
 #include "system.h"
 #include "driver.h"
 
+unsigned int counter;
+
 /** @addtogroup Template_Project
   * @{
   */
@@ -138,6 +140,7 @@ INTERRUPT_HANDLER(EXTI_PORTD_IRQHandler, 6)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+	counter += 1;
 }
 
 /**
@@ -245,9 +248,28 @@ INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
   */
 INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+#if defined( S105_DISCOVERY ) && defined( HAS_SERVO_INPUT )
+    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
+    {
+//        GPIOD->ODR &=  ~(1<<LED); // clear test pin
+        Driver_on_capture_fall();
+
+        TIM1_ClearITPendingBit(TIM1_IT_CC3);
+        TIM1_ClearFlag(TIM1_FLAG_CC3);
+    }
+    else
+    {
+//        GPIOD->ODR |=  (1<<LED); // set test pin
+        Driver_on_capture_rise();
+    }
+
+       // no idea why this flag not getting set .. oh well
+//    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC4) )
+    {
+        TIM1_ClearITPendingBit(TIM1_IT_CC4);
+        TIM1_ClearFlag(TIM1_FLAG_CC4);
+    }
+#endif
 }
 
 #if defined (STM8S903) || defined (STM8AF622x)
@@ -298,10 +320,14 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 
     Driver_on_PWM_edge(); // starts ADC conversion
-
-    // must reset the tmer interrupt flag
-    TIM2->SR1 &= ~TIM2_SR1_UIF;
 #endif
+
+// tmp test
+    /* Toggles LED */
+//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+
+    // reset interrupt flag
+    TIM2->SR1 &= ~TIM2_SR1_UIF;
 }
 
 /**
@@ -311,9 +337,36 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_CAP_COM_IRQHandler, 14)
  {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
+#if defined( S105_DEV ) && defined( HAS_SERVO_INPUT )
+    if ( 0 != TIM2_GetFlagStatus(TIM2_FLAG_CC1) )
+    {
+//        GPIOD->ODR &=  ~(1<<LED); // clear test pin
+        Driver_on_capture_fall();
+
+        TIM2_ClearITPendingBit(TIM2_IT_CC1);
+        TIM2_ClearFlag(TIM2_FLAG_CC1);
+    }
+    else
+    {
+//        GPIOD->ODR |=  (1<<LED); // set test pin
+        Driver_on_capture_rise();
+
+    /* Toggles LED */
+//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+    }
+
+    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC2) )
+    {
+        TIM2_ClearITPendingBit(TIM2_IT_CC2);
+        TIM2_ClearFlag(TIM2_FLAG_CC2);
+    }
+
+    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
+    {
+        TIM2_ClearITPendingBit(TIM2_IT_CC3);
+        TIM2_ClearFlag(TIM2_FLAG_CC3);
+    }
+#endif
  }
 #endif /* (STM8S903) || (STM8AF622x) */
 

@@ -42,12 +42,13 @@
   #define CONTRLLR_TIMER  MCP_CTRL_TIMER_1
   #define COMMSTEP_TIMER  MCP_COMM_TIMER_3
 
-#elif defined ( S003_DEV )
-/*
- * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
- */
-  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
-  #define COMMSTEP_TIMER  MCP_COMM_TIMER_1
+  #define LED_GPIO_PORT    GPIOE
+  #define LED_GPIO_PIN     GPIO_PIN_5
+
+  #define SERVO_GPIO_PORT  GPIOD
+  #define SERVO_GPIO_PIN   GPIO_PIN_4
+
+  #define HAS_SERVO_INPUT
 
 #elif defined ( S105_DISCOVERY )
 /*
@@ -56,11 +57,27 @@
  * drive the commutation step, leaving TIM1 unnused (TIM1 input capture/compare 
  * might be used capture servo signal from R/C radio or flight controller).
  */
-  #define CONTRLLR_TIMER  2
-  #define COMMSTEP_TIMER  3
+  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
+  #define COMMSTEP_TIMER  MCP_COMM_TIMER_3
 
-#else
-// #pragma error no platform defined
+  #define LED_GPIO_PORT    GPIOD
+  #define LED_GPIO_PIN     GPIO_PIN_0
+
+  #define SERVO_GPIO_PORT  GPIOC
+  #define SERVO_GPIO_PIN   GPIO_PIN_4
+
+//  #define HAS_SERVO_INPUT
+
+#else // S003_DEV ?
+/*
+ * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
+ * Not likely to use the 8k flash part, code barely or does not fit.
+ */
+  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
+  #define COMMSTEP_TIMER  MCP_COMM_TIMER_1
+
+  #define LED_GPIO_PORT    GPIOB
+  #define LED_GPIO_PIN     GPIO_PIN_5
 #endif
 
 
@@ -127,21 +144,5 @@
 
 #define PWM_100PCNT  TIM2_PWM_PD
 
-
-/**
- * Pin/port for on-board LED (move to mcu.h?)
- */
-#if defined ( S105_DEV )
-  #define LED_GPIO_PORT  (GPIOE)
-  #define LED_GPIO_PINS  (GPIO_PIN_5)
-
-#elif defined ( S003_DEV ) // STM8S003 dev board 
-  #define LED_GPIO_PORT  (GPIOB)
-  #define LED_GPIO_PINS  (GPIO_PIN_5)
-
-#else // S105_DISCOVERY
-  #define LED_GPIO_PORT  (GPIOD)
-  #define LED_GPIO_PINS  (GPIO_PIN_0)
-#endif
 
 #endif // SYSTEM_H

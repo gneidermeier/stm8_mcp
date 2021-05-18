@@ -198,63 +198,52 @@ uint8_t SerialKeyPressed(char *key)
 */
 static void GPIO_Config(void)
 {
+// LED output pin
+  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+
+// /SD: A1, A2, C3
+  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
+
+#if 0//#if defined( HAS_SERVO_INPUT )
+// RC servo pulse input signal (with TIMx Capture/Compare)
+// Input pull-up, external interrupt
+  GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_IT);
+#else
+// Input pull-up, no external interrupt
+  GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_NO_IT);	
+#endif // SERVO
 
 #if defined ( S105_DEV )
 
-// built-in LED
-  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
+// AIN0: todo consistent use of SPL 
+  GPIOB->DDR &= ~GPIO_PIN_0;
+  GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
+  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled
 
-// /SD: A1, A2, C3
-  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-
-// AIN0
-
-#elif ( defined S003_DEV )
-  /* Initialize I/Os in Output Mode */
-  GPIO_Init(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PINS, GPIO_MODE_OUT_PP_LOW_FAST);
-
-// /SD: A1, A2, C3
-  GPIO_Init(SDA_PORT, (GPIO_Pin_TypeDef)SDA_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-  GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
-#if 0
-// AIN3
-  GPIOD->DDR &= ~(1 << 2);
-  GPIOD->CR1 &= ~(1 << 2);  // floating input
-  GPIOD->CR2 &= ~(1 << 2);  // 0: External interrupt disabled   ???
-#endif
-
-#else // if defined ( S105_DISCOVERY )
+#elif defined( S105_DISCOVERY )
 // this is the "legacy" '105 code and tended to avoid SPL
 // OUTPUTS
 // built-in LED
-  GPIOD->ODR |= LED_GPIO_PINS; // (1 << LED); //LED initial state is OFF (cathode driven to Vcc)
-  GPIOD->DDR |= LED_GPIO_PINS; // (1 << LED); //PD.n as output
-  GPIOD->CR1 |= LED_GPIO_PINS; // (1 << LED); //push pull output
-
+  GPIOD->ODR |= LED_GPIO_PINS; // pin initial state is OFF
+  GPIOD->DDR |= LED_GPIO_PINS; //PD.n as output
+  GPIOD->CR1 |= LED_GPIO_PINS; //push pull output
 // PD2 -> SD/A
   GPIOD->ODR &=  ~GPIO_PIN_2;
   GPIOD->DDR |=  GPIO_PIN_2;
   GPIOD->CR1 |=  GPIO_PIN_2;
-
 // PE0 -> SD/B
   GPIOE->ODR &=  ~GPIO_PIN_0;
   GPIOE->DDR |=  GPIO_PIN_0;
   GPIOE->CR1 |=  GPIO_PIN_0;
-
 // PA5 -> SD/C
-  GPIOA->ODR &= ~GPIO_PIN_5; // set pin off
-  GPIOA->DDR |= GPIO_PIN_5;  // OUTPUT
-  GPIOA->CR1 |= GPIO_PIN_5;  // push pull output
+  GPIOA->ODR &= ~GPIO_PIN_5;
+  GPIOA->DDR |= GPIO_PIN_5;
+  GPIOA->CR1 |= GPIO_PIN_5;
 
 // INPUTS
 #if 0
-// C4 set as input (used with TIM1 CC4 to measure servo pulse)
-  GPIOC->DDR &= ~GPIO_PIN_4;
-  GPIOC->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
-
 // PA4 as button input (Stop)
   GPIOA->DDR &= ~GPIO_PIN_4;
   GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
@@ -262,17 +251,17 @@ static void GPIO_Config(void)
 // AIN2
   GPIOB->DDR &= ~GPIO_PIN_2;
   GPIOB->CR1 &= ~GPIO_PIN_2;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_2;  // 0: External interrupt disabled   ???
+  GPIOB->CR2 &= ~GPIO_PIN_2;  // 0: External interrupt disabled
 
 // AIN1
   GPIOB->DDR &= ~GPIO_PIN_1;
   GPIOB->CR1 &= ~GPIO_PIN_1;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_1;  // 0: External interrupt disabled   ???
+  GPIOB->CR2 &= ~GPIO_PIN_1;  // 0: External interrupt disabled
 
 // AIN0
   GPIOB->DDR &= ~GPIO_PIN_0;
   GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled   ???
+  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled
 #endif
 }
 
@@ -354,9 +343,46 @@ static void ADC1_setup(void)
   ADC1_StartConversion(); // i.e. for scanning mode only has to start once ...
 }
 
-#if 0 // setup TIM1 with CC enabled
 /**
- * @brief Timer 1 Setup
+ * S003 did not have available timer for servo input ... 105 boards should have 
+ * a spare timer available, but not necessarily the same peripheral instance .
+ */
+#if defined( HAS_SERVO_INPUT )
+
+#if defined( S105_DEV )
+
+/*
+ * copy from stm8s_tim2.c (static in there)
+ */
+static void _TI1_Config(uint8_t TIM2_ICPolarity,
+                       uint8_t TIM2_ICSelection,
+                       uint8_t TIM2_ICFilter)
+{
+  /* Disable the Channel: Reset the CCE Bit */
+  TIM2->CCER1 &= (uint8_t)(~TIM2_CCER1_CC2E); // Capture/Compare 2 output enable mask
+  
+  /* Select the Input and set the filter */
+  TIM2->CCMR1  = (uint8_t)((uint8_t)(TIM2->CCMR1 & (uint8_t)(~(uint8_t)( TIM2_CCMR_CCxS | TIM2_CCMR_ICxF )))
+                           | (uint8_t)(((TIM2_ICSelection)) | ((uint8_t)( TIM2_ICFilter << 4))));
+  
+  // Capture/Compare 2 output Polarity mask and output enable are in CCER1
+  if (TIM2_ICPolarity != TIM2_ICPOLARITY_RISING)
+  {
+    TIM2->CCER1 |= TIM2_CCER1_CC2P;
+  }
+  else
+  {
+    TIM2->CCER1 &= (uint8_t)(~TIM2_CCER1_CC2P);
+  }
+  /* Set the CCE Bit */
+  TIM2->CCER1 |= TIM2_CCER1_CC2E; // Capture/Compare 2 output enable mask
+}
+
+/* Available pins for PWM channels require use of TIM1 ... TIM2 CH1 is a spare
+ * pin on the STM8S105 Black (D4) so the input capture is assigned there.
+ */
+/**
+ * @brief Setup timer capture for servo signal pulse input.
  *
  * @details
  * The clock prescaler is used to scale 1ms radio signal pulse measurement to a
@@ -365,14 +391,89 @@ static void ADC1_setup(void)
  * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
  * THis is explained in STM8 Reference Manual RM0016.
 */
-static void TIM1_setup(void)
+static void Servo_CC_setup(void)
+{
+  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
+  const uint16_t T1_Period = 0xFFFF;
+
+  TIM2_DeInit();
+
+  TIM2_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), T1_Period);
+
+  TIM2_ICInit(TIM2_CHANNEL_1,
+              TIM2_ICPOLARITY_RISING,
+              TIM2_ICSELECTION_DIRECTTI,
+              TIM2_ICPSC_DIV1, // TIM1_ICPrescaler
+              0x0F // 1  // TIM1_ICFilter maxxd out ... motor noise
+             );
+
+  /* TI3 Configuration set input to TIM1ch4 .. copied from TIM1_ICInit() */
+   _TI1_Config(TIM2_ICPOLARITY_FALLING,
+              TIM2_ICSELECTION_INDIRECTTI, // TIM1 Input 3 is selected to be connected to IC4
+              1);
+
+  /* Set the Input Capture Prescaler value */
+  TIM2_SetIC3Prescaler(TIM2_ICPSC_DIV1);
+
+// timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
+  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE);
+	
+// enable capture channels
+  TIM2_ITConfig(TIM2_IT_CC1, ENABLE);
+  TIM2_ITConfig(TIM2_IT_CC2, ENABLE);
+
+  TIM2_Cmd(ENABLE);
+}
+
+#elif defined( S105_DISCOVERY )
+/**
+ * STM8s105 Discovery TIM1 not available for PWM (unless touch pad disabled by
+ * removing solder bridges, i.e. PWM must be on TIM2 but TIM1 is available for input capture.
+ */
+// copied from STM8 peripheral library (it is static in there)
+static void _TI3_Config(uint8_t TIM1_ICPolarity,
+                        uint8_t TIM1_ICSelection,
+                        uint8_t TIM1_ICFilter)
+{
+    /* Disable the Channel 3: Reset the CCE Bit */
+    TIM1->CCER2 &=  (uint8_t)(~TIM1_CCER2_CC3E);
+
+    /* Select the Input and set the filter */
+    TIM1->CCMR3 =
+        (uint8_t)((uint8_t)(TIM1->CCMR3 & (uint8_t)(~(uint8_t)( TIM1_CCMR_CCxS | TIM1_CCMR_ICxF)))
+                  | (uint8_t)(( (TIM1_ICSelection)) | ((uint8_t)( TIM1_ICFilter << 4))));
+
+    /* Select the Polarity */
+    if (TIM1_ICPolarity != TIM1_ICPOLARITY_RISING)
+    {
+        TIM1->CCER2 |= TIM1_CCER2_CC3P;
+    }
+    else
+    {
+        TIM1->CCER2 &= (uint8_t)(~TIM1_CCER2_CC3P);
+    }
+    /* Set the CCE Bit */
+    TIM1->CCER2 |=  TIM1_CCER2_CC3E;
+}
+
+/**
+ * @brief Setup timer capture for servo signal pulse input.
+ *
+ * @details
+ * The clock prescaler is used to scale 1ms radio signal pulse measurement to a
+ * range of just of 0x0300 (exceeds the PWM resolution commanded to the motor).
+ * The timer period is set to maximum and left free running and the capture-compare
+ * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
+ * THis is explained in STM8 Reference Manual RM0016.
+*/
+static void Servo_CC_setup(void)
 {
   const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
   const uint16_t T1_Period = 0xFFFF;
 
   TIM1_DeInit();
 
-  TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 1);
+  TIM1_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 1);
 
   TIM1_ICInit(TIM1_CHANNEL_4,
               TIM1_ICPOLARITY_RISING,
@@ -396,7 +497,8 @@ static void TIM1_setup(void)
 
   TIM1_Cmd(ENABLE);
 }
-#endif // 105
+#endif // S105 DISCOVERY
+#endif // HAS_SERVO_INP
 
 /*
  * commutation timer on TIM1 or TIM3 depending on the specific stm8s part
@@ -460,7 +562,7 @@ void MCU_set_comm_timer(uint16_t period)
   TIM1->CR1 = TIM1_CR1_ARPE; // auto (re)loading the count
   TIM1->CR1 |= TIM1_CR1_CEN; // Enable timer
 }
-#endif // 5/5 no longer used ?
+#endif
 
 /*
  * http://embedded-lab.com/blog/starting-stm8-microcontrollers/13/
@@ -570,6 +672,10 @@ void MCU_Init(void)
   UART_setup();
   PWM_setup();
   ADC1_setup();
+
+#if defined( HAS_SERVO_INPUT )
+  Servo_CC_setup();
+#endif
 
 #if defined( SPI_ENABLED )
   SPI_setup();
