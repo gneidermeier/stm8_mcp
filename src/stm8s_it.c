@@ -15,7 +15,6 @@
 #include "system.h"
 #include "driver.h"
 
-unsigned int counter;
 
 /** @addtogroup Template_Project
   * @{
@@ -137,10 +136,14 @@ INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5)
   */
 INTERRUPT_HANDLER(EXTI_PORTD_IRQHandler, 6)
 {
-  /* In order to detect unexpected events during development,
-     it is recommended to set a breakpoint on the following instruction.
-  */
-	counter += 1;
+	if (GPIO_ReadInputPin(SERVO_GPIO_PORT, SERVO_GPIO_PIN))
+	{
+    GPIO_WriteHigh(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+   }
+  else
+	{
+    GPIO_WriteLow(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+  }
 }
 
 /**
@@ -327,7 +330,9 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 //    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 
     // reset interrupt flag
-    TIM2->SR1 &= ~TIM2_SR1_UIF;
+		//   /* Cleat Interrupt Pending bit */
+  TIM2_ClearITPendingBit(TIM2_IT_UPDATE);
+//    TIM2->SR1 &= ~TIM2_SR1_UIF;
 }
 
 /**

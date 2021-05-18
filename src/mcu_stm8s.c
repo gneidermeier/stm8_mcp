@@ -206,7 +206,7 @@ static void GPIO_Config(void)
   GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
   GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
 
-#if 0//#if defined( HAS_SERVO_INPUT )
+#if 1 //#if defined( HAS_SERVO_INPUT )
 // RC servo pulse input signal (with TIMx Capture/Compare)
 // Input pull-up, external interrupt
   GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_IT);
@@ -217,10 +217,8 @@ static void GPIO_Config(void)
 
 #if defined ( S105_DEV )
 
-// AIN0: todo consistent use of SPL 
-  GPIOB->DDR &= ~GPIO_PIN_0;
-  GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled
+// AIN0 (back-EMF sensor): Input floating, no external interrupt 
+  GPIO_Init(GPIOB, (GPIO_Pin_TypeDef)GPIO_PIN_0, GPIO_MODE_IN_FL_NO_IT);
 
 #elif defined( S105_DISCOVERY )
 // this is the "legacy" '105 code and tended to avoid SPL
@@ -417,7 +415,7 @@ static void Servo_CC_setup(void)
 
 // timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
   TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE);
-	
+
 // enable capture channels
   TIM2_ITConfig(TIM2_IT_CC1, ENABLE);
   TIM2_ITConfig(TIM2_IT_CC2, ENABLE);
@@ -661,6 +659,27 @@ void SPI_setup(void)
 }
 #endif // SPI_ENABLE
 
+
+
+void TIM2_test(void)
+{
+  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
+  const uint16_t T1_Period = 256;
+
+  TIM2_DeInit();
+
+  TIM2_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), T1_Period);
+
+  /* Clear TIM4 update flag */
+  TIM2_ClearFlag(TIM2_FLAG_UPDATE);
+
+/* Enable the ISR  */
+  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
+
+  /* Enable TIM2 */
+  TIM2_Cmd(ENABLE);
+}
+
 /**
  * @brief  Initialize MCU and peripheral modules
  * Configures clocks, GPIO, UART, ADC, timers, PWM.
@@ -672,6 +691,8 @@ void MCU_Init(void)
   UART_setup();
   PWM_setup();
   ADC1_setup();
+
+TIM2_test();
 
 #if defined( HAS_SERVO_INPUT )
   Servo_CC_setup();
