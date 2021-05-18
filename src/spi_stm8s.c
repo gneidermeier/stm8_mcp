@@ -105,11 +105,15 @@ exit:
 
 void chip_select(void)
 {
+#ifdef SPI_CTRLR_USE_CS
     GPIOE->ODR &= (uint8_t)~(1 << CS_PIN);
+#endif
 }
 void chip_deselect(void)
 {
+#ifdef SPI_CTRLR_USE_CS
     GPIOE->ODR |= (1 << CS_PIN);
+#endif
 }
 
 void SPI_write(uint8_t data)
