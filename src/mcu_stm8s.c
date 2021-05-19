@@ -343,7 +343,7 @@ static void ADC1_setup(void)
 static void Servo_CC_setup(void)
 {
   const uint16_t period = 0xFFFF;
-  const uint8_t uint8_t ICFilter = 1;
+  const uint8_t ICFilter = 1;
 
   TIM2_DeInit();
 
