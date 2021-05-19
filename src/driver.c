@@ -119,6 +119,33 @@ static void udpate_phase_average(void)
 
 /* External functions ---------------------------------------------------------*/
 
+#if defined( S105_DEV )
+
+uint16_t get_pulse_start(void)
+{
+    return TIM2_GetCapture1();
+}
+
+uint16_t get_pulse_end(void)
+{
+    return TIM2_GetCapture2();
+}
+
+#elif defined(S105_DISCOVERY)
+
+uint16_t get_pulse_start(void)
+{
+    return TIM1_GetCapture4();
+}
+
+uint16_t get_pulse_end(void)
+{
+    return TIM1_GetCapture3();
+}
+
+#else // ?
+#endif
+
 /**
  * @brief Call from ISR on capture of pulse rise.
  *
@@ -133,7 +160,7 @@ void Driver_on_capture_rise(void)
 {
 // 16-bit counter setup to wrap at 0xffff so no concern for sign of result
   prev_pulse_start_tm = curr_pulse_start_tm;
-  curr_pulse_start_tm = TIM1_GetCapture4();
+  curr_pulse_start_tm = get_pulse_start();
   Pulse_perd = curr_pulse_start_tm  - prev_pulse_start_tm;
 }
 
@@ -145,7 +172,7 @@ void Driver_on_capture_fall(void)
 // noise on this signal when motor running
 //    uint16_t t16 =  TIM1_GetCapture3() - TIM1_GetCapture4();
 //    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
-  Pulse_dur = TIM1_GetCapture3() - TIM1_GetCapture4();
+  Pulse_dur = get_pulse_end() - get_pulse_start();
 }
 
 /**

@@ -206,11 +206,7 @@ static void GPIO_Config(void)
   GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
   GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
 
-#if 1 //#if defined( HAS_SERVO_INPUT )
-// RC servo pulse input signal (with TIMx Capture/Compare)
-// Input pull-up, external interrupt
-  GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_IT);
-#else
+#if defined( HAS_SERVO_INPUT )
 // Input pull-up, no external interrupt
   GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_NO_IT);	
 #endif // SERVO
@@ -221,24 +217,6 @@ static void GPIO_Config(void)
   GPIO_Init(GPIOB, (GPIO_Pin_TypeDef)GPIO_PIN_0, GPIO_MODE_IN_FL_NO_IT);
 
 #elif defined( S105_DISCOVERY )
-// this is the "legacy" '105 code and tended to avoid SPL
-// OUTPUTS
-// built-in LED
-  GPIOD->ODR |= LED_GPIO_PINS; // pin initial state is OFF
-  GPIOD->DDR |= LED_GPIO_PINS; //PD.n as output
-  GPIOD->CR1 |= LED_GPIO_PINS; //push pull output
-// PD2 -> SD/A
-  GPIOD->ODR &=  ~GPIO_PIN_2;
-  GPIOD->DDR |=  GPIO_PIN_2;
-  GPIOD->CR1 |=  GPIO_PIN_2;
-// PE0 -> SD/B
-  GPIOE->ODR &=  ~GPIO_PIN_0;
-  GPIOE->DDR |=  GPIO_PIN_0;
-  GPIOE->CR1 |=  GPIO_PIN_0;
-// PA5 -> SD/C
-  GPIOA->ODR &= ~GPIO_PIN_5;
-  GPIOA->DDR |= GPIO_PIN_5;
-  GPIOA->CR1 |= GPIO_PIN_5;
 
 // INPUTS
 #if 0
@@ -348,35 +326,8 @@ static void ADC1_setup(void)
 #if defined( HAS_SERVO_INPUT )
 
 #if defined( S105_DEV )
-
 /*
- * copy from stm8s_tim2.c (static in there)
- */
-static void _TI1_Config(uint8_t TIM2_ICPolarity,
-                       uint8_t TIM2_ICSelection,
-                       uint8_t TIM2_ICFilter)
-{
-  /* Disable the Channel: Reset the CCE Bit */
-  TIM2->CCER1 &= (uint8_t)(~TIM2_CCER1_CC2E); // Capture/Compare 2 output enable mask
-  
-  /* Select the Input and set the filter */
-  TIM2->CCMR1  = (uint8_t)((uint8_t)(TIM2->CCMR1 & (uint8_t)(~(uint8_t)( TIM2_CCMR_CCxS | TIM2_CCMR_ICxF )))
-                           | (uint8_t)(((TIM2_ICSelection)) | ((uint8_t)( TIM2_ICFilter << 4))));
-  
-  // Capture/Compare 2 output Polarity mask and output enable are in CCER1
-  if (TIM2_ICPolarity != TIM2_ICPOLARITY_RISING)
-  {
-    TIM2->CCER1 |= TIM2_CCER1_CC2P;
-  }
-  else
-  {
-    TIM2->CCER1 &= (uint8_t)(~TIM2_CCER1_CC2P);
-  }
-  /* Set the CCE Bit */
-  TIM2->CCER1 |= TIM2_CCER1_CC2E; // Capture/Compare 2 output enable mask
-}
-
-/* Available pins for PWM channels require use of TIM1 ... TIM2 CH1 is a spare
+ * Available pins for PWM channels require use of TIM1 ... TIM2 CH1 is a spare
  * pin on the STM8S105 Black (D4) so the input capture is assigned there.
  */
 /**
@@ -391,30 +342,30 @@ static void _TI1_Config(uint8_t TIM2_ICPolarity,
 */
 static void Servo_CC_setup(void)
 {
-  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
-  const uint16_t T1_Period = 0xFFFF;
+  const uint16_t period = 0xFFFF;
+  const uint8_t uint8_t ICFilter = 1;
 
   TIM2_DeInit();
 
-  TIM2_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), T1_Period);
+// The counter clock frequency fCK_CNT is equal to fCK_PSC / 2(PSC[3:0])
+  TIM2_TimeBaseInit( TIM2_PRESCALER_32, period);
 
   TIM2_ICInit(TIM2_CHANNEL_1,
               TIM2_ICPOLARITY_RISING,
               TIM2_ICSELECTION_DIRECTTI,
-              TIM2_ICPSC_DIV1, // TIM1_ICPrescaler
-              0x0F // 1  // TIM1_ICFilter maxxd out ... motor noise
+              TIM2_ICPSC_DIV1,
+              ICFilter
              );
 
-  /* TI3 Configuration set input to TIM1ch4 .. copied from TIM1_ICInit() */
-   _TI1_Config(TIM2_ICPOLARITY_FALLING,
-              TIM2_ICSELECTION_INDIRECTTI, // TIM1 Input 3 is selected to be connected to IC4
-              1);
-
-  /* Set the Input Capture Prescaler value */
-  TIM2_SetIC3Prescaler(TIM2_ICPSC_DIV1);
+  TIM2_ICInit(TIM2_CHANNEL_2,
+              TIM2_ICPOLARITY_FALLING,
+              TIM2_ICSELECTION_INDIRECTTI,
+              TIM2_ICPSC_DIV1, // TIM1_ICPrescaler
+              ICFilter
+             );
 
 // timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
-  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE);
+//  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE);
 
 // enable capture channels
   TIM2_ITConfig(TIM2_IT_CC1, ENABLE);
@@ -424,36 +375,10 @@ static void Servo_CC_setup(void)
 }
 
 #elif defined( S105_DISCOVERY )
-/**
+/*
  * STM8s105 Discovery TIM1 not available for PWM (unless touch pad disabled by
  * removing solder bridges, i.e. PWM must be on TIM2 but TIM1 is available for input capture.
  */
-// copied from STM8 peripheral library (it is static in there)
-static void _TI3_Config(uint8_t TIM1_ICPolarity,
-                        uint8_t TIM1_ICSelection,
-                        uint8_t TIM1_ICFilter)
-{
-    /* Disable the Channel 3: Reset the CCE Bit */
-    TIM1->CCER2 &=  (uint8_t)(~TIM1_CCER2_CC3E);
-
-    /* Select the Input and set the filter */
-    TIM1->CCMR3 =
-        (uint8_t)((uint8_t)(TIM1->CCMR3 & (uint8_t)(~(uint8_t)( TIM1_CCMR_CCxS | TIM1_CCMR_ICxF)))
-                  | (uint8_t)(( (TIM1_ICSelection)) | ((uint8_t)( TIM1_ICFilter << 4))));
-
-    /* Select the Polarity */
-    if (TIM1_ICPolarity != TIM1_ICPOLARITY_RISING)
-    {
-        TIM1->CCER2 |= TIM1_CCER2_CC3P;
-    }
-    else
-    {
-        TIM1->CCER2 &= (uint8_t)(~TIM1_CCER2_CC3P);
-    }
-    /* Set the CCE Bit */
-    TIM1->CCER2 |=  TIM1_CCER2_CC3E;
-}
-
 /**
  * @brief Setup timer capture for servo signal pulse input.
  *
@@ -466,26 +391,31 @@ static void _TI3_Config(uint8_t TIM1_ICPolarity,
 */
 static void Servo_CC_setup(void)
 {
-  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
-  const uint16_t T1_Period = 0xFFFF;
+/*
+ * counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)
+ */
+  const uint16_t T1_Prescaler = 32 - 1; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
 
+  const uint16_t T1_Period = 0xFFFF;
+  const uint8_t repetitionCounter = 1;
+  const uint8_t uint8_t ICFilter = 1;
   TIM1_DeInit();
 
-  TIM1_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 1);
+  TIM1_TimeBaseInit( T1_Prescaler, TIM1_COUNTERMODE_UP, T1_Period, repetitionCounter );
 
   TIM1_ICInit(TIM1_CHANNEL_4,
               TIM1_ICPOLARITY_RISING,
               TIM1_ICSELECTION_DIRECTTI,
-              TIM1_ICPSC_DIV1, // TIM1_ICPrescaler
-              0x0F // 1  // TIM1_ICFilter maxxd out ... motor noise
+              TIM1_ICPSC_DIV1,
+              ICFilter
              );
 
-  /* TI3 Configuration set input to TIM1ch4 .. copied from TIM1_ICInit() */
-  _TI3_Config(TIM1_ICPOLARITY_FALLING,
-              TIM1_ICSELECTION_INDIRECTTI, // TIM1 Input 3 is selected to be connected to IC4
-              1);
-  /* Set the Input Capture Prescaler value */
-  TIM1_SetIC3Prescaler(TIM1_ICPSC_DIV1);
+  TIM1_ICInit(TIM1_CHANNEL_3,
+              TIM1_ICPOLARITY_FALLING,
+              TIM1_ICSELECTION_INDIRECTTI,
+              TIM1_ICPSC_DIV1,
+              ICFilter
+             );
 
 // timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
   TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
@@ -661,25 +591,6 @@ void SPI_setup(void)
 
 
 
-void TIM2_test(void)
-{
-  const uint16_t T1_Prescaler = 32; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
-  const uint16_t T1_Period = 256;
-
-  TIM2_DeInit();
-
-  TIM2_TimeBaseInit(( /* TIM1_PRESCALER */ T1_Prescaler - 1 ), T1_Period);
-
-  /* Clear TIM4 update flag */
-  TIM2_ClearFlag(TIM2_FLAG_UPDATE);
-
-/* Enable the ISR  */
-  TIM2_ITConfig(TIM2_IT_UPDATE, ENABLE); // GN: for eventual A/D triggering
-
-  /* Enable TIM2 */
-  TIM2_Cmd(ENABLE);
-}
-
 /**
  * @brief  Initialize MCU and peripheral modules
  * Configures clocks, GPIO, UART, ADC, timers, PWM.
@@ -691,8 +602,6 @@ void MCU_Init(void)
   UART_setup();
   PWM_setup();
   ADC1_setup();
-
-TIM2_test();
 
 #if defined( HAS_SERVO_INPUT )
   Servo_CC_setup();

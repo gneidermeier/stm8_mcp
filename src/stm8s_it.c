@@ -136,13 +136,13 @@ INTERRUPT_HANDLER(EXTI_PORTC_IRQHandler, 5)
   */
 INTERRUPT_HANDLER(EXTI_PORTD_IRQHandler, 6)
 {
-	if (GPIO_ReadInputPin(SERVO_GPIO_PORT, SERVO_GPIO_PIN))
-	{
-    GPIO_WriteHigh(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-   }
-  else
-	{
-    GPIO_WriteLow(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+    if (GPIO_ReadInputPin(SERVO_GPIO_PORT, SERVO_GPIO_PIN))
+    {
+//    GPIO_WriteHigh(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+    }
+    else
+    {
+//    GPIO_WriteLow(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
   }
 }
 
@@ -325,14 +325,9 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     Driver_on_PWM_edge(); // starts ADC conversion
 #endif
 
-// tmp test
-    /* Toggles LED */
-//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-
     // reset interrupt flag
-		//   /* Cleat Interrupt Pending bit */
-  TIM2_ClearITPendingBit(TIM2_IT_UPDATE);
-//    TIM2->SR1 &= ~TIM2_SR1_UIF;
+    TIM2_ClearITPendingBit(TIM2_IT_UPDATE); // TIM2 interrupt sources defined in stm8s_tim2.h
+//    TIM2->SR1 &= ~ TIM2_SR1_UIF; // Update Interrupt Flag mask defined in stm8s.h
 }
 
 /**
@@ -343,33 +338,21 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
  INTERRUPT_HANDLER(TIM2_CAP_COM_IRQHandler, 14)
  {
 #if defined( S105_DEV ) && defined( HAS_SERVO_INPUT )
+
     if ( 0 != TIM2_GetFlagStatus(TIM2_FLAG_CC1) )
     {
-//        GPIOD->ODR &=  ~(1<<LED); // clear test pin
-        Driver_on_capture_fall();
+        Driver_on_capture_rise();
 
         TIM2_ClearITPendingBit(TIM2_IT_CC1);
         TIM2_ClearFlag(TIM2_FLAG_CC1);
     }
-    else
-    {
-//        GPIOD->ODR |=  (1<<LED); // set test pin
-        Driver_on_capture_rise();
 
-    /* Toggles LED */
-//    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-    }
-
-    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC2) )
+    if ( 0 != TIM2_GetFlagStatus(TIM2_FLAG_CC2) )
     {
+        Driver_on_capture_fall();
+
         TIM2_ClearITPendingBit(TIM2_IT_CC2);
         TIM2_ClearFlag(TIM2_FLAG_CC2);
-    }
-
-    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC3) )
-    {
-        TIM2_ClearITPendingBit(TIM2_IT_CC3);
-        TIM2_ClearFlag(TIM2_FLAG_CC3);
     }
 #endif
  }

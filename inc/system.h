@@ -48,7 +48,7 @@
   #define SERVO_GPIO_PORT  GPIOD
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
-//  #define HAS_SERVO_INPUT
+  #define HAS_SERVO_INPUT
 
 #elif defined ( S105_DISCOVERY )
 /*

@@ -214,13 +214,14 @@ static void dbg_println(int zrof)
 //  tmpi = (int)Faultm_get_status();
 //  uispd = (int)UI_Speed;
   printf(
-    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X \r\n",
+    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X \r\n",
     Line_Count,
     uispd,
     get_commutation_period(),
     BLDC_PWMDC_Get(),
     Vsystem,
-    faults
+    faults,
+    UI_pulse_dur
   );
 #endif
 }
@@ -402,13 +403,13 @@ static void Periodic_task(void)
   Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
   enableInterrupts();  ///////////////// EI EI O
-
+#if 1
   // update system voltage diagnostic - check plausibilty of Vsys
   if (BL_IS_RUNNING == bl_state  && Vsystem > 0  )
   {
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
-
+#endif
   /*
    * debug logging to terminal
    */
