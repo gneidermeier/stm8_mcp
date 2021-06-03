@@ -34,7 +34,12 @@
 // thru the lower speed transition into closed-loop control. 
 // The fault can be tested by letting the spinning prop disc strike a flimsy
 // obstacle like a 3x5 index card.
+#if defined ( S105_DEV )
+// TBD /???????   Vcc==3.3v  33k/10k @ Vbatt==14.2v
+#define V_SHUTDOWN_THR      0x03A0    // experimentally determined!
+#else
 #define V_SHUTDOWN_THR      0x0340    // experimentally determined!
+#endif
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
 
@@ -403,7 +408,8 @@ static void Periodic_task(void)
   Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
 
   enableInterrupts();  ///////////////// EI EI O
-#if 1
+
+#if defined( UNDERVOLTAGE_FAULT_ENABLED )
   // update system voltage diagnostic - check plausibilty of Vsys
   if (BL_IS_RUNNING == bl_state  && Vsystem > 0  )
   {

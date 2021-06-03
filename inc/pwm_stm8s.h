@@ -27,11 +27,11 @@
 // leave D3 and D4 available for servo pulse input capture (TIM2 CH1 and CH2)
   #define SDa_SD_PIN  GPIO_PIN_0  // D0
   #define SDb_SD_PIN  GPIO_PIN_2  // D2
-  #define SDc_SD_PIN  GPIO_PIN_7  // D7
+  #define SDc_SD_PIN  GPIO_PIN_1  // A1
 
-  #define SDa_SD_PORT  GPIOD
-  #define SDb_SD_PORT  GPIOD
-  #define SDc_SD_PORT  GPIOD
+  #define SDa_SD_PORT  GPIOD  // D0
+  #define SDb_SD_PORT  GPIOD  // D2
+  #define SDc_SD_PORT  GPIOA  // A1
 
 #elif defined ( S105_DISCOVERY )
 
