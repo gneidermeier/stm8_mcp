@@ -12,6 +12,8 @@
 #include <ctype.h> // isprint
 #include <string.h> // memset
 
+#if defined (SPI_ENABLED)
+
 // app headers
 #include "mcu_stm8s.h"
 
@@ -201,3 +203,6 @@ static void SPI_periphd(void)
     UARTputs(sbuf);
 }
 #endif
+
+#endif // defined (SPI_ENABLED)
+

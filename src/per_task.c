@@ -155,69 +155,6 @@ static void dbg_println(int zrof)
 
   Line_Count  += 1;;
 
-#if 0 // #ifdef OLD_PUTS
-  strcat(sbuf, "(");
-  itoa(Line_Count, cbuf, 16);
-  strcat(sbuf, cbuf);
-  strcat(sbuf, ")");
-
-  strcat(sbuf, " CT=");
-  itoa(get_commutation_period(), cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " DC=");
-  itoa( BLDC_PWMDC_Get(), cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " Vs=");
-  itoa( Vsystem, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " SF=");
-  itoa( Faultm_get_status(), cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " TTE=");
-  itoa( timing_error, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " CM=");
-  itoa( Control_mode, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " bRi=");
-  itoa( Back_EMF_Riseing_PhX, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " bFi=");
-  itoa( Back_EMF_Falling_PhX, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " UI=");
-  itoa(UI_Speed, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " AS=");
-  itoa(Analog_slider, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " RF=");
-  itoa(UI_pulse_dc, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " PPD=");
-  itoa(UI_pulse_perd, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, " DUR=");
-  itoa(UI_pulse_dur, cbuf, 16);
-  strcat(sbuf, cbuf);
-
-  strcat(sbuf, "\r\n");
-  UARTputs(sbuf);
-#else
-//  tmpi = (int)Faultm_get_status();
-//  uispd = (int)UI_Speed;
   printf(
     "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X \r\n",
     Line_Count,
@@ -228,7 +165,6 @@ static void dbg_println(int zrof)
     faults,
     UI_pulse_dur
   );
-#endif
 }
 
 //$0768 - $044A  = $031E
