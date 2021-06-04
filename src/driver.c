@@ -143,7 +143,18 @@ uint16_t get_pulse_end(void)
     return TIM1_GetCapture3();
 }
 
-#else // ?
+#else // unimplemented ... stm8s003
+
+uint16_t get_pulse_start(void)
+{
+    return (uint16_t)-1;
+}
+
+uint16_t get_pulse_end(void)
+{
+    return (uint16_t)-1;
+}
+
 #endif
 
 /**
@@ -229,6 +240,10 @@ void Driver_on_ADC_conv(void)
   ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
 
 // assert (buffer should be sized big enough for slowest speed)
+
+// TODO: ph0_adc_fbuf can simply be a running sma ... there is no real need to 
+// reset the average at each commutation switch????!!!???
+
   if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
   {
     ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
@@ -281,7 +296,7 @@ void Driver_Update(void)
   }
   else if ( 0 == (trate % UI_UPDATEM))
   {
-#if 0 // tmp
+#if 1
     /* Toggles LED */
     GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 #endif

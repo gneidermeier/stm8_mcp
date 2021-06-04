@@ -54,6 +54,8 @@
 
   #define HAS_SERVO_INPUT
 
+  #define SPI_ENABLED
+
 #elif defined ( S105_DISCOVERY )
 /*
  * S105 Discovery board can't use TIM1 for PWM (unless solder bridges connecting the
@@ -70,7 +72,8 @@
   #define SERVO_GPIO_PORT  GPIOC
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
-//  #define HAS_SERVO_INPUT
+#define SPI_ENABLED     // can't fit SPI in 8k
+//  #define HAS_SERVO_INPUT // 6/21 ... GN: haven't tested this one for some time ...
 
 #else // S003_DEV ?
 /*
@@ -82,10 +85,15 @@
 
   #define LED_GPIO_PORT    GPIOB
   #define LED_GPIO_PIN     GPIO_PIN_5
+
+// invalid .. no timer avilable ?
+  #define SERVO_GPIO_PORT  (GPIO_TypeDef *)-1
+  #define SERVO_GPIO_PIN   (uint8_t)-1
+
+//  #define HAS_SERVO_INPUT // no timer available?
+//  #define SPI_ENABLED     // can't fit SPI in 8k
 #endif
 
-
-#define SPI_ENABLED
 #if defined( SPI_ENABLED )
   #define SPI_CONTROLLER
 #endif
