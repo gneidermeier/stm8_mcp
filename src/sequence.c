@@ -227,7 +227,6 @@ static void sector_5(void)
 }
 
 /* Public functions ---------------------------------------------------------*/
-#if 0
 /**
  * @brief  Determine plausibility of Control error term.
  *
@@ -240,25 +239,15 @@ static void sector_5(void)
  * @return signed error which at its extreme should be equal to or less than the
  *  range of the initial ADC measurement i.e. 0x0400
  */
-int Seq_get_timing_error_p(int16_t * p16term)
+int8_t Seq_get_timing_error_p(void)
 {
-//    int16_t perror = comm_timing_error; // positive if advanced
-  int err = -1; // report error on measurement plausibility
-
   if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
   {
-    err = 0;
-// 4/30: turns out there is only one caller, and it is not using the error term (passes in NULL)
-#if 0 
-    if ( NULL != int16p)
-    {
-      *int16p = Seq_get_timing_error(); // comm_tm_err_ratio;  // positive if advanced
-    }
-#endif
+    return (int8_t)0;
   }
-  return err;
+  return (int8_t)(-1);
 }
-#endif
+
 /**
  * @brief Accessor for control error term
  *
@@ -279,6 +268,16 @@ int16_t Seq_get_timing_error(void)
  * @details Vbatt is in this module because the measurement has to be timed to
  * the PWM signal as well as the commutation sequence.
  */
+uint16_t Seq_Get_bemfR(void)
+{
+  return Back_EMF_Riseing_PhX ;
+}
+
+uint16_t Seq_Get_bemfF(void)
+{
+  return Back_EMF_Falling_PhX ;
+}
+
 uint16_t Seq_Get_Vbatt(void)
 {
   return Vbatt_;

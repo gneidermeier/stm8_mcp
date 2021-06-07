@@ -53,6 +53,7 @@ uint16_t BLDC_PWMDC_Get(void);
 void BL_reset(void);
 
 BL_RUNSTATE_t BL_get_state(void);
+uint8_t BL_get_ct_mode(void);
 
 /**
  * @brief Periodic state machine update.

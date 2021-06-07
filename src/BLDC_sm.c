@@ -208,7 +208,7 @@ void BLDC_PWMDC_Set(uint8_t dc)
          * control of commutation timing. Also considered imposing a minimum
          * elapsed run-time but there is apparently no obvious reason to do such a thing.
         */
-        if ( 0 == Seq_get_timing_error() )
+        if ( 0 == Seq_get_timing_error_p() )
         {
 #ifdef CLMODE_ENABLED
           Control_mode = TRUE;
@@ -291,6 +291,11 @@ BL_RUNSTATE_t BL_get_state(void)
   }
   // else
   return BL_NOT_RUNNING;
+}
+
+uint8_t BL_get_ct_mode(void)
+{
+  return Control_mode;
 }
 
 /**
