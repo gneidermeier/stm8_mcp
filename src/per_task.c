@@ -156,14 +156,15 @@ static void dbg_println(int zrof)
   Line_Count  += 1;;
 
   printf(
-    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X \r\n",
+    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X ERR=%04X \r\n",
     Line_Count,
     uispd,
     get_commutation_period(),
     BLDC_PWMDC_Get(),
     Vsystem,
     faults,
-    UI_pulse_dur
+    UI_pulse_dur,
+    Seq_get_timing_error()
   );
 }
 
