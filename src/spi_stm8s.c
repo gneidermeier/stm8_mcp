@@ -12,6 +12,10 @@
 #include <ctype.h> // isprint
 #include <string.h> // memset
 
+// unfortunately this has to be included merely for SPI ENABLED define
+// todo consider -DSPI_ENABLED ? in project/makefile
+#include "system.h"
+
 #if defined (SPI_ENABLED)
 
 // app headers
