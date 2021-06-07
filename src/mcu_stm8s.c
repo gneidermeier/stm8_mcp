@@ -111,10 +111,8 @@ uint8_t SerialKeyPressed(char *key)
     *key = (char)UART2->DR;
     return 1;
   }
-  else
-  {
-    return 0;
-  }
+
+  return 0;
 }
 #else // stm8s003
 /**

@@ -99,9 +99,11 @@ static void sector_0(void)
 //    { DC_OUTP_HI,       DC_OUTP_LO,       DC_OUTP_FLOAT_F,
 
 // previously phase-A was floating-rising transition
-  Back_EMF_Riseing_PhX =
-    ( Back_EMF_Riseing_PhX + Driver_Get_Back_EMF_Avg() ) >> 1 ;
-
+#ifdef BUFFER_ADC_BEMF
+  Back_EMF_Riseing_PhX = ( Back_EMF_Riseing_PhX + Driver_Get_Back_EMF_Avg() ) >> 1 ;
+#else
+  Back_EMF_Riseing_PhX = ( Back_EMF_Riseing_PhX + Driver_Get_ADC() ) >> 1 ;
+#endif
 //PWM OFF: C
   PWM_PhC_Disable();
 
@@ -160,9 +162,11 @@ static void sector_2(void)
 static void sector_3(void)
 {
 // previously phase-A was floating-falling transition
-  Back_EMF_Falling_PhX =
-    ( Back_EMF_Falling_PhX + Driver_Get_Back_EMF_Avg() ) >> 1;
-
+#ifdef BUFFER_ADC_BEMF
+  Back_EMF_Falling_PhX = ( Back_EMF_Falling_PhX + Driver_Get_Back_EMF_Avg() ) >> 1;
+#else
+  Back_EMF_Falling_PhX = ( Back_EMF_Falling_PhX + Driver_Get_ADC() ) >> 1;
+#endif
 //    { DC_OUTP_LO,       DC_OUTP_HI,       DC_OUTP_FLOAT_R,
 
 //PWM OFF:
@@ -223,7 +227,7 @@ static void sector_5(void)
 }
 
 /* Public functions ---------------------------------------------------------*/
-
+#if 0
 /**
  * @brief  Determine plausibility of Control error term.
  *
@@ -251,9 +255,10 @@ int Seq_get_timing_error_p(int16_t * p16term)
       *int16p = Seq_get_timing_error(); // comm_tm_err_ratio;  // positive if advanced
     }
 #endif
-  }  return err;
+  }
+  return err;
 }
-
+#endif
 /**
  * @brief Accessor for control error term
  *
@@ -328,7 +333,7 @@ void Sequence_Step(void)
   }
   else
   {
-    // intitialize the averages measurements ... doesn't really matter and might go away
+    // intitialize the averages measurements 
     Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
   }
 }

@@ -87,7 +87,8 @@ Do this at your ownn risk to your dev board and equipment!
 The hardware consists of:
  * stm8s105 development board (stm8s105c Discovery or stm8s105k "Black" board)
  * 1100kv brushless motor
- * Benchtop power supply set to 11.1v (recommended) or 3s pack.
+ * Benchtop power supply set to 14.2v (see resistor divider ratio on schematic)
+   (TODO: eventual support for 11.1v 3s pack)
  * FTDI cable (for remote user interface)
  * A 3-phase driver circuit - please see reference here:
    https://simple-circuit.com/wp-content/uploads/2018/02/arduino-sensorless-bldc-motor-controller-ir2101.png
@@ -103,7 +104,7 @@ The hardware consists of:
  Power the bench supply (keep eye on current meter)!
  
  In putty, tera term, minicom etc.:
-   Pressing comma or period keys (have the < and > signs) starts the motor if
+   Pressing comma or period keys (< and > signs) starts the motor if
    not running, and increases/decreases the PWM duty-cycle applied to the motor phases.
    Space bar stops the motor.
  

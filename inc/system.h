@@ -53,7 +53,6 @@
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
   #define HAS_SERVO_INPUT
-
   #define SPI_ENABLED
 
 #elif defined ( S105_DISCOVERY )
@@ -72,7 +71,7 @@
   #define SERVO_GPIO_PORT  GPIOC
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
-#define SPI_ENABLED     // can't fit SPI in 8k
+  #define SPI_ENABLED
 //  #define HAS_SERVO_INPUT // 6/21 ... GN: haven't tested this one for some time ...
 
 #else // S003_DEV ?

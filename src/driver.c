@@ -96,7 +96,7 @@ static uint16_t Pulse_dur;
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-
+#ifdef BUFFER_ADC_BEMF
 /*
  * averag 8 samples .. could be inline or macro
  */
@@ -114,8 +114,8 @@ static void udpate_phase_average(void)
   }
 
   ph0_adc_tbct = 0; // reset the sample index
-
 }
+#endif
 
 /* External functions ---------------------------------------------------------*/
 
@@ -219,8 +219,9 @@ uint16_t Driver_get_pulse_dur(void)
  */
 void Driver_on_PWM_edge(void)
 {
+#ifdef BUFFER_ADC_BEMF
   ph0_adc_tbct += 1 ; // advance the buffer index
-
+#endif
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
   ADC1_Cmd(ENABLE);
 
@@ -238,7 +239,7 @@ void Driver_on_PWM_edge(void)
 void Driver_on_ADC_conv(void)
 {
   ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
-
+#ifdef BUFFER_ADC_BEMF
 // assert (buffer should be sized big enough for slowest speed)
 
 // TODO: ph0_adc_fbuf can simply be a running sma ... there is no real need to 
@@ -248,8 +249,9 @@ void Driver_on_ADC_conv(void)
   {
     ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
   }
+#endif
 }
-
+#ifdef BUFFER_ADC_BEMF
 /**
  * @brief Get Back-EMF buffer averaged.
  *
@@ -261,7 +263,7 @@ uint16_t Driver_Get_Back_EMF_Avg(void)
 {
   return phase_average;
 }
-
+#endif
 /**
  * @brief Accessor for system voltage measurement.
  * @details the phase voltage measurement from ADC Channel 0 is to be used as
@@ -338,7 +340,9 @@ void Driver_Step(void)
   switch(index)
   {
   case 0:
+#ifdef BUFFER_ADC_BEMF
     udpate_phase_average(); // average 8 samples from frame buffer
+#endif
     Sequence_Step();
     break;
 
