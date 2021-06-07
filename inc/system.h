@@ -25,6 +25,9 @@
 // advise enabling this, so long as it is working (not triggering fault positives)
 #define UNDERVOLTAGE_FAULT_ENABLED
 
+// apparently this is not working (6/7/2021)
+//#define CLMODE_ENABLED
+
 // STM8 timers for control/pwm task
 #define MCP_CTRL_TIMER_1  (1)
 #define MCP_CTRL_TIMER_2  (1)
