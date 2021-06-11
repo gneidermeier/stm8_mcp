@@ -56,17 +56,9 @@
 /**
  * The PWM pins used depend on the Timer instance, which may likely be either TIM1 or TIM2
  */
-#if (CONTRLLR_TIMER == 1)
-// s105 DEV board TIM1 CH1 shares pin with UART2_CK on pin PC1 (not used, but maybe it would be)
-  #define SDa_PWM_PIN  GPIO_PIN_2 // C1
-  #define SDb_PWM_PIN  GPIO_PIN_3 // C2
-  #define SDc_PWM_PIN  GPIO_PIN_4 // C3
 
-  #define SDa_PWM_PORT  GPIOC
-  #define SDb_PWM_PORT  GPIOC
-  #define SDc_PWM_PORT  GPIOC
 
-#elif (CONTRLLR_TIMER == 2)
+#if 1 // #elif (CONTRLLR_TIMER == 2)
   #define SDa_PWM_PIN  GPIO_PIN_4 // D4
   #define SDb_PWM_PIN  GPIO_PIN_3 // D3
   #define SDc_PWM_PIN  GPIO_PIN_3 // A3
@@ -75,9 +67,6 @@
   #define SDb_PWM_PORT  GPIOD
   #define SDc_PWM_PORT  GPIOA
 
-#else 
-// #pragma controller/pwm timer not defined
-asdg
 #endif
 
 // PD4 set LO

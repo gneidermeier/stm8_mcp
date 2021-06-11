@@ -597,7 +597,10 @@ void MCU_Init(void)
   GPIO_Config();
   UART_setup();
   PWM_setup();
+
+#if !defined (S003_DEV)
   ADC1_setup();
+#endif
 
 #if defined( HAS_SERVO_INPUT )
   Servo_CC_setup();

@@ -23,14 +23,14 @@
 
 
 // advise enabling this, so long as it is working (not triggering fault positives)
-#define UNDERVOLTAGE_FAULT_ENABLED
+//#define UNDERVOLTAGE_FAULT_ENABLED
 
 // apparently this is not working (6/7/2021)
 //#define CLMODE_ENABLED
 
 // STM8 timers for control/pwm task
 #define MCP_CTRL_TIMER_1  (1)
-#define MCP_CTRL_TIMER_2  (1)
+#define MCP_CTRL_TIMER_2  (2)
 // STM8 timers for commutation step
 #define MCP_COMM_TIMER_1  (1)
 #define MCP_COMM_TIMER_3  (3)
@@ -58,6 +58,8 @@
   #define HAS_SERVO_INPUT
   #define SPI_ENABLED
 
+  #define UNDERVOLTAGE_FAULT_ENABLED
+
 #elif defined ( S105_DISCOVERY )
 /*
  * S105 Discovery board can't use TIM1 for PWM (unless solder bridges connecting the
@@ -75,9 +77,11 @@
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
   #define SPI_ENABLED
-//  #define HAS_SERVO_INPUT // 6/21 ... GN: haven't tested this one for some time ...
+  #define HAS_SERVO_INPUT
 
-#else // S003_DEV ?
+  #define UNDERVOLTAGE_FAULT_ENABLED
+
+#elif defined ( S003_DEV )
 /*
  * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
  * Not likely to use the 8k flash part, code barely or does not fit.
@@ -94,6 +98,7 @@
 
 //  #define HAS_SERVO_INPUT // no timer available?
 //  #define SPI_ENABLED     // can't fit SPI in 8k
+//  #define UNDERVOLTAGE_FAULT_ENABLED
 #endif
 
 #if defined( SPI_ENABLED )

@@ -217,14 +217,14 @@ INTERRUPT_HANDLER(SPI_IRQHandler, 10)
   */
 INTERRUPT_HANDLER(TIM1_UPD_OVF_TRG_BRK_IRQHandler, 11)
 {
-#if (COMMSTEP_TIMER == 1) // S105 Dev Board or S105 Discovery
+#if defined ( S003_DEV )
     Driver_Step();
 
     // reset interrupt flag
     TIM1_ClearITPendingBit(TIM1_IT_UPDATE);
     TIM1_ClearFlag(TIM1_FLAG_UPDATE);
-
-#elif (CONTRLLR_TIMER == 1)
+#endif
+#if defined(S105_DEV) || defined (S105_DISCOVERY)
 
     static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
@@ -308,9 +308,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM2_UPD_OVF_BRK_IRQHandler, 13)
 {
-// stm8s003 dev board
-#if (CONTRLLR_TIMER == 2)
-
     static const int Frame_count = 4;
     static uint8_t frame_counter = 0;
 
@@ -323,7 +320,6 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     }
 
     Driver_on_PWM_edge(); // starts ADC conversion
-#endif
 
     // reset interrupt flag
     TIM2_ClearITPendingBit(TIM2_IT_UPDATE); // TIM2 interrupt sources defined in stm8s_tim2.h
@@ -367,7 +363,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   */
  INTERRUPT_HANDLER(TIM3_UPD_OVF_BRK_IRQHandler, 15)
  {
-#if (COMMSTEP_TIMER == 3)
+#if defined( S105_DEV ) || defined(S105_DISCOVERY)
     Driver_Step();
     // reset interrupt flag
     TIM3->SR1 &= ~TIM3_SR1_UIF;
