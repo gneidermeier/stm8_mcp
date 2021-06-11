@@ -202,38 +202,25 @@ static void GPIO_Config(void)
   GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
   GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
 
+// AIN0 (back-EMF sensor): Input floating, no external interrupt 
+  GPIO_Init(PH0_BEMF_IN_PORT, (GPIO_Pin_TypeDef)PH0_BEMF_IN_PIN, GPIO_MODE_IN_FL_NO_IT);
+
 #if defined( HAS_SERVO_INPUT )
 // Input pull-up, no external interrupt
   GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_NO_IT);	
 #endif // SERVO
 
+// Input pull-up, no external interrupt
+  GPIO_Init(PH0_BEMF_IN_PORT, (GPIO_Pin_TypeDef)PH0_BEMF_IN_PIN, GPIO_MODE_IN_PU_NO_IT);
+
 #if defined ( S105_DEV )
-
-// AIN0 (back-EMF sensor): Input floating, no external interrupt 
-  GPIO_Init(GPIOB, (GPIO_Pin_TypeDef)GPIO_PIN_0, GPIO_MODE_IN_FL_NO_IT);
-
 #elif defined( S105_DISCOVERY )
-
-// INPUTS
 #if 0
 // PA4 as button input (Stop)
   GPIOA->DDR &= ~GPIO_PIN_4;
   GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
 #endif
-// AIN2
-  GPIOB->DDR &= ~GPIO_PIN_2;
-  GPIOB->CR1 &= ~GPIO_PIN_2;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_2;  // 0: External interrupt disabled
-
-// AIN1
-  GPIOB->DDR &= ~GPIO_PIN_1;
-  GPIOB->CR1 &= ~GPIO_PIN_1;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_1;  // 0: External interrupt disabled
-
-// AIN0
-  GPIOB->DDR &= ~GPIO_PIN_0;
-  GPIOB->CR1 &= ~GPIO_PIN_0;  // floating input
-  GPIOB->CR2 &= ~GPIO_PIN_0;  // 0: External interrupt disabled
+#else
 #endif
 }
 
@@ -250,7 +237,7 @@ static void GPIO_Config(void)
  */
 static void UART_setup(void)
 {
-#if !defined( S003_DEV ) // S105 Dev, or 105S DISCOVERY
+#if defined( S105_DEV ) || defined( S105_DISCOVERY )
 
   UART2_DeInit();
 
@@ -262,7 +249,9 @@ static void UART_setup(void)
              UART2_MODE_TXRX_ENABLE);
 
   UART2_Cmd(ENABLE);
-#else  // S003 Dev board 
+
+#elif defined( S003_DEV )
+
   UART1_DeInit();
 
   UART1_Init(
@@ -292,6 +281,8 @@ static void UART_setup(void)
  */
 static void ADC1_setup(void)
 {
+  CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
+
   ADC1_DeInit();
 
   ADC1_Init(ADC1_CONVERSIONMODE_SINGLE, // don't care, see ConversionConfig below ..
@@ -394,7 +385,7 @@ static void Servo_CC_setup(void)
 
   const uint16_t T1_Period = 0xFFFF;
   const uint8_t repetitionCounter = 1;
-  const uint8_t uint8_t ICFilter = 1;
+  const uint8_t ICFilter = 1;
   TIM1_DeInit();
 
   TIM1_TimeBaseInit( T1_Prescaler, TIM1_COUNTERMODE_UP, T1_Period, repetitionCounter );
@@ -414,7 +405,8 @@ static void Servo_CC_setup(void)
              );
 
 // timer update/ovrflow ISR not strictly needed but is handy to confirm timer rate
-  TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE);
+//  TIM1_ITConfig(TIM1_IT_UPDATE, ENABLE); // be sure flag is cleared in ISR!
+
 // enable capture channels 3 & 4
   TIM1_ITConfig(TIM1_IT_CC4, ENABLE);
   TIM1_ITConfig(TIM1_IT_CC3, ENABLE);
@@ -427,7 +419,7 @@ static void Servo_CC_setup(void)
 /*
  * commutation timer on TIM1 or TIM3 depending on the specific stm8s part
  */
-#if (COMMSTEP_TIMER == 3)
+#if defined ( S105_DEV ) || defined ( S105_DISCOVERY )
 /*
  * Timers 2 3 & 5 are 16-bit general purpose timers
  *  Sets the commutation switching period.
@@ -459,7 +451,9 @@ void MCU_set_comm_timer(uint16_t period)
   TIM3->CR1 = TIM3_CR1_ARPE; // auto (re)loading the count
   TIM3->CR1 |= TIM3_CR1_CEN; // Enable TIM3
 }
-#else // uses TIM1 which is not preferred
+
+#elif defined( S003_DEV ) // uses TIM1 which is not preferred
+
 /**
  * @brief Sets period of the commutation timer.
  * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
@@ -498,10 +492,11 @@ static void Clock_setup(void)
 {
   CLK_DeInit();
 
-#if defined ( S105_DEV ) || defined (S003_DEV )
+#if defined( S105_DEV ) || defined( S003_DEV )
   /*High speed internal clock prescaler: 1*/
   CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
-#else  // S105_DISCOVERY
+
+#elif defined( S105_DISCOVERY )
   // Configure Quartz Clock
   CLK_HSECmd(ENABLE);
 #endif
@@ -512,15 +507,11 @@ static void Clock_setup(void)
   CLK_SYSCLKConfig(CLK_PRESCALER_HSIDIV2); // 8Mhz
 #endif // CLK
 
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_SPI, ENABLE);
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_I2C, DISABLE);
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_ADC, ENABLE);
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_AWU, DISABLE);
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_UART2, ENABLE); // uart2 on the stm8s Discovery
+// enable timer peripheral clocks ... otherwise the clocks enables left to the
+// individual peripheral initialiations.
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER1, ENABLE);
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER2, ENABLE);
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER3, ENABLE);
-  CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER4, ENABLE);
 }
 
 #if defined( SPI_ENABLED )

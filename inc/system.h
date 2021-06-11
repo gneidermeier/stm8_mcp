@@ -28,12 +28,6 @@
 // apparently this is not working (6/7/2021)
 //#define CLMODE_ENABLED
 
-// STM8 timers for control/pwm task
-#define MCP_CTRL_TIMER_1  (1)
-#define MCP_CTRL_TIMER_2  (2)
-// STM8 timers for commutation step
-#define MCP_COMM_TIMER_1  (1)
-#define MCP_COMM_TIMER_3  (3)
 /**
  * the STM8 variant is defined in the project file, along with the appropriate 
  * compiler settings for the particular MCU (memory model etc.)
@@ -41,13 +35,13 @@
  * routing determines how the peripherals and GPIO pins are allocated.
  */
 #if defined ( S105_DEV )
-/*
- * S105 Dev Board only has TIM2 Ch3 on Alt pin mapping, therefore, TIM1 drives  
- * PWM/control, while either TIM2 or TIM3 can driver commutation step as they 
- * are both 16-bit timers. TIM2 remains available for other purpose (servo input?).
- */
-  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_1
-  #define COMMSTEP_TIMER  MCP_COMM_TIMER_3
+
+  #define ESTOP_BTN_IN_PORT  GPIOF
+  #define ESTOP_BTN_IN_PIN   GPIO_PIN_4
+
+// AIN0, B0
+  #define PH0_BEMF_IN_PORT   GPIOB
+  #define PH0_BEMF_IN_PIN    GPIO_PIN_0
 
   #define LED_GPIO_PORT    GPIOE
   #define LED_GPIO_PIN     GPIO_PIN_5
@@ -67,8 +61,12 @@
  * drive the commutation step, leaving TIM1 unnused (TIM1 input capture/compare 
  * might be used capture servo signal from R/C radio or flight controller).
  */
-  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
-  #define COMMSTEP_TIMER  MCP_COMM_TIMER_3
+  #define ESTOP_BTN_IN_PORT  GPIOA
+  #define ESTOP_BTN_IN_PIN   GPIO_PIN_4
+
+// AIN0, B0
+  #define PH0_BEMF_IN_PORT   GPIOB
+  #define PH0_BEMF_IN_PIN    GPIO_PIN_0
 
   #define LED_GPIO_PORT    GPIOD
   #define LED_GPIO_PIN     GPIO_PIN_0
@@ -86,8 +84,13 @@
  * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
  * Not likely to use the 8k flash part, code barely or does not fit.
  */
-  #define CONTRLLR_TIMER  MCP_CTRL_TIMER_2
-  #define COMMSTEP_TIMER  MCP_COMM_TIMER_1
+// C4 is ok so long as AIN3 is not needed
+  #define ESTOP_BTN_IN_PORT  GPIOD
+  #define ESTOP_BTN_IN_PIN   GPIO_PIN_2
+
+// AIN2, C4
+  #define PH0_BEMF_IN_PORT   GPIOC
+  #define PH0_BEMF_IN_PIN    GPIO_PIN_4 // B4 is not HS (TTL)
 
   #define LED_GPIO_PORT    GPIOB
   #define LED_GPIO_PIN     GPIO_PIN_5
