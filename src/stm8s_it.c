@@ -260,15 +260,10 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
         TIM1_ClearITPendingBit(TIM1_IT_CC3);
         TIM1_ClearFlag(TIM1_FLAG_CC3);
     }
-    else
+    else if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC4) )
     {
 //        GPIOD->ODR |=  (1<<LED); // set test pin
         Driver_on_capture_rise();
-    }
-
-       // no idea why this flag not getting set .. oh well
-//    if ( 0 != TIM1_GetFlagStatus(TIM1_FLAG_CC4) )
-    {
         TIM1_ClearITPendingBit(TIM1_IT_CC4);
         TIM1_ClearFlag(TIM1_FLAG_CC4);
     }
@@ -342,8 +337,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
         TIM2_ClearITPendingBit(TIM2_IT_CC1);
         TIM2_ClearFlag(TIM2_FLAG_CC1);
     }
-
-    if ( 0 != TIM2_GetFlagStatus(TIM2_FLAG_CC2) )
+    else if ( 0 != TIM2_GetFlagStatus(TIM2_FLAG_CC2) )
     {
         Driver_on_capture_fall();
 
@@ -366,6 +360,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
 #if defined( S105_DEV ) || defined(S105_DISCOVERY)
     Driver_Step();
     // reset interrupt flag
+//    TIM3_ClearITPendingBit(TIM3_IT_UPDATE);
     TIM3->SR1 &= ~TIM3_SR1_UIF;
 #endif
  }
