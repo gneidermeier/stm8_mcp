@@ -53,12 +53,11 @@
   #define SDc_SD_PORT  GPIOC
 #endif
 
+
+#if defined( S105_DISCOVERY ) || defined( S003_DEV )
 /**
- * The PWM pins used depend on the Timer instance, which may likely be either TIM1 or TIM2
+ * Using TIM2 as PWM ... pins are same for 2 platforms
  */
-
-
-#if 1 // #elif (CONTRLLR_TIMER == 2)
   #define SDa_PWM_PIN  GPIO_PIN_4 // D4
   #define SDb_PWM_PIN  GPIO_PIN_3 // D3
   #define SDc_PWM_PIN  GPIO_PIN_3 // A3
@@ -67,6 +66,17 @@
   #define SDb_PWM_PORT  GPIOD
   #define SDc_PWM_PORT  GPIOA
 
+#else if defined( S105_DEV )
+/**
+ * TIM2 not available, uses TIM1
+ */
+  #define SDa_PWM_PIN  GPIO_PIN_4 // C2
+  #define SDb_PWM_PIN  GPIO_PIN_3 // C3
+  #define SDc_PWM_PIN  GPIO_PIN_3 // C4
+
+  #define SDa_PWM_PORT  GPIOC
+  #define SDb_PWM_PORT  GPIOC
+  #define SDc_PWM_PORT  GPIOC
 #endif
 
 // PD4 set LO
