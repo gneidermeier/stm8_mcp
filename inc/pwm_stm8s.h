@@ -43,13 +43,13 @@
   #define SDb_SD_PORT  GPIOE
   #define SDc_SD_PORT  GPIOA
 
-#elif defined ( S003_DEV )
-  #define SDa_SD_PIN  GPIO_PIN_1 // A1
-  #define SDb_SD_PIN  GPIO_PIN_2 // A2
-  #define SDc_SD_PIN  GPIO_PIN_3 // C3
+#elif defined ( S003_DEV ) // SPI not enabled, three drive pins useable for /SD
+  #define SDa_SD_PIN  GPIO_PIN_7 // C7
+  #define SDb_SD_PIN  GPIO_PIN_6 // C6
+  #define SDc_SD_PIN  GPIO_PIN_5 // C5
 
-  #define SDa_SD_PORT  GPIOA
-  #define SDb_SD_PORT  GPIOA
+  #define SDa_SD_PORT  GPIOC
+  #define SDb_SD_PORT  GPIOC
   #define SDc_SD_PORT  GPIOC
 #endif
 
