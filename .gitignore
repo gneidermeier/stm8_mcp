@@ -1,3 +1,9 @@
+# output folders
+/docs/output/
+
+# IDE local folders
+/.vscode/
+
 # Prerequisites
 *.d
 
