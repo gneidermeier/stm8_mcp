@@ -1,5 +1,5 @@
 # output folders
-/docs/output/
+/build/
 
 # IDE local folders
 /.vscode/
