@@ -8,8 +8,8 @@
   ******************************************************************************
   */
 /**
- * \defgroup BLDC_sm BLDC State
- * @brief BLDC state management and timing control
+ * \defgroup  BLDC_sm BLDC State
+ * @brief  BLDC state management and timing control
  * @{
  */
 
@@ -177,17 +177,13 @@ void BL_reset(void)
 /**
  * @brief Sets motor speed from commanded throttle/UI setting
  *
- * @details  Establishes the condition to transition from off->running. The motor
- *  is enabled to start once reaching the ramp speed threshold, and allowed to
+ * @details
+ *  The motor is started once reaching the ramp speed threshold, and allowed to
  *  slow down to the low shutoff threshold.
- *  UI Speed is shared with background task so this function all should
+ *  UI Speed is shared with background task so this function should
  *  be invoked only from within a CS.
  *
- * @param dc Speed input which can be in the range [0:255] but 255 is to be
- *        reserved for special use (out of band value). If the PWM resolution
- *        changes then the input speed will have to be re-scaled accordingly.
- *
- * Now with low speed cut off !
+ * @param dc Speed input which can be in the range [0:255]
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
@@ -293,22 +289,22 @@ BL_RUNSTATE_t BL_get_state(void)
   return BL_NOT_RUNNING;
 }
 
+/**
+ * @brief  Accessor for state variable.
+ *
+ * @details
+ *  Control Mode is TRUE if transitioned from open-loop to closed-loop
+ *  commutation control.
+ *
+ * @return  state value
+ */
 uint8_t BL_get_ct_mode(void)
 {
   return Control_mode;
 }
 
 /**
- * @brief Periodic state machine update.
- *
- * @details
- * Called from TIM4 ISR. FRom the driver, the commutation-rate timer is being set
- * synchronous to this wihch is ideal, however, the control an probably be performed at
- * a lower rate (100Hz, 50Hz, 10Hz ..?). There is  no evident documentation of how this
- * timer rate came to be (TIM4 at ~ 0.5ms) Reducing it would give the commutation
- * time variable and therefore the control timing more precision .
- *
- * closed-loop control ... speed duty-cycle threshold, error switch sign? area under integratino curve
+ * @brief  Top level task which perform commutation timing update.
  */
 void BLDC_Update(void)
 {

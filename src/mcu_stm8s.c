@@ -8,18 +8,18 @@
   ******************************************************************************
   */
 /**
- * @defgroup mcu Platform STM8S
+ * @defgroup MCU Platform STM8S
  * @brief STM8S platform and peripheral configuration.
  * @{
  */
 /* Includes ------------------------------------------------------------------*/
-// app headers
-#include "system.h" // platform specific delarations
 
- // external declarsations used internally
+// app headers
+#include "system.h" // platform specific declarations
+
+ // external declarations used internally
 #include "mcu_stm8s.h"
 #include "pwm_stm8s.h"
-
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -35,25 +35,25 @@
   * Code was copied from the stm8s SPL USART examples
   *
   * Concerning getch():
-  * Works satisfactorily  for its intended purpose, however, to me this one 
-  * operates exactly like getch(),  as opposed to getc(stdin).
+  * Works satisfactorily for its intended purpose, however, to me this one
+  * operates exactly like getch(), as opposed to getc(stdin).
   *
   * The difference between getc() and getchar() is getc() can read from any input
-  * stream, but getchar() reads from standard input. So getchar() is equivalent 
+  * stream, but getchar() reads from standard input. So getchar() is equivalent
   * to getc(stdin).
   *
-  * getch()is a nonstandard function and is present in conio.h header file (MS-DOS 
-  * compilers like Turbo C). It is not part of the C standard library or ISO C, 
+  * getch()is a nonstandard function and is present in conio.h header file (MS-DOS
+  * compilers like Turbo C). It is not part of the C standard library or ISO C,
   * nor is it defined by POSIX.
-  * getch() reads a single character from the keyboard. But it does not use any 
-  * buffer, so the entered character is immediately returned without waiting for 
+  * getch() reads a single character from the keyboard. But it does not use any
+  * buffer, so the entered character is immediately returned without waiting for
   * the enter key.
   *  https://www.geeksforgeeks.org/difference-getchar-getch-getc-getche/
   *  https://www.geeksforgeeks.org/getch-function-in-c-with-examples/
   *
-  * SerialKeyPressed() on the other hand, is intended to be non-blocking, and it is
-  * more akin to 
+  * SerialKeyPressed() on the other hand, is intended to be non-blocking.
   */
+/** @cond */ // Doxygen gets tripped up over the "prototype" macros
 
 #ifdef STM8S105 // S105 Dev board or DISCOVERY
 
@@ -173,6 +173,7 @@ uint8_t SerialKeyPressed(char *key)
   return 0;
 }
 #endif
+/** @endcond */
 
 /*
  * @brief Configure GPIO.
@@ -202,12 +203,12 @@ static void GPIO_Config(void)
   GPIO_Init(SDB_PORT, (GPIO_Pin_TypeDef)SDB_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
   GPIO_Init(SDC_PORT, (GPIO_Pin_TypeDef)SDC_PIN, GPIO_MODE_OUT_PP_LOW_FAST);
 
-// AIN0 (back-EMF sensor): Input floating, no external interrupt 
+// AIN0 (back-EMF sensor): Input floating, no external interrupt
   GPIO_Init(PH0_BEMF_IN_PORT, (GPIO_Pin_TypeDef)PH0_BEMF_IN_PIN, GPIO_MODE_IN_FL_NO_IT);
 
 #if defined( HAS_SERVO_INPUT )
 // Input pull-up, no external interrupt
-  GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_NO_IT);	
+  GPIO_Init(SERVO_GPIO_PORT, (GPIO_Pin_TypeDef)SERVO_GPIO_PIN, GPIO_MODE_IN_PU_NO_IT);
 #endif // SERVO
 
 // Input pull-up, no external interrupt
@@ -307,7 +308,7 @@ static void ADC1_setup(void)
 }
 
 /**
- * S003 did not have available timer for servo input ... 105 boards should have 
+ * S003 did not have available timer for servo input ... 105 boards should have
  * a spare timer available, but not necessarily the same peripheral instance .
  */
 #if defined( HAS_SERVO_INPUT )
@@ -435,10 +436,8 @@ static void Servo_CC_setup(void)
 #endif
 
 /**
- * @brief Sets TIM3 period.
- * Sets the TIM3 prescaler, auto-reload register (ARR), enables interrupt.
- * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
- * @param  period  Value written to TIM3 ARR
+ * @brief  Set timer that establishes commutation timing period.
+ * @param  period  Value written to timer reload register
  */
 void MCU_set_comm_timer(uint16_t period)
 {
@@ -516,9 +515,11 @@ static void Clock_setup(void)
 
 #if defined( SPI_ENABLED )
 /**
-* References:
-*   https://www.programmersought.com/article/34101773427/
-*/
+ * @brief  Configure SPI bus
+ *
+ * References:
+ *   https://www.programmersought.com/article/34101773427/
+ */
 void SPI_setup(void)
 {
   // Enable SPI Clock.
@@ -530,7 +531,7 @@ void SPI_setup(void)
 
   // Set GPIO pins to output push-pull high level.
 
-// S105_BLACK ... LED on E5	
+// S105_BLACK ... LED on E5
 // CS not required for single master/slave pair
 //   GPIO_Init(GPIOE, GPIO_PIN_5, GPIO_MODE_OUT_PP_HIGH_SLOW); // CS
 
@@ -580,7 +581,7 @@ void SPI_setup(void)
 
 /**
  * @brief  Initialize MCU and peripheral modules
- * Configures clocks, GPIO, UART, ADC, timers, PWM.
+ * @details  Configures clocks, GPIO, UART, ADC, timers, PWM.
  */
 void MCU_Init(void)
 {

@@ -29,7 +29,7 @@
   ******************************************************************************
   */
 /**
- * @defgroup mcu Platform STM8S
+ * @defgroup  MCU Platform STM8S
  * @brief STM8S platform and peripheral configuration.
  * @{
  */
@@ -77,16 +77,12 @@ void All_phase_stop(void)
     PWM_PhC_HB_DISABLE();
 }
 
-/**
- * @brief Putter accessor for PWM duty cycle
- * @details Motor speed is controlled through the UI and converted to PWM duty cycle .
- */
+/** @cond */ // hide the low-level code
+
 void set_dutycycle(uint16_t global_dutycycle)
 {
     global_uDC = global_dutycycle;
 }
-
-/** @cond */ // hide the low-level code
 
 /*
  * The S105 dev board unfortunately does not let the TIM2 CH3 pin (unless by alt. fundtion)
@@ -133,8 +129,8 @@ void PWM_setup(void)
   TIM2_Cmd(ENABLE);
 }
 
-/**
- * Control /SD inputs to IR2104
+/*
+ * Operate /SD inputs to IR2104
  */
 void PWM_PhA_Disable(void)
 {

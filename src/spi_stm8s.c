@@ -1,12 +1,17 @@
 /**
   ******************************************************************************
-  * @file spi.c
+  * @file spi_stm8s.c
   * @brief This file contains the main function for the BLDC motor control
   * @author Neidermeier
   * @version
   * @date March-2021
   ******************************************************************************
   */
+/**
+ * @defgroup comms Communication Interface
+ * @brief STM8S platform and peripheral configuration.
+ * @{
+ */
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <ctype.h> // isprint
@@ -32,10 +37,11 @@
 #define RX_BUF_SZ 16
 
 
+/** @cond */
+
 /* Private variables ---------------------------------------------------------*/
 
 uint8_t spi_rx_buf[RX_BUF_SZ];
-
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -103,7 +109,6 @@ exit:
     return index;
 }
 
-
 /*
  * example codes for SPI functions from
  * https://lujji.github.io/blog/bare-metal-programming-stm8/#SPI
@@ -121,13 +126,24 @@ void chip_deselect(void)
     GPIOE->ODR |= (1 << CS_PIN);
 #endif
 }
+/** @endcond */
 
+/**
+ * @brief  Write a byte onto SPI bus.
+ *
+ * @return  Error on time-out.
+ */
 void SPI_write(uint8_t data)
 {
     SPI->DR = data;
     while (! (SPI->SR & SPI_SR_TXE) );
 }
 
+/**
+ * @brief  Read a byte from SPI bus.
+ *
+ * @return  Error on time-out.
+ */
 uint8_t SPI_read( void )
 {
     SPI_write( 0xA5 );
@@ -135,6 +151,11 @@ uint8_t SPI_read( void )
     return SPI->DR;
 }
 
+/**
+ * @brief  Read/write byte on SPI bus.
+ *
+ * @return  Error on time-out.
+ */
 uint8_t SPI_read_write(uint8_t data)
 {
     while (! (SPI->SR & SPI_SR_TXE) );
@@ -146,7 +167,11 @@ uint8_t SPI_read_write(uint8_t data)
     return SPI->DR;
 }
 
-
+/**
+ * @brief  Top-level task for SPI controller (master) task.
+ *
+ * @return  Error on time-out.
+ */
 void SPI_controld(void)
 {
     static uint8_t n;
@@ -154,7 +179,7 @@ void SPI_controld(void)
     uint8_t rxbuf[8] = { 0, 0, 0, 0 } ;
 
     n = (uint8_t)((n >= 0x30 && n < 126) ? n + 1 : 0x30);
-    
+
 // pretty sure it shouldnot be necessary to DI/EI ... all byte read/writes and
 // SPI is not being run in interrupt mode. Not shared variables. EI/DI
 // will tick the motor if the SPI rate is real low!
@@ -178,7 +203,6 @@ void SPI_controld(void)
     sbuf[6] = 0;
     printf("%s\r\n", sbuf);
 }
-
 
 
 #if 0

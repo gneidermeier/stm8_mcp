@@ -21,15 +21,14 @@
 /* Private defines -----------------------------------------------------------*/
 
 /**
- * @brief Initialization value for fault counter bucket. The fault matrix defines
- * the bucket as a 6-bits unsigned integer bitfield.
+ * @brief  Initialization value for fault counter bucket.
  *
- * @note This value should be derived from the faultm update rate somehow - it is 
- * expected that faulm_upd() would be called for all fault codes from within 
+ * @details  The fault matrix defines the bucket as a 6-bits unsigned integer bit-field.
+ *
+ * @note  This value should be derived from the faultm update rate somehow - it is
+ * expected that faulm_upd() would be called for all fault codes from within
  * the background task. Therefore the bucket counts and/or increment rates should
  * share a timing factor with the background task.
- *
- * @warning This is a warning!
  */
 #define  FAULT_BUCKET_BITS   6 // power of 2 ...  2^6==64
 
@@ -71,13 +70,11 @@ typedef enum
 } faultm_enable_t;
 
 /**
- * @brief Fault tracking table. The fault matrix shall be instantiated as an
- * array of 8-bit words
+ * @brief Fault tracking table.
  *
- * Compact table for tracking faults with leaky-bucket algorithm.
- * @note  the matrix is to be instantiated as array of 8-bit words to save RAM
- * @warning the CPU could blow!
- * @todo verify that these bitfields are effective!
+ * @details  Compact table for tracking faults with leaky-bucket algorithm.
+ *
+ * @note  Fault matrix instantiated as an array of 8-bit words to save RAM.
  */
 typedef struct fault_matrix
 {
@@ -144,6 +141,12 @@ fault_status_reg_t Faultm_get_status(void)
     return fault_status_reg;
 }
 
+/**
+ * @brief  Enable or disable triggering of specified fault.
+ *
+ * @param  faultm_ID  Numerical ID of the fault to be configured.
+ * @param  enable_b  boolean for the configured state - TRUE == fault enabled.
+ */
 void Faultm_enable(faultm_ID_t faultm_ID, int enable_b)
 {
 // assert (fault_ID < MAX)
@@ -156,13 +159,11 @@ void Faultm_enable(faultm_ID_t faultm_ID, int enable_b)
 
 /**
  * @brief Set the fault matrix bit and status word.
- * @note TBD a single fault shuts down the system, i.e. no need to flag/mask multiple
- * faults?
+ *
+ * @note  A single fault shuts down the system, i.e. no need to flag/mask
+ * multiple fault conditions.
  *
  * @param faultm_ID  Numerical ID of the fault to be set.
- *
- * @par Returns
- *    Nothing.
  */
 void Faultm_set(faultm_ID_t faultm_ID)
 {

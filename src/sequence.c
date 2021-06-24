@@ -36,10 +36,11 @@
 /* Private types -----------------------------------------------------------*/
 
 /**
-* @brief Pointer to step handler function.
+* @brief  Table of handler functions for 6 commutation steps.
 *
-* Each commutation step sequence is implemented as a simple function -
-* aggregating the function pointers into a table.
+* @details  Each commutation step sequence is implemented as a simple function and
+*  function pointers are aggregated into a single table.
+*
 * @return  void
 */
 typedef void (*step_ptr_t)( void );
@@ -47,12 +48,12 @@ typedef void (*step_ptr_t)( void );
 
 /* Private function prototypes -----------------------------------------------*/
 
-static void sector_0(void /* int iarg */);
-static void sector_1(void /* int iarg */);
-static void sector_2(void /* int iarg */);
-static void sector_3(void /* int iarg */);
-static void sector_4(void /* int iarg */);
-static void sector_5(void /* int iarg */);
+static void sector_0(void);
+static void sector_1(void);
+static void sector_2(void);
+static void sector_3(void);
+static void sector_4(void);
+static void sector_5(void);
 
 
 /* Public variables  ---------------------------------------------------------*/
@@ -231,13 +232,9 @@ static void sector_5(void)
  * @brief  Determine plausibility of Control error term.
  *
  * @details If the motor timing is advanced, the control error should be
- *  positive i.e.  increasing commutation period slows the motor.
+ *  positive i.e. increasing commutation period slows the motor.
  *
- * @param[in]  p16term
- *             pointer to the 16-bit integer error term allocated by the caller
- *
- * @return signed error which at its extreme should be equal to or less than the
- *  range of the initial ADC measurement i.e. 0x0400
+ * @return  Signed integer error.
  */
 int8_t Seq_get_timing_error_p(void)
 {
@@ -263,21 +260,27 @@ int16_t Seq_get_timing_error(void)
 }
 
 /**
- * @brief Accessor for system voltage measurement.
- *
- * @details Vbatt is in this module because the measurement has to be timed to
- * the PWM signal as well as the commutation sequence.
+ * @brief  Accessor for back-EMF measurement.
  */
 uint16_t Seq_Get_bemfR(void)
 {
   return Back_EMF_Riseing_PhX ;
 }
 
+/**
+ * @brief  Accessor for back-EMF measurement.
+ */
 uint16_t Seq_Get_bemfF(void)
 {
   return Back_EMF_Falling_PhX ;
 }
 
+/**
+ * @brief  Accessor for system voltage measurement.
+ *
+ * @details  Vbatt is in this module because the measurement must be coordinated
+ *           with PWM On time.
+ */
 uint16_t Seq_Get_Vbatt(void)
 {
   return Vbatt_;
@@ -290,14 +293,10 @@ uint16_t Seq_Get_Vbatt(void)
  * implemented as individual functions to reduce the amount of code i.e.
  * optimize the timing which is critical to the motor performance and stability.
  *
- * If the series of steps to assert the state of the output pins is not performed
- * in a specific sequence the back-EMF component of phase voltage may be impacted.
- *
  * Ideally, when a phase is at 60 degrees (half of its pwm-on sector) there should
- * be no change/disruption to its PWM signal. Also to maintain timing the TIM2
- * capture/counter register not reset or cleared - only the TIM2 PWM channel is
- * switched between the 3 motor phases, so the overall PWM cycle should remain consistent.
-
+ * be no change/disruption to its PWM signal. The timer capture/counter register
+ * should not be reset or cleared - only the active timer/PWM channel is switched
+ * between the 3 motor phases, so the overall PWM cycle should remain consistent.
  *
  * First: shutoff PWM (before setting any of the new FET states) to ensure PWM
  * leg is turned off and flyback-diode of non-PWM conducts flyback current
@@ -332,7 +331,7 @@ void Sequence_Step(void)
   }
   else
   {
-    // intitialize the averages measurements 
+    // intitialize the average
     Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
   }
 }

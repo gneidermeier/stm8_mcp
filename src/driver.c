@@ -119,6 +119,8 @@ static void udpate_phase_average(void)
 
 /* External functions ---------------------------------------------------------*/
 
+/** @cond */
+
 #if defined( S105_DEV )
 
 uint16_t get_pulse_start(void)
@@ -154,18 +156,12 @@ uint16_t get_pulse_end(void)
 {
     return (uint16_t)-1;
 }
-
 #endif
+/** @endcond */
 
 /**
- * @brief Call from ISR on capture of pulse rise.
+ * @brief Call from timer/capture ISR on capture of rising edge of servo pulse
  *
- * Range of 1ms pulse:
- *         $0768 - $044A  = $031E
- * Pulse period Tx on (rougly 20ms):
- *         $55C4
- * Pulse period Tx off (pulse rate doubles - radio signal lost!):
- *         $2BAE
 */
 void Driver_on_capture_rise(void)
 {
@@ -176,7 +172,7 @@ void Driver_on_capture_rise(void)
 }
 
 /**
- * @brief Call from ISR on capture of pulse fall.
+ * @brief Call from timer/capture ISR on capture of falling edge of servo pulse
  */
 void Driver_on_capture_fall(void)
 {
@@ -206,16 +202,9 @@ uint16_t Driver_get_pulse_dur(void)
 /**
  * @brief  Hook for synchronizing to the PWM pulse.
  *
- * @details  Phase voltage measurements must be synchronized to PWM on i.e. the
- * rising egde.
- * Called from TIM2 UPD+OVF+BRK IRQ Handler.
+ * @details  Invoked from timer ISR.
+ * Phase voltage measurements must be synchronized to PWM.
  * Initiates ADC sample sequence on start of PWM pulse.
- * ADC may be configured for several (3 phases + throttle input) channels.
- * This may be a limitation as the throttle input may be needed although the
- * TIM2/PWM is disabled.
- * On ADC ISR, call ADCx_GetBufferValue(n) to retrieve ADC Channel n.
- * The ADC is configured to trigger IRQ on converion complete.
- * See ADC setup in MCU init for ADC clock setup.
  */
 void Driver_on_PWM_edge(void)
 {
@@ -234,7 +223,7 @@ void Driver_on_PWM_edge(void)
  *
  * @details  Captures phase voltage measurement from ADC Channel 0, to be
  * used as back-EMF sensing or system voltage.
- * Called from ADC1 ISR
+ * Called from ADC1 ISR.
  */
 void Driver_on_ADC_conv(void)
 {
@@ -242,7 +231,7 @@ void Driver_on_ADC_conv(void)
 #ifdef BUFFER_ADC_BEMF
 // assert (buffer should be sized big enough for slowest speed)
 
-// TODO: ph0_adc_fbuf can simply be a running sma ... there is no real need to 
+// TODO: ph0_adc_fbuf can simply be a running sma ... there is no real need to
 // reset the average at each commutation switch????!!!???
 
   if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
@@ -251,7 +240,9 @@ void Driver_on_ADC_conv(void)
   }
 #endif
 }
+
 #ifdef BUFFER_ADC_BEMF
+/** @cond */
 /**
  * @brief Get Back-EMF buffer averaged.
  *
@@ -263,10 +254,12 @@ uint16_t Driver_Get_Back_EMF_Avg(void)
 {
   return phase_average;
 }
+/** @endcond */
 #endif
+
 /**
  * @brief Accessor for system voltage measurement.
- * @details the phase voltage measurement from ADC Channel 0 is to be used as
+ * @details Phase voltage measurement from ADC Channel 0 is to be used as
  * back-EMF sensing or system voltage.
  * @return  Most recent captured ADC conversion value from Channel 0
  */
@@ -276,10 +269,10 @@ uint16_t Driver_Get_ADC(void)
 }
 
 /**
- * @brief  Update background task and system state.
+ * @brief  Invoke background task and control task.
  *
- * @details  Called from TIM4 ISR. The commutation time is updated each time the
- * control task is updated, and in turn the TIM3 reload register value is refreshed
+ * @details  Called from timer ISR. The commutation time is updated each time the
+ * control task is updated, and in turn the timer reload register value is refreshed
  * from latest calculated commutation time period.
  */
 void Driver_Update(void)
@@ -311,17 +304,9 @@ void Driver_Update(void)
 
 
 /**
- * @brief
+ * @brief  Top-level task for commutation switching sequence
  *
- * @details  Called from TIM3 ISR.
- *
- * Establish error-signal by integrating (averaging) as many back-EMF samples as
- * are buffered during the span of a single commutation frame - ideally a sample
- * would be available at each 15-degree interval. However, at higher rotation
- * speed there are progressively fewer PWM samples available within the time span
- * of a single commutation period.
- * The algorithm initializes the buffer to equivalent of 1/2 DC voltage (ideal
- * zero-cross point) so that un-filled sample slots don't affect the average.
+ * @details  Invoked from timer ISR
  */
 void Driver_Step(void)
 {

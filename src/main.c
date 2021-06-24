@@ -7,6 +7,11 @@
   * @date     26-April-2021
   ******************************************************************************
   */
+/**
+ * \defgroup per_task Periodic Task
+ * @brief Background task / periodic task
+ * @{
+ */
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <ctype.h> // isprint
@@ -16,36 +21,26 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 
-#ifndef SPI_CONTROLLER
-#include "spi_stm8s.h"
-#endif
-
 
 #ifdef _SDCC_
 // Interrupt vectors must be implemented in the same file that implements main()
 /*
-If you have multiple source files in your project, interrupt service routines can be present in any of them, but a prototype of the isr MUST be present or included in the file that contains the function main.
+If you have multiple source files in your project, interrupt service routines
+can be present in any of them, but a prototype of the isr MUST be present or
+included in the file that contains the function main.
 */
-//  #include "stm8s_it.h" // not sure if this works ... enable stm8s_it.c to be built in the build config
 #include "stm8s_it.c"
 #endif
 
-
 /* Private macro -------------------------------------------------------------*/
-
 
 /* Private functions ---------------------------------------------------------*/
 
 /**
   * @brief  Mainly looping.
-  * @param  None
-  * @retval None
   */
 void main(int argc, char **argv)
 {
-#ifndef SPI_CONTROLLER
-  static const uint8_t tx_buf[RX_BUF_SZ] = "0123456789ABCDEF";
-#endif
   uint8_t linec = 0;
   uint8_t framecount = 0;
   uint8_t i = 0;
@@ -62,7 +57,7 @@ void main(int argc, char **argv)
 
   while(1)
   {
-#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time	
+#if 0 //  TEST DEV ONLY: manual adjustment of commutation cycle time
 //  button input either button would transition from OFF->RAMP
     if (! (( GPIOA->IDR)&(1<<4)))
     {
@@ -99,32 +94,11 @@ void main(int argc, char **argv)
       {
       }
     }
-
-#if defined( SPI_ENABLED )
-#ifndef SPI_CONTROLLER
-    if (-1 != SPI_read_write_b(tx_buf, 0xA5, TIME_OUT_0) )
-    {
-      char sbuf[16]; // am i big enuff?
-      // tmp dump test SPI test data to UART
-      linec = (uint8_t)(linec < 126 ? linec++ : 0x30);
-      sbuf[0] = '>';
-      sbuf[1] = linec++;
-      sbuf[2] = isprint( (int)spi_rx_buf[0] ) ? spi_rx_buf[0] : '.' ;
-      sbuf[3] = isprint( (int)spi_rx_buf[1] ) ? spi_rx_buf[1] : '.' ;
-      sbuf[4] = isprint( (int)spi_rx_buf[2] ) ? spi_rx_buf[2] : '.' ;
-      sbuf[5] = isprint( (int)spi_rx_buf[3] ) ? spi_rx_buf[3] : '.' ;
-      sbuf[6] = isprint( (int)spi_rx_buf[4] ) ? spi_rx_buf[4] : '.' ;
-      sbuf[7] = 0;
-      strcat(sbuf, "\r\n");
-      UARTputs(sbuf);
-    }
-#endif // SPI CONT
-#endif // SPI_EN
   } // while 1
 }
 
 #ifdef USE_FULL_ASSERT
-
+/** @cond */
 /**
   * @brief  Reports the name of the source file and the source line number
   *   where the assert_param error has occurred.
@@ -142,6 +116,7 @@ void assert_failed(uint8_t* file, uint32_t line)
   {
   }
 }
+/** @endcond */
 #endif
 
 /**

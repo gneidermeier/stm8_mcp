@@ -30,8 +30,8 @@
 
 #define TRIM_DEFAULT  0 //
 
-// Threshold is set low enuogh that the machine doesn't stall 
-// thru the lower speed transition into closed-loop control. 
+// Threshold is set low enuogh that the machine doesn't stall
+// thru the lower speed transition into closed-loop control.
 // The fault can be tested by letting the spinning prop disc strike a flimsy
 // obstacle like a 3x5 index card.
 #if defined ( S105_DEV )
@@ -77,7 +77,7 @@ enum
 };
 
 /**
- * @brief Data type for the keycode lookup table.
+ * @brief Data type for the key code lookup table.
  */
 typedef char ui_keycode_t;
 
@@ -116,20 +116,13 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
   {M_STOP,     m_stop}
 };
 
-// macros to help make the LUT slightly more encapsulateed
+// macros to help make the LUT slightly more encapsulated
 #define _SIZE_K_LUT  ( sizeof( ui_keyhandlers_tb ) / sizeof( ui_key_handler_t ) )
 #define _GET_KEY_CODE( _INDEX_ )  ui_keyhandlers_tb[ _INDEX_ ].key_code
 #define _GET_UI_HDLRP( _INDEX_ )  ui_keyhandlers_tb[ _INDEX_ ].phandler
 
 
 /* Private functions ---------------------------------------------------------*/
-
-/** @cond */ // hide some developer/debug code
-// hack, temp
-extern uint8_t Control_mode;
-extern int Back_EMF_Falling_PhX;
-extern int Back_EMF_Riseing_PhX;
-/** @endcond */
 
 /**
  * @brief Print one line to the debug serial port.
@@ -228,10 +221,7 @@ static void set_ui_speed(void)
 }
 
 /**
- * @brief stop the system
- *
- * This is not particularly ISR safe but stopping the system so what then.
- * needs to be externable to main because the hard-button stop button is polled there
+ * @brief  Stop the system
  */
 void UI_Stop(void)
 {
@@ -317,9 +307,11 @@ static ui_handlrp_t handle_term_inp(void)
   return fp;
 }
 
-/*
- * Execution context is 'main()'
- * Servicing the UI and communication handlers
+/**
+ * @brief  The User Interface task
+ *
+ * @details   Service the UI and communication handlers. Invoked in the
+ *   execution context of 'main()' (background task)
  */
 static void Periodic_task(void)
 {
@@ -368,12 +360,13 @@ static void Periodic_task(void)
 }
 
 /**
- * @brief Run Periodic Task if ready
+ * @brief  Run Periodic Task if ready
+ *
  * @details
  * Called in non-ISR context - checks the background task ready flag which if !0
  * will invoke the Periodic Task function.
- * @note referred to as Pertask_chk_ready
- * @return true if task ran (allows caller to also sync w/ the time period)
+ * @note  Referred to as Pertask_chk_ready
+ * @return  True if task ran (allows caller to also sync w/ the time period)
  */
 uint8_t Task_Ready(void)
 {
@@ -400,10 +393,10 @@ uint8_t Task_Ready(void)
 
 /**
  * @brief  Trigger background task.
+ *
  * @details
  * Called in ISR context - sets the background task ready flag which when seen
  * by polling Task_Ready in background task will invoke the Periodic Task function.
- * @note referred to as Pertask_set_ready
  */
 void Periodic_Task_Wake(void)
 {

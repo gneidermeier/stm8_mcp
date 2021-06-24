@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file spi.c
+  * @file spi_stm8s.h
   * @brief This file contains the main function for the BLDC motor control
   * @author Neidermeier
   * @version
@@ -26,12 +26,7 @@
 
 /* Declarations --------------------------------------------------------------*/
 
-extern uint8_t spi_rx_buf[RX_BUF_SZ]; // tmp test
-
-
 /* Function prototypes -------------------------------------------------------*/
-
-int SPI_read_write_b(uint8_t * chbuf, uint8_t data, uint16_t time_out);
 void SPI_controld(void);
 
 
