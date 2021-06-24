@@ -21,7 +21,7 @@
 // todo consider -DSPI_ENABLED ? in project/makefile
 #include "system.h"
 
-#if defined (SPI_ENABLED)
+#if SPI_ENABLED
 
 // app headers
 #include "mcu_stm8s.h"
@@ -232,5 +232,5 @@ static void SPI_periphd(void)
 }
 #endif
 
-#endif // defined (SPI_ENABLED)
+#endif // SPI_ENABLED
 
