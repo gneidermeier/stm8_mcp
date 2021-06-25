@@ -28,6 +28,13 @@
 // apparently this is not working (6/7/2021)
 //#define CLMODE_ENABLED
 
+
+// List of supported SPI configurations
+#define SPI_NONE                0
+#define SPI_STM8_MASTER         1
+#define SPI_STM8_SLAVE          2
+
+
 /**
  * the STM8 variant is defined in the project file, along with the appropriate 
  * compiler settings for the particular MCU (memory model etc.)
@@ -50,7 +57,7 @@
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
   #define HAS_SERVO_INPUT
-  #define SPI_ENABLED
+  #define SPI_ENABLED      SPI_STM8_MASTER
 
   #define UNDERVOLTAGE_FAULT_ENABLED
 
@@ -74,7 +81,7 @@
   #define SERVO_GPIO_PORT  GPIOC
   #define SERVO_GPIO_PIN   GPIO_PIN_4
 
-  #define SPI_ENABLED
+  #define SPI_ENABLED      SPI_STM8_MASTER
   #define HAS_SERVO_INPUT
 
   #define UNDERVOLTAGE_FAULT_ENABLED
@@ -104,8 +111,8 @@
 //  #define UNDERVOLTAGE_FAULT_ENABLED
 #endif
 
-#if defined( SPI_ENABLED )
-  #define SPI_CONTROLLER
+#ifndef SPI_ENABLED
+#define SPI_ENABLED SPI_NONE
 #endif
 
 #define SPI_RX_BUF_SZ  16 // 256 // tmp

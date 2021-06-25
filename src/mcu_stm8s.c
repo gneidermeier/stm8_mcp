@@ -513,7 +513,7 @@ static void Clock_setup(void)
   CLK_PeripheralClockConfig(CLK_PERIPHERAL_TIMER3, ENABLE);
 }
 
-#if defined( SPI_ENABLED )
+#if SPI_ENABLED
 /**
  * @brief  Configure SPI bus
  *
@@ -527,7 +527,7 @@ void SPI_setup(void)
 
   SPI_DeInit();
 
-#ifdef SPI_CONTROLLER
+#if SPI_ENABLED == SPI_STM8_MASTER
 
   // Set GPIO pins to output push-pull high level.
 
@@ -570,7 +570,7 @@ void SPI_setup(void)
   SPI_ITConfig(SPI_IT_RXNE, ENABLE); // Interrupt when the Rx buffer is not empty.
 #endif
 
-#endif // SPI_CONTROLLER
+#endif // SPI_ENABLED == SPI_STM8_MASTER
 
   //Enable SPI.
   SPI_Cmd(ENABLE);
@@ -598,7 +598,7 @@ void MCU_Init(void)
   Servo_CC_setup();
 #endif
 
-#if defined( SPI_ENABLED )
+#if SPI_ENABLED
   SPI_setup();
 #endif
 }

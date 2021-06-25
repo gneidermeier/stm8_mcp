@@ -382,7 +382,7 @@ uint8_t Task_Ready(void)
 
     if ( ! ((framecount++) % 0x20) )
     {
-#if defined( SPI_ENABLED ) && defined( SPI_CONTROLLER )
+#if SPI_ENABLED == SPI_STM8_MASTER
       SPI_controld();
 #endif
     }
