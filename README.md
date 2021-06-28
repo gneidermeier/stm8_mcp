@@ -152,8 +152,10 @@ In a separate project folder, create a clone of the project repo in which to
 checkout the `gh-pages` 
 [https://github.com/gneidermeier/stm8_mcp/tree/gh-pages](branch). 
 
-In the gh-pages clone-repo, create an orphan branch 'gh-pages'. Replace all of 
-the contents in the `/docs` folder of the `gh-pages` branch with the contents
+In the gh-pages clone-repo, create an orphan branch 'gh-pages'. I needed [help with this]
+(https://stackoverflow.com/questions/48235671/deploy-project-to-gh-pages-from-a-git-clone).
+
+Replace all of the contents in the `/docs` folder of the `gh-pages` branch with the contents
 of `<project_root>/build/html` in the build branch. This is shown below in 
 Unix shell syntax for clarity (we have Git Bash and/or Cygwin on our Windows 
 workstations). 
@@ -162,9 +164,9 @@ workstations).
     git checkout --orphan gh-pages
     git rm -rf .
     rm '.gitignore'
-    echo "#Title of Readme" > README.md
-    git add README.md
+    echo "#Project gh-pages site" > README.md
     cp -r `<project_root>/build/html/* /docs
+    git add docs/
     git commit -a -m "Initial Commit"
     git push -u origin gh-pages
 
