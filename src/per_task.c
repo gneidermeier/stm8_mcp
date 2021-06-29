@@ -98,7 +98,7 @@ static uint16_t UI_pulse_perd;
 static uint16_t UI_pulse_dur;
 
 static uint16_t Analog_slider; // input var for 10-bit ADC conversions
-static uint8_t UI_Speed;       // speed setting in 8-bits
+static uint8_t UI_Speed;       // speed setting (needs to be in terms of pcnt of servo position)
 static int8_t Digital_trim_switch; // trim switches have + and - extents
 
 static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
@@ -212,10 +212,11 @@ static void set_ui_speed(void)
   if (tmp_sint16 > 0)
   {
     // clip to INT8 MAX S8
-    if (tmp_sint16 > U8_MAX)
+    if (tmp_sint16 > U8_MAX)    //  TODO: limit should equate to 100% servo position (motor will die first!)
     {
       tmp_sint16 = U8_MAX;
     }
+
     UI_Speed = (uint8_t)tmp_sint16;
   }
 }
@@ -282,8 +283,6 @@ static ui_handlrp_t handle_term_inp(void)
 {
   ui_handlrp_t fp = NULL;
   char key;
-  // whats going on with the prinf format specifiers when lvalues are cast and/or promoted?
-  int uispd = (int)UI_Speed;
 
   if (SerialKeyPressed(&key))
   {
@@ -300,9 +299,6 @@ static ui_handlrp_t handle_term_inp(void)
     }
 // anykey ...
     Log_Level = 255;// default anykey enable continous/verbous log
-
-// term output is allowed here (not in an ISR or a CS)
-    printf("%X\r\n", uispd);
   }
   return fp;
 }

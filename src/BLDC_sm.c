@@ -25,17 +25,23 @@
 
 #define PWM_0PCNT      0
 
-// cast arg to 16-bit and group the pcnt*100 term to retain precision
+/**
+ * @brief Compute PWM timer period from percent duty-cycle
+ *
+ * @details Should be PWM_PCNT_TO_PERIOD or something like that.
+ *
+ * @note To retain precision, cast arg to 16-bit and group the pcnt*100 term.
+ */
 #define PWM_X_PCNT( _PCNT_ )   (uint16_t)( ( _PCNT_ * PWM_100PCNT ) / 100.0 )
 
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_RAMPUP    PWM_X_PCNT( 12.0 )  // 0x1E ... 30 * 0.4 = 12.0
+#define PWM_DC_STARTUP   12.0   // 0x1E ... 30 * 0.4 = 12.0
+#define PWM_DC_SHUTOFF   8.0    // stalls below 18 counts (7.4 %)
 
-#define PWM_DC_SHUTOFF   PWM_X_PCNT( 8.0 )   // stalls below 18 counts (7.4 %)
-
-#define PWM_DC_CTRL_MODE  PWM_DC_RAMPUP
+#define PWM_PD_STARTUP   PWM_X_PCNT( PWM_DC_STARTUP )
+#define PWM_PD_SHUTOFF   PWM_X_PCNT( PWM_DC_SHUTOFF )
 
 
 /*
@@ -82,7 +88,7 @@ static uint16_t BLDC_OL_comm_tm;     // persistent value of ramp timing
 
 static uint16_t Commanded_Dutycycle; // copied select DC to global for logging
 
-static uint8_t UI_speed;             // input from UI task, file-scope for sm_update
+static uint8_t BL_pwm_period;  // input from UI task, file-scope for sm_update
 
 static uint8_t Control_mode;   // indicates manual commuation buttons are active
 
@@ -134,7 +140,7 @@ static void timing_ramp_control(uint16_t tgt_commutation_per)
 static void haltensie(void)
 {
 // have to clear the local UI_speed since that is the transition OFF->RAMP condition
-  UI_speed = 0;
+  BL_pwm_period = 0;
 
   // kill the driver signals
   All_phase_stop();
@@ -184,17 +190,17 @@ void BL_reset(void)
  *  be invoked only from within a CS.
  *
  * @param dc Speed input which can be in the range [0:255]
+ *            TODO: needs to be in terms of percent of speed range (0:100)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-//    static uint8_t cl_timer = 0; // at 1K, 1 byte counter about 1/4 second
 
-  if (dc > PWM_DC_SHUTOFF)
+  if (dc > PWM_PD_SHUTOFF)
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if ( dc > PWM_DC_CTRL_MODE  ||  0 != UI_speed )
+    if ( dc > PWM_PD_STARTUP  ||  0 != BL_pwm_period )
     {
-      UI_speed = dc;
+      BL_pwm_period = dc;
 
       // on speed change, check for condition to transition to closed loopo
       if (FALSE == Control_mode)
@@ -220,8 +226,6 @@ void BLDC_PWMDC_Set(uint8_t dc)
     // reset needed in case system was running, in which case there is no
     // going back .. has to ramp again to get started.
     BL_reset(); // asserting this ... so what, system not running anyway!
-
-    // assert (UI_speed == 0)  //  BL reset is supposed to set these initial conditions
   }
 }
 
@@ -281,7 +285,7 @@ uint16_t get_commutation_period(void)
  */
 BL_RUNSTATE_t BL_get_state(void)
 {
-  if (UI_speed > PWM_DC_SHUTOFF )
+  if (BL_pwm_period > PWM_PD_SHUTOFF )
   {
     return BL_IS_RUNNING;
   }
@@ -323,7 +327,7 @@ void BLDC_Update(void)
 
   if ( 0 == fm_status )
   {
-    inp_dutycycle = UI_speed;
+    inp_dutycycle = BL_pwm_period;
   }
   else
   {
