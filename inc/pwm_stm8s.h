@@ -70,9 +70,9 @@
 /**
  * TIM2 not available, uses TIM1
  */
-  #define SDa_PWM_PIN  GPIO_PIN_4 // C2
+  #define SDa_PWM_PIN  GPIO_PIN_2 // C2
   #define SDb_PWM_PIN  GPIO_PIN_3 // C3
-  #define SDc_PWM_PIN  GPIO_PIN_3 // C4
+  #define SDc_PWM_PIN  GPIO_PIN_4 // C4
 
   #define SDa_PWM_PORT  GPIOC
   #define SDb_PWM_PORT  GPIOC
