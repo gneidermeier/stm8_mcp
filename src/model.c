@@ -18,10 +18,12 @@ TBLMAX = TBLSZ - 1; // this constant is for generating indices colum e.g. [0:249
 
 // started with parameters from excel curve fit (A=922, TAU=50)
 // sync range [32-4E] MAX=56
-A = 1500; // brings the idle (@DC=32) slow/high enuff to sync 
-TAU = 50;  //
-Y_INT = 0; //
-X_INT = 0; //
+//A = 1500; // brings the idle (@DC=32) slow/high enuff to sync 
+//A = 1800; // starts and runs close to time @ 12v on BPS
+A = 1700; // 12.5v WW (@1800, timing is too inhibited for the 12v WW)
+TAU = 50;
+Y_INT = 0;
+X_INT = 0;
 
 
 
@@ -39,8 +41,12 @@ dtable(:,1) =  Y_INT +  A * exp( -1 / TAU * ( X_INT + dtable(:,2) ) );
 
 // the response seems to become more linear past 30%, this segment works up to about 57%
 // (2)  Y = mx + b
-SR=75  // set starting row for linear segment [SR:TBLSZ]
-dtable(SR:TBLSZ,1) = ( 1 -  3 * ( dtable( SR:TBLSZ,2 )  + 0 )  + 565 )
+SR=75;       // set starting row for linear segment [SR:TBLSZ]
+OFFS=560;    // @ A=1500
+OFFS=560+70; // @ A=1800
+OFFS=560+60; // @ 1700  for the 12v WW
+
+dtable(SR:TBLSZ,1) = ( 1 -  3 * ( dtable( SR:TBLSZ,2 )  + 0 )  + OFFS )
 // plot( 1 -  3 * ( dtable( 1:TBLSZ,2 )  + 0 )  + 560, 'red' ) // use SR to offset on X-axis
 
 // wip develop data in the range of the ramp segment (may be able to slow down slightly from the default ramp-to speed)
