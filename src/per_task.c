@@ -35,10 +35,11 @@
 // The fault can be tested by letting the spinning prop disc strike a flimsy
 // obstacle like a 3x5 index card.
 #if defined ( S105_DEV )
-// TBD /???????   Vcc==3.3v  33k/10k @ Vbatt==14.2v
-#define V_SHUTDOWN_THR      0x03A0    // experimentally determined!
+//  Vcc==3.3v  33k/10k @ Vbatt==12.4v
+  #define V_SHUTDOWN_THR      0x0390    // experimentally determined @ 12.4v 
 #else
-#define V_SHUTDOWN_THR      0x0340    // experimentally determined!
+  // applies presently only to the stm8s-Discovery, at 14.2v and ADCref == 5v
+  #define V_SHUTDOWN_THR      0x0340    // experimentally determined!
 #endif
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
@@ -330,7 +331,7 @@ static void Periodic_task(void)
 
   bl_state = BL_get_state();
 
-  Vsystem = ( Seq_Get_Vbatt() + Vsystem ) / 2; // sma
+  Vsystem = Seq_Get_Vbatt();
 
   enableInterrupts();  ///////////////// EI EI O
 
