@@ -15,6 +15,6 @@ Dependencies=
 Filename=stm8s105_devblk.stp
 Dependencies=
 [Options]
-ActiveProject=stm8s003
+ActiveProject=stm8s105_devblk
 ActiveConfig=Debug
 AddSortedElements=1
