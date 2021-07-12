@@ -67,15 +67,15 @@
 // the commutation timing constants (TIM3 period) effectively have a factor of
 // 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
 // actual motor commutation frequency.
-#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // start of ramp
+#define BLDC_OL_TM_LO_SPD     (0x0C00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v)
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
-#define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // macro to determine this number from motor numbers?
+#define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // this is untested! can't open-loop this fast!
 
 
 // ramp rate derived from control rate which is derived from overall system rate
 // commutation time factor is rolled in there as well
-#define BLDC_ONE_RAMP_UNIT    (1 * CTRL_RATEM * CTIME_SCALAR)
+#define BLDC_ONE_RAMP_UNIT    (0.5 * CTRL_RATEM * CTIME_SCALAR)
 
 
 /* Private types -----------------------------------------------------------*/
