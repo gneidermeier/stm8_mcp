@@ -277,12 +277,14 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
-  static const uint8_t UI_UPDATEM  = 32; // 16 Mhz sysclock
+#ifdef CLOCK_16
+  static const uint8_t UI_UPDATEM = 32; // 16 Mhz sysclock
+#else
+  static const uint8_t UI_UPDATEM = 16; // 8 Mhz sysclock
+#endif
+
   static uint8_t trate = 0;
 
-#ifndef CLOCK_16
-  UI_UPDATEM = 16; // 8 Mhz sysclock
-#endif
   // the controller and the UI are updated on alternate frames (doubled the
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
   if ( 0 != ( ++trate & 0x01 ) )
