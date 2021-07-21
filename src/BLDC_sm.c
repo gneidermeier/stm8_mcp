@@ -23,7 +23,7 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define PWM_0PCNT      0
+//#define PWM_0PCNT      0
 
 /**
  * @brief Compute PWM timer period from percent duty-cycle
@@ -63,11 +63,13 @@
  *   ... divided by TIM3 base period (0.25 us)  -> 111 counts
  */
 
-//#define TIM3_RATE_MODULUS   4 // each commutation sector of 60-degrees spans 4x TIM3 periods
-// the commutation timing constants (TIM3 period) effectively have a factor of
+//#define TIM3_RATE_MODULUS   4
+// Each commutation sector of 60-degrees spans 4x TIM3 periods.
+// The commutation timing constants (TIM3 period) effectively have a factor of
 // 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
 // actual motor commutation frequency.
-#define BLDC_OL_TM_LO_SPD     (0x0C00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v)
+
+#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v)
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 #define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // this is untested! can't open-loop this fast!
@@ -80,6 +82,19 @@
 
 /* Private types -----------------------------------------------------------*/
 
+/**
+ * @brief Type for BL operating state.
+ */
+typedef enum
+{
+  BL_ALIGN,
+  BL_RAMPUP,
+  BL_OPN_LOOP,
+  BL_CLS_LOOP,
+  BL_MANUAL
+} BL_State_T;
+
+
 /* Public variables  ---------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -90,7 +105,7 @@ static uint16_t Commanded_Dutycycle; // copied select DC to global for logging
 
 static uint8_t BL_pwm_period;  // input from UI task, file-scope for sm_update
 
-static uint8_t Control_mode;   // indicates manual commuation buttons are active
+static BL_State_T Control_mode;  // BL operation state
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,7 +123,7 @@ static uint8_t Control_mode;   // indicates manual commuation buttons are active
  */
 static void timing_ramp_control(uint16_t tgt_commutation_per)
 {
-  const uint8_t stepi = BLDC_ONE_RAMP_UNIT;
+  const uint8_t stepi = (uint8_t)BLDC_ONE_RAMP_UNIT;
 
   uint16_t u16 = BLDC_OL_comm_tm;
 
@@ -163,8 +178,6 @@ void BL_reset(void)
   // stop the system in case it is already running
   haltensie();  //  zeros the  UI speed
 
-  // reset the system
-
   // the commutation period (TIM3) apparantly has to be set to something (not 0)
   // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
 
@@ -173,7 +186,7 @@ void BL_reset(void)
 
   Faultm_init();
 
-  Control_mode = FALSE;
+  Control_mode = BL_OPN_LOOP; // BL_MANUAL;
   // eventually it gets around to asserting the timer/PWM reset in the ISR update
   // but explicitly handled here will be more deterministic
 //    set_dutycycle( PWM_0PCNT );
@@ -194,16 +207,15 @@ void BL_reset(void)
  */
 void BLDC_PWMDC_Set(uint8_t dc)
 {
-
   if (dc > PWM_PD_SHUTOFF)
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if ( dc > PWM_PD_STARTUP  ||  0 != BL_pwm_period )
+    if ( dc > PWM_PD_STARTUP || 0 != BL_pwm_period )
     {
       BL_pwm_period = dc;
 
       // on speed change, check for condition to transition to closed loopo
-      if (FALSE == Control_mode)
+      if (BL_OPN_LOOP == Control_mode)
       {
         /*
          * checks a plausibility condition for transition to closed-loop
@@ -213,19 +225,18 @@ void BLDC_PWMDC_Set(uint8_t dc)
         if ( 0 == Seq_get_timing_error_p() )
         {
 #ifdef CLMODE_ENABLED
-          Control_mode = TRUE;
+          Control_mode = BL_CLS_LOOP;
 #endif
         }
       }
-      // else
-      // if dc < THRESHOLD, then unlatch control mode?
+      // else if dc < THRESHOLD, then unlatch control mode?
     }
   }
   else
   {
     // reset needed in case system was running, in which case there is no
     // going back .. has to ramp again to get started.
-    BL_reset(); // asserting this ... so what, system not running anyway!
+    BL_reset();
   }
 }
 
@@ -239,14 +250,14 @@ uint16_t BLDC_PWMDC_Get(void)
   return Commanded_Dutycycle;
 }
 
-#if 0
+#ifdef ENABLE_COMM_INP
 /** @cond */ // hide some developer/debug code
 /*
  * TEST DEV ONLY: manual adjustment of commutation cycle time)
  */
 void BLDC_Spd_dec()
 {
-  Control_mode = TRUE; //tbd
+  Control_mode = BL_MANUAL; //tbd
 
   BLDC_OL_comm_tm += 1; // slower
 }
@@ -256,7 +267,7 @@ void BLDC_Spd_dec()
  */
 void BLDC_Spd_inc()
 {
-  Control_mode = TRUE; // tbd
+  Control_mode = BL_MANUAL; // tbd
 
   BLDC_OL_comm_tm -= 1; // faster
 }
@@ -343,14 +354,15 @@ void BLDC_Update(void)
   // there isn't much point in enabling commuation timing contrl if speed is 0
   // and by leaving it along until the system is actually running, it can set
   // the initial condition in the global BL_Reset() above.
-  if (inp_dutycycle > 0    &&  ( 0 == fm_status ) )
+  if (inp_dutycycle > 0 && 0 == fm_status /* TODO: fm_status redundant condition */ )
   {
-    if (FALSE == Control_mode)
+    if (BL_OPN_LOOP == Control_mode)
     {
       timing_ramp_control( Get_OL_Timing( inp_dutycycle ) );
     }
-    else
+    else if (BL_CLS_LOOP == Control_mode)
     {
+#if 1 // test code
       // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
       uint16_t t16 = BLDC_OL_comm_tm ;
       timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
@@ -361,8 +373,11 @@ void BLDC_Update(void)
       {
         BLDC_OL_comm_tm  = t16;
       }
+#endif // test code
     }
+    // else ...
   }
+
   Commanded_Dutycycle = inp_dutycycle; // refresh the logger variable
 }
 
