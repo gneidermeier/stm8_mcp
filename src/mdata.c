@@ -124,12 +124,14 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
  */
 uint16_t Get_OL_Timing(uint16_t index)
 {
+    uint16_t t16 = (U16_MAX); // error
+
     // assert index < OL_TIMING_TBL_SIZE
     if ( index < OL_TIMING_TBL_SIZE )
     {
-        return OL_Timing[ index ] * CTIME_SCALAR;
+        t16 = OL_Timing[ index ] * CTIME_SCALAR;
     }
-    return (U16_MAX); // error
+    return t16;
 }
 
 /**@}*/ // defgroup
