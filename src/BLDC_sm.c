@@ -23,8 +23,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-//#define PWM_0PCNT      0
-
 /**
  * @brief Compute PWM timer period from percent duty-cycle
  *
@@ -69,7 +67,7 @@
 // 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
 // actual motor commutation frequency.
 
-#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v) (todo sohould be from table)
+//#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v) (todo sohould be from table)
 
 //   0.000667 seconds / 24 / 0.25us = 111 counts
 #define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // this is untested! can't open-loop this fast!
@@ -175,23 +173,18 @@ static void BL_stop(void)
  */
 void BL_reset(void)
 {
-  // grab the initial commutation period from table	
-  uint16_t olt = Get_OL_Timing( 0 );
-
   // assert PWM channels to disabled
   BL_stop();
 
-  // the commutation period (TIM3) apparantly has to be set to something (not 0)
-  // If TIM3 IE, the period must be long enough to ensure not saturated by ISR!
-
   // Set initial commutation timing period upon state transition.
-  BLDC_OL_comm_tm = olt;  // todo should be from table
-//  BLDC_OL_comm_tm =  BLDC_OL_TM_LO_SPD;
+  // TIM3 is left enabled, so the commutation period (TIM3) is simply set to a 
+  // arbitrarily large number. The TIM3 ISR will still fire but the commutation 
+  // step logic has no effect as long as the PWM is disabled. 	
+  BLDC_OL_comm_tm =  0xFFFF;
 
   Faultm_init();
 
-  // assert the initial control-state
-  Control_mode = BL_OPN_LOOP; // todo BL_STOPPED;
+  Control_mode = BL_STOPPED;  // set the initial control-state
 }
 
 
@@ -215,25 +208,6 @@ void BLDC_PWMDC_Set(uint8_t dc)
     if ( dc > PWM_PD_STARTUP || 0 != BL_pwm_period  /* if Control_mode != STOPPED */ )
     {
       BL_pwm_period = dc;
-
-// extra logic to only assert this upon transition event
-//if (0 == BL_pwm_period){ //  Control_mode = BL_OPN_LOOP; }
-
-#if 1 // test code
-      // on speed change, check for condition to transition to closed loopo
-      if (BL_OPN_LOOP == Control_mode)
-      {
-        /*
-         * checks a plausibility condition for transition to closed-loop
-        */
-        if ( 0 == Seq_get_timing_error_p() )
-        {
-#ifdef CLMODE_ENABLED
-          Control_mode = BL_CLS_LOOP;
-#endif
-        }
-      } // else if dc < THRESHOLD, then unlatch control mode?
-#endif //test code
     }
   } // if dc > START_OF_RAMP
   else // if (BL_STOPPED != Control_mode) // extra logic to only assert this upon transition event
@@ -322,7 +296,7 @@ uint8_t BL_get_ct_mode(void)
 }
 
 // TBD, test code
-  // 1 bit is /2 for sma, 1 bit is /2 for "gain"
+// 1 bit is /2 for sma, 1 bit is /2 for "gain"
 #define SMA_SH  1 // tmp
 #define GAIN_SH  2 // tmp
 /**
@@ -337,36 +311,49 @@ void BLDC_Update(void)
 
   if ( 0 != Faultm_get_status() )
   {
-      BL_stop(); // sets BL pwm period to 0 and disables timer PWM channels but 
-                 // doesn't re-init the system state
+    BL_stop(); // sets BL pwm period to 0 and disables timer PWM channels but
+               // doesn't re-init the system state
   }
   else
   {
-    if (BL_pwm_period > 0) /* if Control_mode != STOPPED ? */
-    {
-      inp_dutycycle = BL_pwm_period; // set pwm period from UI
+    inp_dutycycle = BL_pwm_period; // set pwm period from UI
 
-      if (BL_OPN_LOOP == Control_mode) // not really effective until the state- 
-                                       // handling made consistent (for now, [period > 0] logic required above!)
+    if (BL_STOPPED == Control_mode)
+    {
+      if (BL_pwm_period > 0)
       {
-        uint16_t olt = Get_OL_Timing( inp_dutycycle );
-        timing_ramp_control( olt );
-      }
-      else if (BL_CLS_LOOP == Control_mode)
-      {
-#if 1 // test code
-        // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
-        uint16_t t16 = BLDC_OL_comm_tm ;
-        timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
-        t16 += timing_error;
-// if this overshoots, the control runs away until the TIM3 becomes so low the system locks up and no faultm can work .. not failsafe!
-        if (t16 > LUDICROUS_SPEED)
-        {
-          BLDC_OL_comm_tm  = t16;
-        }
-#endif // test code
+        Control_mode = BL_OPN_LOOP; // state-transition
+
+        // Set initial commutation timing period upon state transition.
+        // this is a hack to get a starting step based on the table by simply doubling the table value at 
+        // the present index (in dutycycle) which roughly approximate the exponential value at the prev index.
+        BLDC_OL_comm_tm = 2 * CTIME_SCALAR * Get_OL_Timing( inp_dutycycle ); // BLDC_OL_TM_LO_SPD;
       }
     }
+    else if (BL_OPN_LOOP == Control_mode)
+    {
+      uint16_t olt = Get_OL_Timing( inp_dutycycle );
+      timing_ramp_control( olt );
+
+      // check plausibility condition for transition to closed-loop
+      // if ( Seq_get_timing_error_p() )
+      //           Control_mode = BL_CLS_LOOP; // state-transition
+    }
+    else if (BL_CLS_LOOP == Control_mode)
+    {
+#if 0 // test code
+      // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
+      uint16_t t16 = BLDC_OL_comm_tm ;
+      timing_error = ( Seq_get_timing_error() + timing_error ) >> CONTROL_GAIN_SH;
+      t16 += timing_error;
+// if this overshoots, the control runs away until the TIM3 becomes so low the system locks up and no faultm can work .. not failsafe!
+      if (t16 > LUDICROUS_SPEED)
+      {
+        BLDC_OL_comm_tm  = t16;
+      }
+#endif // test code
+    }
+    // else ...check for conditions if necessary to unlatch CL control mode? (too slow, lost sync)
   }
 
   // pwm duty-cycle will be upated to the timer peripheral at next commutation step.
