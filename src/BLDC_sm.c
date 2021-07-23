@@ -28,54 +28,27 @@
  *
  * @details Should be PWM_PCNT_TO_PERIOD or something like that.
  *
- * @note To retain precision, cast arg to 16-bit and group the pcnt*100 term.
+ * @note 100 percent PWM time:
+ *   fMaster * timer_prescaler * 250 counts = (1/16Mhz) * 8 * 250 -> 0.000125 S
  */
 #define PWM_X_PCNT( _PCNT_ )   (uint16_t)( ( _PCNT_ * PWM_100PCNT ) / 100.0 )
 
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_STARTUP   12.0   // 0x1E ... 30 * 0.4 = 12.0
-#define PWM_DC_SHUTOFF   8.0    // stalls below 18 counts (7.4 %)
+#define PWM_DC_STARTUP   11.5
+#define PWM_DC_SHUTOFF    6.8   // stalls if slower
 
 #define PWM_PD_STARTUP   PWM_X_PCNT( PWM_DC_STARTUP )
 #define PWM_PD_SHUTOFF   PWM_X_PCNT( PWM_DC_SHUTOFF )
 
 
-/*
- * These constants are the number of timer counts (TIM3) to achieve a given
- *  commutation step period.
- * See TIM3 setup - base period is 0.000000250 seconds (0.25 usec) in order to
- * provide high precision for controlling the commutation time, and each commutation step
- * unit is 4x TIM3 periods for back-EMF sampling at 1/4 and 3/4 in the commutation period.
- *
- * For the theoretical 1100kv motor @ 13.8v -> ~15000 RPM:
- *   15000 / 60 = 250 rps
- *   "Electrical cycles" per sec = 250 * (12/2) = 1500 ... where (12/2) is nr. of pole-pairs.
- *   Time of 1 cycle = 1/1500 = 0.000667 seconds  (360 degrees of 1 electrical cycle)
- *
- *   1 commutation sector is 60 degrees.
- *   Using TIM3 to get 4 updates per sector, and 360/15degrees=24 so ..
- *
- *   0.000667 seconds / 24 = 0.00002778 sec  (the "1/4 sector time" is 27.78us )
- *   ... divided by TIM3 base period (0.25 us)  -> 111 counts
- */
-
-//#define TIM3_RATE_MODULUS   4
-// Each commutation sector of 60-degrees spans 4x TIM3 periods.
-// The commutation timing constants (TIM3 period) effectively have a factor of
-// 'TIM3_RATE_MODULUS' rolled into them since the timer fires 4x faster than the
-// actual motor commutation frequency.
-
-//#define BLDC_OL_TM_LO_SPD     (0x0B00 * CTIME_SCALAR) // commutation period at start of ramp (est. @ 12v) (todo sohould be from table)
-
-//   0.000667 seconds / 24 / 0.25us = 111 counts
-#define LUDICROUS_SPEED       (0x006F * CTIME_SCALAR) // this is untested! can't open-loop this fast!
-
+ // commutation period at start of ramp (est. @ 12v) - exp. det.
+#define BLDC_OL_TM_LO_SPD     (0x1600 * CTIME_SCALAR)
 
 // ramp rate derived from control rate which is derived from overall system rate
 // commutation time factor is rolled in there as well
-#define BLDC_ONE_RAMP_UNIT    (0.5 * CTRL_RATEM * CTIME_SCALAR)
+#define BLDC_ONE_RAMP_UNIT    (1.0 * CTRL_RATEM * CTIME_SCALAR)
 
 
 /* Private types -----------------------------------------------------------*/
@@ -325,9 +298,7 @@ void BLDC_Update(void)
         Control_mode = BL_OPN_LOOP; // state-transition
 
         // Set initial commutation timing period upon state transition.
-        // this is a hack to get a starting step based on the table by simply doubling the table value at 
-        // the present index (in dutycycle) which roughly approximate the exponential value at the prev index.
-        BLDC_OL_comm_tm = 2 * CTIME_SCALAR * Get_OL_Timing( inp_dutycycle ); // BLDC_OL_TM_LO_SPD;
+        BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
       }
     }
     else if (BL_OPN_LOOP == Control_mode)

@@ -22,12 +22,6 @@
 #endif // UNIT_TEST
 
 
-// advise enabling this, so long as it is working (not triggering fault positives)
-//#define UNDERVOLTAGE_FAULT_ENABLED
-
-// apparently this is not working (6/7/2021)
-//#define CLMODE_ENABLED
-
 
 // List of supported SPI configurations
 #define SPI_NONE                0
@@ -42,6 +36,8 @@
  * routing determines how the peripherals and GPIO pins are allocated.
  */
 #if defined ( S105_DEV )
+
+//#define ENABLE_COMM_INP
 
   #define ESTOP_BTN_IN_PORT  GPIOF
   #define ESTOP_BTN_IN_PIN   GPIO_PIN_4
@@ -139,11 +135,9 @@
 #define CTRL_RATEM  SYS_RATE_MULT  // control task rate multiplier
 
 
-// the timer prescalar is to show that fixed timing data must somehow factor in
-// the timer rate - halving the prescalar to make timer 2x faster means timing
-// periods are 2x duration relative to the previous scalar of 1
-
-#define CTIME_SCALAR 2
+// "legacy" macro that worked like an additional pre-scaler term used while messing with
+//  commutation timer related parameters. Set to 1 i.e. doesn't really do anything presently. 
+#define CTIME_SCALAR 1
 
 
 /*

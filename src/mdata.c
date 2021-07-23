@@ -19,25 +19,16 @@
 
 /*
  * The table is indexed by PWM duty cycle counts (i.e. [0:1:250)
- * The function generates the data in Scilab and imported from csv:
+ * The function generates the data in Scilab and imported from csv.
+ * Gain and time constant experimentally determined for timing 1100kV motor @ 12.4v
  *
- *   y =  ( 4000 * EXP( -t/25 ) ) + 150
+ *   Y =  A * exp( -t / TAU )
  *
- * Excel was used  to find initial parameters using some data obtained experimentally
- * sync range seems to be [32-68] (duty-cycle) with parameters roughly in these ranges:
- *  A     = [ 1800 : 2000 ]
- *  TAU   = [ 38 : 34 ]
- *  Y_INT = [ 25 : 30 ]
- *  X_INT = 0
+ *   A     = 3400
+ *   TAU   = 50
  *
- *  (32-80)/(788-268) =  -0.0923077
- *
- * The range that needs to be synced is between "Idle" (DC=32) and some higher speed where b-emf is measureable.
- * The exponential seems to do a better job at tracking over the needed
- * interval. Taking the coordinates at the start and end of the range over which
- * the motor is able to stay in sync would give the slope that could be tried for
- * a linear tracking function.
- *
+ * Note that the first 16 or so table entries aren't really used as the motor 
+ * can't run at such low duty-cycle!
  */
 static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 {
