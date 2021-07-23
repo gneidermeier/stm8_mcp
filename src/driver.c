@@ -228,12 +228,8 @@ void Driver_on_PWM_edge(void)
 void Driver_on_ADC_conv(void)
 {
   ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
+
 #ifdef BUFFER_ADC_BEMF
-// assert (buffer should be sized big enough for slowest speed)
-
-// TODO: ph0_adc_fbuf can simply be a running sma ... there is no real need to
-// reset the average at each commutation switch????!!!???
-
   if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
   {
     ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
@@ -271,37 +267,57 @@ uint16_t Driver_Get_ADC(void)
 /**
  * @brief  Invoke background task and control task.
  *
- * @details  Called from timer ISR. The commutation time is updated each time the
- * control task is updated, and in turn the timer reload register value is refreshed
+ * @details  Called from timer ISR. The timer reload register value is refreshed
  * from latest calculated commutation time period.
+ *
+ * Driven by PWM timer ISR
+ *  e.g.
+ *   timer period = fMaster * PS * 100%DC 
+ *                                   = (1/16 Mhz) * 8 * 250 counts -> 0.000125 S
+ *
+ * The ISR multiplexes the PWM capture with Driver upate, but the driver update 
+ * only requires x/hz
+ *
+ *   timer period * ISR Frame Count * CT_FRAME 
+ *                               = 0.000125 * 4 ISRs * 2 count -> 0.001 seconds 
+ *
+ * The Periodic Task (UI) update is targetted to ~60 Hz (.0167 ms) i.e.
+ *   timer period * ISR Frame Count * UI_FRAME 
+ *                              = 0.000125 * 4 ISRs * 32 count -> 0.016 seconds 
+ *   
  */
 void Driver_Update(void)
 {
-#ifdef CLOCK_16
-  static const uint8_t UI_UPDATEM = 32; // 16 Mhz sysclock
-#else
-  static const uint8_t UI_UPDATEM = 16; // 8 Mhz sysclock
-#endif
+  static const uint8_t UI_FRAME = 0x20; // UI task every 32 steps (even)
+  static const uint8_t CT_FRAME = 0x01; // control task on odd steps
 
   static uint8_t trate = 0;
 
+  trate += 1;
+
   // the controller and the UI are updated on alternate frames (doubled the
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
-  if ( 0 != ( ++trate & 0x01 ) )
+  if ( 0 != (trate & CT_FRAME))
   {
-    BLDC_Update();
-  }
-  else if ( 0 == (trate % UI_UPDATEM))
-  {
+    BLDC_Update();  // update commutation timing controller 
+
+    // refresh the timer with the updated commutation time period
+    MCU_set_comm_timer( get_commutation_period() );
+
 #if 1
-    /* Toggles LED */
+    /* Toggles LED to verify task timing */
     GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 #endif
-    Periodic_Task_Wake();
   }
+  else if (0 == (trate % UI_FRAME))
+  {
+    Periodic_Task_Wake();
 
-  // update the commutation switch timer period
-  MCU_set_comm_timer( get_commutation_period() );
+#if 0
+    /* Toggles LED to verify task timing */
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+#endif
+  }
 }
 
 
@@ -309,6 +325,14 @@ void Driver_Update(void)
  * @brief  Top-level task for commutation switching sequence
  *
  * @details  Invoked from timer ISR
+ * Each SequenceStep() is at 60-electrical-degrees.
+ * Timing is established by:
+ *  timer period * commutation period 
+ * The Sequence Step is called every 4th iteration (equivalent to 60-degrees)
+ *  ( i.e. the timer period is 1/4 the time duration of 60-degrees).
+ * e.g.
+ *  frame time = fMaster * PS * timer period
+ *  60 electrical degrees = timer period * 4 frames
  */
 void Driver_Step(void)
 {
@@ -338,5 +362,10 @@ void Driver_Step(void)
   case 3:
     break;
   }
+
+#if 0
+    /* Toggles LED */
+    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+#endif
 }
 /**@}*/ // defgroup
