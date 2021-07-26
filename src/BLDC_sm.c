@@ -36,6 +36,7 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
+#define PWM_DC_RAMPUP    25.0 
 #define PWM_DC_STARTUP   11.5
 #define PWM_DC_SHUTOFF    6.8   // stalls if slower
 
@@ -295,11 +296,27 @@ void BLDC_Update(void)
     {
       if (BL_pwm_period > 0)
       {
-        Control_mode = BL_OPN_LOOP; // state-transition
+        Control_mode = BL_RAMPUP; // state-transition
 
         // Set initial commutation timing period upon state transition.
         BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
       }
+    }
+    else if (BL_RAMPUP == Control_mode)
+    {
+        uint16_t olt;
+
+        // (tbd) during the ramp the duty-cycle should be set somewhere between 10-25%
+        inp_dutycycle = PWM_DC_RAMPUP;
+
+        // commutation timing control target is the pre-determined motor idle speed (tbd)
+        olt = Get_OL_Timing( PWM_DC_STARTUP );
+        timing_ramp_control( olt );
+
+        if (BLDC_OL_comm_tm > Get_OL_Timing( PWM_DC_STARTUP ))
+        {
+            Control_mode = BL_OPN_LOOP; // state-transition
+        }
     }
     else if (BL_OPN_LOOP == Control_mode)
     {
