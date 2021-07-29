@@ -58,12 +58,14 @@ BL_RUNSTATE_t BL_get_state(void);
 uint8_t BL_get_ct_mode(void);
 
 /**
- * @brief Periodic state machine update.
- *
- * Called from ISR. Evaluate state transition conditions and determine new
- * state.
- *
+ * @brief fixed-rate controller update (timer ISR callback).
  */
 void BL_State_Ctrl(void);
+
+/**
+ * @brief commutation sequence step (timer ISR callback)
+ */
+void BL_Commutation_Step(void);
+
 
 #endif // BLDC_H

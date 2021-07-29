@@ -377,5 +377,16 @@ void BL_State_Ctrl(void)
   // pwm duty-cycle will be upated to the timer peripheral at next commutation step.
   set_dutycycle( inp_dutycycle );
 }
+
+/**
+ * @brief  commutation sequence step (timer ISR callback)
+ *
+ * @details 
+ */ 
+void BL_Commutation_Step(void)
+{
+  Sequence_Step();
+}
+
 /**@}*/ // defgroup
 

@@ -19,7 +19,6 @@
 
 #include "mcu_stm8s.h"
 #include "bldc_sm.h"
-#include "sequence.h"
 #include "per_task.h"
 
 
@@ -348,7 +347,7 @@ void Driver_Step(void)
 #if 0 // BUFFER_ADC_BEMF
     udpate_phase_average(); // average 8 samples from frame buffer
 #endif
-    Sequence_Step();
+    BL_Commutation_Step();
     break;
 
   case 1:
