@@ -25,15 +25,11 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define PH0_ADC_TBUF_SZ  8
+//#define PH0_ADC_TBUF_SZ  8
 
 /*
- TODO: resistor divider values must be updated for 3.3v operation
+ TODO: system voltage should be measured at startup
 */
-
-// half of 10-bit ADC which is also assumed to be exactly half DC thanks to perfectly sized resistor divider, unflinching supply voltage set exactly to 13.8v
-#define MID_ADC 0x0200  // tbd ... DC HALF
-
 // divider: 33k/18k
 //  18/(18+33)=0.35
 // 0.35 * 14.1v = 4.98
@@ -70,21 +66,20 @@
 
 /* Private types -----------------------------------------------------------*/
 
-
 /* Public variables  ---------------------------------------------------------*/
-
 
 /* Private variables ---------------------------------------------------------*/
 
+// global for getting
 static uint16_t ADC_Global;
 
 // Accummulates a string of 10-bit ADC samples for averaging - could reduce
 // to 8 bits as possibly the 2 lsb's are not that significant anyway.
-static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
+//static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
 
-static uint8_t  ph0_adc_tbct;
+//static uint8_t  ph0_adc_tbct;
 
-static uint16_t phase_average;
+//static uint16_t phase_average;
 
 static uint16_t prev_pulse_start_tm;
 static uint16_t curr_pulse_start_tm;
@@ -96,7 +91,7 @@ static uint16_t Pulse_dur;
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-#ifdef BUFFER_ADC_BEMF
+#if 0 // BUFFER_ADC_BEMF
 /*
  * averag 8 samples .. could be inline or macro
  */
@@ -208,7 +203,7 @@ uint16_t Driver_get_pulse_dur(void)
  */
 void Driver_on_PWM_edge(void)
 {
-#ifdef BUFFER_ADC_BEMF
+#if 0 // BUFFER_ADC_BEMF
   ph0_adc_tbct += 1 ; // advance the buffer index
 #endif
 // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
@@ -229,7 +224,7 @@ void Driver_on_ADC_conv(void)
 {
   ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
 
-#ifdef BUFFER_ADC_BEMF
+#if 0 // BUFFER_ADC_BEMF
   if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
   {
     ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
@@ -237,7 +232,7 @@ void Driver_on_ADC_conv(void)
 #endif
 }
 
-#ifdef BUFFER_ADC_BEMF
+#if 0 // BUFFER_ADC_BEMF
 /** @cond */
 /**
  * @brief Get Back-EMF buffer averaged.
@@ -292,17 +287,16 @@ void Driver_Update(void)
   static const uint8_t CT_FRAME = 0x01; // control task on odd steps
 
   static uint8_t trate = 0;
-
   trate += 1;
 
   // the controller and the UI are updated on alternate frames (doubled the
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
   if ( 0 != (trate & CT_FRAME))
   {
-    BLDC_Update();  // update commutation timing controller 
+    BL_State_Ctrl();  // update commutation timing controller 
 
     // refresh the timer with the updated commutation time period
-    MCU_set_comm_timer( get_commutation_period() );
+    MCU_set_comm_timer( BL_get_timing() );
 
 #if 1
     /* Toggles LED to verify task timing */
@@ -351,7 +345,7 @@ void Driver_Step(void)
   switch(index)
   {
   case 0:
-#ifdef BUFFER_ADC_BEMF
+#if 0 // BUFFER_ADC_BEMF
     udpate_phase_average(); // average 8 samples from frame buffer
 #endif
     Sequence_Step();

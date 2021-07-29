@@ -35,20 +35,22 @@ typedef enum
 {
     BL_NOT_RUNNING,
     BL_IS_RUNNING
-} BL_RUNSTATE_t;
+} 
+BL_RUNSTATE_t;
 
 /**
   * @brief Accessor for commutation period.
   *
   * @return commutation period
   */
-uint16_t get_commutation_period(void);
+uint16_t BL_get_timing(void);
+void BL_set_timing( uint16_t );
 
-void BLDC_Spd_inc(void);
-void BLDC_Spd_dec(void);
+void BL_timing_step_slower(void);
+void BL_timing_step_faster(void);
 
-void BLDC_PWMDC_Set(uint8_t dc);
-uint16_t BLDC_PWMDC_Get(void);
+void BL_set_speed(uint8_t dc);
+uint16_t BL_get_speed(void);
 
 void BL_reset(void);
 
@@ -62,6 +64,6 @@ uint8_t BL_get_ct_mode(void);
  * state.
  *
  */
-void BLDC_Update(void);
+void BL_State_Ctrl(void);
 
 #endif // BLDC_H

@@ -14,7 +14,6 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include <stddef.h>  // NULL
 #include "bldc_sm.h" // external types used internally
 #include "mdata.h"
 #include "pwm_stm8s.h" // motor phase control
@@ -36,19 +35,27 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_RAMPUP    25.0 
+#define PWM_DC_RAMPUP    15.0 
 #define PWM_DC_STARTUP   11.5
-#define PWM_DC_SHUTOFF    6.8   // stalls if slower
+#define PWM_DC_SHUTOFF    9.2   // stalls if slower
 
+#define PWM_PD_RAMPUP    PWM_X_PCNT( PWM_DC_RAMPUP )
 #define PWM_PD_STARTUP   PWM_X_PCNT( PWM_DC_STARTUP )
 #define PWM_PD_SHUTOFF   PWM_X_PCNT( PWM_DC_SHUTOFF )
 
 
+/**
+ * @brief Scale Factor in commutation timing constant terms
+ * @details
+ *  All related timing constant terms have Time Scale factored into them. Time 
+ *  Scale would be set (#defined) to 1.0 if additional scaling is not needed. 
+ */
+ 
  // commutation period at start of ramp (est. @ 12v) - exp. det.
-#define BLDC_OL_TM_LO_SPD     (0x1600 * CTIME_SCALAR)
+#define BL_CT_RAMP_START  (5632.0 * CTIME_SCALAR) // $1600
 
-// ramp rate derived from control rate which is derived from overall system rate
-// commutation time factor is rolled in there as well
+// Integer ramp step (per control-frame) is derived from control rate. 
+// Ramp could probably faster if there was an alignment step starting off.
 #define BLDC_ONE_RAMP_UNIT    (1.0 * CTRL_RATEM * CTIME_SCALAR)
 
 
@@ -73,8 +80,8 @@ BL_State_T;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t BLDC_OL_comm_tm; // persistent value of ramp timing
-static uint8_t BL_pwm_period; // input from UI - made static global for access in ISR thread
+static uint16_t BL_comm_period; // persistent value of ramp timing
+static uint16_t BL_pwm_period; // input from UI - made static global for access in ISR thread
 static BL_State_T Control_mode; // BL operation state
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,31 +96,30 @@ static BL_State_T Control_mode; // BL operation state
  *
  * @param   tgt_commutation_per  Target value to track.
  */
-static void timing_ramp_control(uint16_t tgt_commutation_per)
+static uint16_t timing_ramp_control(uint16_t setpoint, uint16_t target)
 {
   const uint8_t stepi = (uint8_t)BLDC_ONE_RAMP_UNIT;
 
-  uint16_t u16 = BLDC_OL_comm_tm;
+  uint16_t u16 = setpoint;
 
   // determine signage of error i.e. step increment
-  if (u16 > tgt_commutation_per)
+  if (u16 > target)
   {
     u16 -= stepi;
-    if (u16 < tgt_commutation_per)
+    if (u16 < target)
     {
-      u16 = tgt_commutation_per;
+      u16 = target;
     }
-    BLDC_OL_comm_tm  = u16;
   }
-  else if (u16 < tgt_commutation_per)
+  else if (u16 < target)
   {
     u16 += stepi;
-    if (u16 > tgt_commutation_per)
+    if (u16 > target)
     {
-      u16 = tgt_commutation_per;
+      u16 = target;
     }
-    BLDC_OL_comm_tm  = u16;
   }
+  return u16;
 }
 
 /**
@@ -154,7 +160,7 @@ void BL_reset(void)
   // TIM3 is left enabled, so the commutation period (TIM3) is simply set to a 
   // arbitrarily large number. The TIM3 ISR will still fire but the commutation 
   // step logic has no effect as long as the PWM is disabled. 	
-  BLDC_OL_comm_tm =  0xFFFF;
+  BL_set_timing( U16_MAX ); // 0xFFFF;
 
   Faultm_init();
 
@@ -174,14 +180,19 @@ void BL_reset(void)
  * @param dc Speed input which can be in the range [0:255]
  *            TODO: needs to be in terms of percent of speed range (0:100)
  */
-void BLDC_PWMDC_Set(uint8_t dc)
+void BL_set_speed(uint8_t ui_speed)
 {
-  if (dc > PWM_PD_SHUTOFF)
+  /*
+   * todo: convert speed (percent throttle) to PWM period (derived from PWM % duty-cycle) 
+   */
+  uint16_t ui_pwm_perd = (uint16_t) ui_speed;
+
+  if( ui_pwm_perd > PWM_PD_SHUTOFF )
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if ( dc > PWM_PD_STARTUP || 0 != BL_pwm_period  /* if Control_mode != STOPPED */ )
+    if( ui_pwm_perd > PWM_PD_STARTUP || 0 != BL_pwm_period  /* if Control_mode != STOPPED */ )
     {
-      BL_pwm_period = dc;
+      BL_pwm_period = ui_pwm_perd;
     }
   } // if dc > START_OF_RAMP
   else // if (BL_STOPPED != Control_mode) // extra logic to only assert this upon transition event
@@ -194,45 +205,49 @@ void BLDC_PWMDC_Set(uint8_t dc)
 /**
  * @brief Accessor for Commanded Duty Cycle
  *
- * @return Commanded Duty Cycle
+ * @return PWM period
  */
-uint16_t BLDC_PWMDC_Get(void)
+uint16_t BL_get_speed(void)
 {
-  return (uint16_t)BL_pwm_period;
+  return BL_pwm_period;
 }
 
-#ifdef ENABLE_COMM_INP
-/** @cond */ // hide some developer/debug code
-/*
- * TEST DEV ONLY: manual adjustment of commutation cycle time)
+/**
+ * @brief adjust commutation timing by step amount
  */
-void BLDC_Spd_dec()
+void BL_timing_step_slower(void)
 {
   Control_mode = BL_MANUAL; //tbd
 
-  BLDC_OL_comm_tm += 1; // slower
+  BL_comm_period += 1; // slower
 }
 
-/*
- * TEST DEV ONLY: manual adjustment of commutation cycle time)
+/**
+ * @brief adjust commutation timing by step amount
  */
-void BLDC_Spd_inc()
+void BL_timing_step_faster(void)
 {
   Control_mode = BL_MANUAL; // tbd
 
-  BLDC_OL_comm_tm -= 1; // faster
+  BL_comm_period -= 1; // faster
 }
-/** @endcond */
-#endif
 
 /**
   * @brief Accessor for commutation period.
   *
   * @return commutation period
   */
-uint16_t get_commutation_period(void)
+uint16_t BL_get_timing(void)
 {
-  return BLDC_OL_comm_tm;
+  return BL_comm_period;
+}
+
+/**
+  * @brief Accessor for commutation period.
+  */
+void BL_set_timing(uint16_t u16)
+{
+  BL_comm_period = u16;
 }
 
 /**
@@ -271,15 +286,15 @@ uint8_t BL_get_ct_mode(void)
 
 // TBD, test code
 // 1 bit is /2 for sma, 1 bit is /2 for "gain"
-#define SMA_SH  1 // tmp
-#define GAIN_SH  2 // tmp
+//#define SMA_SH  1 // tmp
+//#define GAIN_SH  2 // tmp
 /**
- * @brief  Top level task which perform commutation timing update.
+ * @brief  Implement control task (fixed exec rate of ~1ms).
  */
-void BLDC_Update(void)
+void BL_State_Ctrl(void)
 {
-  static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
-  static int16_t timing_error;
+//  static const uint8_t CONTROL_GAIN_SH  = (GAIN_SH + SMA_SH);
+//  static int16_t timing_error;
 
   uint16_t inp_dutycycle = 0; // in case of error, PWM output remains 0
 
@@ -299,21 +314,31 @@ void BLDC_Update(void)
         Control_mode = BL_RAMPUP; // state-transition
 
         // Set initial commutation timing period upon state transition.
-        BLDC_OL_comm_tm = BLDC_OL_TM_LO_SPD;
+        BL_set_timing( (uint16_t)BL_CT_RAMP_START );
       }
     }
     else if (BL_RAMPUP == Control_mode)
     {
-        uint16_t olt;
+        // grab the current commutation period setpoint to handoff to ramp control
+        uint16_t comm_perd_sp; // = BL_get_timing();
 
-        // (tbd) during the ramp the duty-cycle should be set somewhere between 10-25%
-        inp_dutycycle = PWM_DC_RAMPUP;
+        // table-lookup for the target commutation timing period for the PWM duty-cycle (low speed-startup) 
+        uint16_t olt = Get_OL_Timing( PWM_PD_STARTUP );
 
-        // commutation timing control target is the pre-determined motor idle speed (tbd)
-        olt = Get_OL_Timing( PWM_DC_STARTUP );
-        timing_ramp_control( olt );
+        // Set duty-cycle for rampup somewhere between 10-25% (tbd)
+        inp_dutycycle = PWM_PD_RAMPUP;
 
-        if (BLDC_OL_comm_tm > Get_OL_Timing( PWM_DC_STARTUP ))
+        // PWM period ramped down by fixed rate of increment (decrement) ... linear ramp
+
+        // this would only be ramping in one direction (commutation-period only decreasing in rampup!)
+//        BL_set_timing( comm_perd_sp, (timing_ramp_control( olt ) );
+
+        BL_timing_step_faster(); // decrement the commutation-period by 1 ramp-step
+
+        // check state-transition .. has it reached the timing for the low speed setpoint?
+        comm_perd_sp = BL_get_timing();
+
+        if (comm_perd_sp > olt)
         {
             Control_mode = BL_OPN_LOOP; // state-transition
         }
@@ -321,7 +346,12 @@ void BLDC_Update(void)
     else if (BL_OPN_LOOP == Control_mode)
     {
       uint16_t olt = Get_OL_Timing( inp_dutycycle );
-      timing_ramp_control( olt );
+      // grab the current commutation period setpoint to handoff to ramp control
+      uint16_t comm_perd_sp = BL_get_timing();
+
+      // update the commutation time period
+      uint16_t temp16 = timing_ramp_control(comm_perd_sp, olt);
+      BL_set_timing(temp16);
 
       // check plausibility condition for transition to closed-loop
       // if ( Seq_get_timing_error_p() )

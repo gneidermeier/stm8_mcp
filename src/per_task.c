@@ -28,7 +28,7 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define TRIM_DEFAULT  0 //
+#define TRIM_DEFAULT  0
 
 // Threshold is set low enuogh that the machine doesn't stall
 // thru the lower speed transition into closed-loop control.
@@ -36,10 +36,10 @@
 // obstacle like a 3x5 index card.
 #if defined ( S105_DEV )
 //  Vcc==3.3v  33k/10k @ Vbatt==12.4v
-  #define V_SHUTDOWN_THR      0x0390    // experimentally determined @ 12.4v 
+  #define V_SHUTDOWN_THR      0x02c0    // experimentally determined @ 12.4v
 #else
   // applies presently only to the stm8s-Discovery, at 14.2v and ADCref == 5v
-  #define V_SHUTDOWN_THR      0x0340    // experimentally determined!
+  #define V_SHUTDOWN_THR      0x02C0    // experimentally determined!
 #endif
 
 #define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
@@ -47,8 +47,8 @@
 
 /* Private function prototypes -----------------------------------------------*/
 
-static void comm_plus(void);
-static void comm_minus(void);
+static void timing_plus(void);
+static void timing_minus(void);
 static void spd_plus(void);
 static void spd_minus(void);
 static void m_stop(void);
@@ -68,7 +68,7 @@ typedef void (*ui_handlrp_t)( void );
 // local enum only for setting enumerated order to UI event dispatcher
 enum
 {
-#if 0 // tmp?
+#ifdef ENABLE_MAN_TIMING
   COMM_PLUS  = ']',
   COMM_MINUS = '[',
 #endif
@@ -89,7 +89,8 @@ typedef struct
 {
   ui_keycode_t   key_code;  /**< Key code. */
   ui_handlrp_t   phandler;  /**< Pointer to handler function. */
-} ui_key_handler_t;
+} 
+ui_key_handler_t;
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -110,8 +111,10 @@ static  uint16_t Vsystem; // persistent for averaging
 
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
-//  {COMM_PLUS,  comm_plus},
-//  {COMM_MINUS, comm_minus},
+#ifdef ENABLE_MAN_TIMING
+  {COMM_PLUS,  timing_plus},
+  {COMM_MINUS, timing_minus},
+#endif
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
   {M_STOP,     m_stop}
@@ -133,32 +136,29 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
 static void dbg_println(int zrof)
 {
   static uint16_t Line_Count = 0;
-  // whats going on with the prinf format specifiers when lvalues are cast and/or promoted?
   int faults = (int)Faultm_get_status();
-  int uispd = (int)UI_Speed;
-
-  char sbuf[80] ;                     // am i big enuff?
-
-// globals are accessed (read) outside of CS so be it
-  int16_t timing_error = Seq_get_timing_error();
+  uint16_t ui_speed = UI_Speed;
+  uint16_t bl_speed = BL_get_speed(); 
+  uint16_t timing_error = Seq_get_timing_error();
+  uint16_t comm_period = BL_get_timing();
 
   if ( 0 != zrof)
   {
-    Line_Count  = 0;
+    Line_Count = 0;
   }
 
-  Line_Count  += 1;;
+  Line_Count += 1;;
 
   printf(
     "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X ERR=%04X \r\n",
     Line_Count,
-    uispd,
-    get_commutation_period(),
-    BLDC_PWMDC_Get(),
+    ui_speed,
+    comm_period,
+    bl_speed,
     Vsystem,
     faults,
     UI_pulse_dur,
-    Seq_get_timing_error()
+    timing_error
   );
 }
 
@@ -179,7 +179,8 @@ static void dbg_println(int zrof)
 static void set_ui_speed(void)
 {
   uint16_t tmp_u16;
-  int16_t tmp_sint16;
+  int16_t tmp_s16;
+
   uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
 #ifdef ANLG_SLIDER
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
@@ -202,55 +203,48 @@ static void set_ui_speed(void)
 //	Analog_slider = UI_pulse_dc;
   }
 
-
 // careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
   UI_Speed = 0;
 
-  tmp_sint16 = Digital_trim_switch;
-  tmp_sint16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
+  tmp_s16 = Digital_trim_switch;
+  tmp_s16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
 
-  if (tmp_sint16 > 0)
+  if (tmp_s16 > 0)
   {
     // clip to INT8 MAX S8
-    if (tmp_sint16 > U8_MAX)    //  TODO: limit should equate to 100% servo position (motor will die first!)
+    if (tmp_s16 > U8_MAX)    //  TODO: limit should equate to 100% servo position (motor will die first!)
     {
-      tmp_sint16 = U8_MAX;
+      tmp_s16 = U8_MAX;
     }
 
-    UI_Speed = (uint8_t)tmp_sint16;
+    UI_Speed = (uint8_t)tmp_s16;
   }
 }
 
-/**
- * @brief  Stop the system
- */
-void UI_Stop(void)
-{
-// reset the machine
-  BL_reset();
-}
-#if 0
 /*
  * handlers for UI events must be short as they are invoked in ISR context
  */
+#ifdef ENABLE_MAN_TIMING
 // for development user only
-static void comm_plus(void)
+static void timing_plus(void)
 {
-  BLDC_Spd_inc();
+  BL_timing_step_slower();
 }
 // for development user only
-static void comm_minus(void)
+static void timing_minus(void)
 {
-  BLDC_Spd_dec();
+  BL_timing_step_faster();
 }
 #endif
 
-// stop key from terminal ... merge w/ UI_stop?
+/*
+ * stop key from terminal 
+ */
 static void m_stop(void)
 {
   // reset the machine
-  UI_Stop();
+  BL_reset();
 
   // reset the simulated trim swich between system runs
   Digital_trim_switch = TRIM_DEFAULT;
@@ -327,7 +321,7 @@ static void Periodic_task(void)
   // update the UI speed input slider+trim
   set_ui_speed();
 
-  BLDC_PWMDC_Set(UI_Speed);
+  BL_set_speed(UI_Speed);
 
   bl_state = BL_get_state();
 
@@ -337,13 +331,14 @@ static void Periodic_task(void)
 
 #if defined( UNDERVOLTAGE_FAULT_ENABLED )
   // update system voltage diagnostic - check plausibilty of Vsys
-  if (BL_IS_RUNNING == bl_state  && Vsystem > 0  )
+  if( BL_IS_RUNNING == bl_state && Vsystem > 0 )
   {
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
 #endif
   /*
-   * debug logging to terminal
+   * debug logging to terminal - note: globals that are updated from ISR context
+   * are not going to be read inside a CS (don't want printf inside a CS)
    */
   if (Log_Level > 0)
   {
@@ -352,7 +347,7 @@ static void Periodic_task(void)
     {
       Log_Level -= 1;
     }
-    dbg_println(0);
+    dbg_println(0); // note: would not want to put printf inside a CS (DI/EI)
   }
 }
 
