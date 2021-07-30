@@ -56,7 +56,7 @@
 
 // Integer ramp step (per control-frame) is derived from control rate. 
 // Ramp could probably faster if there was an alignment step starting off.
-#define BLDC_ONE_RAMP_UNIT    (1.0 * CTRL_RATEM * CTIME_SCALAR)
+#define BL_ONE_RAMP_UNIT  (1.0 * CTRL_RATEM * CTIME_SCALAR)
 
 
 /* Private types -----------------------------------------------------------*/
@@ -71,7 +71,8 @@ typedef enum
   BL_RAMPUP,
   BL_OPN_LOOP,
   BL_CLS_LOOP,
-  BL_STOPPED
+  BL_STOPPED,
+  BL_INVALID
 }
 BL_State_T;
 
@@ -82,7 +83,7 @@ BL_State_T;
 
 static uint16_t BL_comm_period; // persistent value of ramp timing
 static uint16_t BL_pwm_period; // input from UI - made static global for access in ISR thread
-static BL_State_T Control_mode; // BL operation state
+static BL_State_T BL_opstate; // BL operation state
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -98,14 +99,12 @@ static BL_State_T Control_mode; // BL operation state
  */
 static uint16_t timing_ramp_control(uint16_t setpoint, uint16_t target)
 {
-  const uint8_t stepi = (uint8_t)BLDC_ONE_RAMP_UNIT;
-
   uint16_t u16 = setpoint;
 
   // determine signage of error i.e. step increment
   if (u16 > target)
   {
-    u16 -= stepi;
+    u16 -= (uint16_t)BL_ONE_RAMP_UNIT;
     if (u16 < target)
     {
       u16 = target;
@@ -113,7 +112,7 @@ static uint16_t timing_ramp_control(uint16_t setpoint, uint16_t target)
   }
   else if (u16 < target)
   {
-    u16 += stepi;
+    u16 += (uint16_t)BL_ONE_RAMP_UNIT;
     if (u16 > target)
     {
       u16 = target;
@@ -164,7 +163,7 @@ void BL_reset(void)
 
   Faultm_init();
 
-  Control_mode = BL_STOPPED;  // set the initial control-state
+  BL_set_opstate( BL_STOPPED );  // set the initial control-state
 }
 
 
@@ -194,8 +193,8 @@ void BL_set_speed(uint8_t ui_speed)
     {
       BL_pwm_period = ui_pwm_perd;
     }
-  } // if dc > START_OF_RAMP
-  else // if (BL_STOPPED != Control_mode) // extra logic to only assert this upon transition event
+  }
+  else
   {
     // commanded speed less than low limit so reset - has to ramp again to get started.
     BL_reset();
@@ -217,9 +216,9 @@ uint16_t BL_get_speed(void)
  */
 void BL_timing_step_slower(void)
 {
-  Control_mode = BL_MANUAL; //tbd
+  BL_set_opstate( BL_MANUAL ); //tbd
 
-  BL_comm_period += 1; // slower
+  BL_comm_period += (uint16_t)BL_ONE_RAMP_UNIT; // slower
 }
 
 /**
@@ -227,9 +226,9 @@ void BL_timing_step_slower(void)
  */
 void BL_timing_step_faster(void)
 {
-  Control_mode = BL_MANUAL; // tbd
+  BL_set_opstate( BL_MANUAL ); // tbd
 
-  BL_comm_period -= 1; // faster
+  BL_comm_period -= (uint16_t)BL_ONE_RAMP_UNIT; // faster
 }
 
 /**
@@ -271,17 +270,21 @@ BL_RUNSTATE_t BL_get_state(void)
 }
 
 /**
- * @brief  Accessor for state variable.
- *
- * @details
- *  Control Mode is TRUE if transitioned from open-loop to closed-loop
- *  commutation control.
- *
- * @return  state value
+ * @brief  Accessor for state variable
  */
-uint8_t BL_get_ct_mode(void)
+void BL_set_opstate(uint8_t opstate)
 {
-  return Control_mode;
+  BL_opstate = opstate;
+}
+
+/**
+ * @brief  Accessor for state variable
+ *
+ * @return  operation state
+ */
+uint8_t BL_get_opstate(void)
+{
+  return BL_opstate;
 }
 
 // TBD, test code
@@ -307,17 +310,17 @@ void BL_State_Ctrl(void)
   {
     inp_dutycycle = BL_pwm_period; // set pwm period from UI
 
-    if (BL_STOPPED == Control_mode)
+    if( BL_STOPPED == BL_get_opstate() )
     {
       if (BL_pwm_period > 0)
       {
-        Control_mode = BL_RAMPUP; // state-transition
+        BL_set_opstate( BL_RAMPUP ); // state-transition
 
         // Set initial commutation timing period upon state transition.
         BL_set_timing( (uint16_t)BL_CT_RAMP_START );
       }
     }
-    else if (BL_RAMPUP == Control_mode)
+    else if( BL_RAMPUP == BL_get_opstate() )
     {
         // grab the current commutation period setpoint to handoff to ramp control
         uint16_t comm_perd_sp; // = BL_get_timing();
@@ -338,12 +341,12 @@ void BL_State_Ctrl(void)
         // check state-transition .. has it reached the timing for the low speed setpoint?
         comm_perd_sp = BL_get_timing();
 
-        if (comm_perd_sp > olt)
-        {
-            Control_mode = BL_OPN_LOOP; // state-transition
-        }
+      if( comm_perd_sp > olt )
+      {
+        BL_set_opstate( BL_OPN_LOOP ); // state-transition
+      }
     }
-    else if (BL_OPN_LOOP == Control_mode)
+    else if( BL_OPN_LOOP == BL_get_opstate() )
     {
       uint16_t olt = Get_OL_Timing( inp_dutycycle );
       // grab the current commutation period setpoint to handoff to ramp control
@@ -357,7 +360,7 @@ void BL_State_Ctrl(void)
       // if ( Seq_get_timing_error_p() )
       //           Control_mode = BL_CLS_LOOP; // state-transition
     }
-    else if (BL_CLS_LOOP == Control_mode)
+    else if( BL_CLS_LOOP == BL_get_opstate() )
     {
 #if 0 // test code
       // the control gain is macro'd together with the unscaling of the error term and also /2 of the sma
@@ -385,7 +388,29 @@ void BL_State_Ctrl(void)
  */ 
 void BL_Commutation_Step(void)
 {
-  Sequence_Step();
+//  static BL_RUNSTATE_t prev_state = BL_INVALID;
+
+  switch( BL_get_opstate() )
+  {
+  case BL_ALIGN:
+    //keep sector 0 on until timeout. Sequencer initializes to sector 0
+//    Sequence_Step_0();
+    break;
+
+  case BL_RAMPUP:
+  case BL_OPN_LOOP:
+  case BL_CLS_LOOP:
+
+    Sequence_Step();
+    break;
+
+  case BL_STOPPED:
+  case BL_MANUAL:
+  default:
+    break;
+  }
+
+//  prev_state = BL_get_state();
 }
 
 /**@}*/ // defgroup
