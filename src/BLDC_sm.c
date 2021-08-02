@@ -22,6 +22,9 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+// if this is defined, stays in aligment state w/ 0 PWM
+//#define TEST_ALIGNMENT
+
 /**
  * @brief Compute PWM timer period from percent duty-cycle
  *
@@ -35,10 +38,12 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
+#define PWM_DC_ALIGN     25.0 
 #define PWM_DC_RAMPUP    15.0 
 #define PWM_DC_STARTUP   11.5
 #define PWM_DC_SHUTOFF    9.2   // stalls if slower
 
+#define PWM_PD_ALIGN     PWM_X_PCNT( PWM_DC_ALIGN )
 #define PWM_PD_RAMPUP    PWM_X_PCNT( PWM_DC_RAMPUP )
 #define PWM_PD_STARTUP   PWM_X_PCNT( PWM_DC_STARTUP )
 #define PWM_PD_SHUTOFF   PWM_X_PCNT( PWM_DC_SHUTOFF )
@@ -57,6 +62,9 @@
 // Integer ramp step (per control-frame) is derived from control rate. 
 // Ramp could probably faster if there was an alignment step starting off.
 #define BL_ONE_RAMP_UNIT  (1.0 * CTRL_RATEM * CTIME_SCALAR)
+
+// how long the alignment step should last
+#define BL_TIME_ALIGN  (200 * 1) // N frames @ 1 ms / frame
 
 
 /* Private types -----------------------------------------------------------*/
@@ -83,6 +91,7 @@ BL_State_T;
 
 static uint16_t BL_comm_period; // persistent value of ramp timing
 static uint16_t BL_pwm_period; // input from UI - made static global for access in ISR thread
+static uint16_t BL_optimer; // allows for timed op state (e.g. alignment)
 static BL_State_T BL_opstate; // BL operation state
 
 /* Private function prototypes -----------------------------------------------*/
@@ -314,10 +323,28 @@ void BL_State_Ctrl(void)
     {
       if (BL_pwm_period > 0)
       {
-        BL_set_opstate( BL_RAMPUP ); // state-transition
+        BL_set_opstate( BL_ALIGN ); // state-transition
+        BL_optimer = BL_TIME_ALIGN;
 
         // Set initial commutation timing period upon state transition.
         BL_set_timing( (uint16_t)BL_CT_RAMP_START );
+      }
+    }
+    else if( BL_ALIGN == BL_get_opstate() )
+    {
+      if (BL_optimer > 0)
+      {
+        inp_dutycycle = PWM_PD_ALIGN;
+        BL_optimer -=1;
+      }
+      else
+      {
+#ifndef TEST_ALIGNMENT
+        BL_set_opstate(BL_RAMPUP);
+#else
+// force it to stay in alignment but kill the pwm
+        inp_dutycycle = 0; //tmp
+#endif
       }
     }
     else if( BL_RAMPUP == BL_get_opstate() )
@@ -394,7 +421,7 @@ void BL_Commutation_Step(void)
   {
   case BL_ALIGN:
     //keep sector 0 on until timeout. Sequencer initializes to sector 0
-//    Sequence_Step_0();
+    Sequence_Step_0();
     break;
 
   case BL_RAMPUP:
