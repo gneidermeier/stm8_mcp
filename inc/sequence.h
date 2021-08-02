@@ -28,5 +28,11 @@ int16_t Seq_get_timing_error(void);
 int8_t Seq_get_timing_error_p(void);
 void Sequence_Step(void);
 
+void Sequence_Step_0(void);
+void Sequence_Step_1(void);
+void Sequence_Step_2(void);
+void Sequence_Step_3(void);
+void Sequence_Step_4(void);
+void Sequence_Step_5(void);
 
 #endif // SEQUENCE_H
