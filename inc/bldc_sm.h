@@ -46,6 +46,9 @@ BL_RUNSTATE_t;
 uint16_t BL_get_timing(void);
 void BL_set_timing( uint16_t );
 
+void BL_set_opstate(uint8_t);
+uint8_t BL_get_opstate(void);
+
 void BL_timing_step_slower(void);
 void BL_timing_step_faster(void);
 
