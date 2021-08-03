@@ -38,10 +38,10 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_DC_ALIGN     25.0 
-#define PWM_DC_RAMPUP    15.0 
-#define PWM_DC_STARTUP   11.5
-#define PWM_DC_SHUTOFF    9.2   // stalls if slower
+#define PWM_DC_ALIGN     25.0
+#define PWM_DC_RAMPUP    15.0
+#define PWM_DC_STARTUP   14.4
+#define PWM_DC_SHUTOFF    7.2 // stalls if slower
 
 #define PWM_PD_ALIGN     PWM_X_PCNT( PWM_DC_ALIGN )
 #define PWM_PD_RAMPUP    PWM_X_PCNT( PWM_DC_RAMPUP )
@@ -61,7 +61,7 @@
 
 // Integer ramp step (per control-frame) is derived from control rate. 
 // Ramp could probably faster if there was an alignment step starting off.
-#define BL_ONE_RAMP_UNIT  (1.0 * CTRL_RATEM * CTIME_SCALAR)
+#define BL_ONE_RAMP_UNIT  (1.5 * CTRL_RATEM * CTIME_SCALAR)
 
 // how long the alignment step should last
 #define BL_TIME_ALIGN  (200 * 1) // N frames @ 1 ms / frame
