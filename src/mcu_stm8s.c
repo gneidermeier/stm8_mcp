@@ -220,13 +220,15 @@ static void GPIO_Config(void)
   GPIO_Init(PH0_BEMF_IN_PORT, (GPIO_Pin_TypeDef)PH0_BEMF_IN_PIN, GPIO_MODE_IN_PU_NO_IT);
 
 #if defined ( S105_DEV )
+
 #elif defined( S105_DISCOVERY )
+
 #if 0
 // PA4 as button input (Stop)
   GPIOA->DDR &= ~GPIO_PIN_4;
   GPIOA->CR1 |= GPIO_PIN_4;  // pull up w/o interrupts
 #endif
-#else
+
 #endif
 }
 
@@ -327,8 +329,35 @@ static void ADC1_setup(void)
  * @brief Setup timer capture for servo signal pulse input.
  *
  * @details
- * The clock prescaler is used to scale 1ms radio signal pulse measurement to a
- * range of just of 0x0300 (exceeds the PWM resolution commanded to the motor).
+ * The clock prescaler is used to scale the input capture timer to approximately
+ * the range of the radio pulse frame (about 25 ms).
+ * The timer period is set to maximum (free running timer) and would have a 
+ * maximum time of 1/16Mhz * 0xFFFF == 4.1ms
+ * With timer prescale 8 i.e.  4.1 ms * 8 == 0.0327675  (32 ms) - max frame time
+ * with 50 Hz frames should be within this range.
+ * 
+ * Reference information from
+ *  https://www.kdedirect.com/blogs/news/understanding-throttle-calibration-esc-deadbands-and-pwm
+ *
+ *   The throttle range is based on the normal operating range of a Futaba system
+ *  (1100탎-1940탎 with 1520 typically being center)
+ *  The default Range calibration (1100-1940) has the following deadbands:
+ *
+ *    Motor Arming pulse: 1100탎
+ *    Motor Spinning pulse: 1125탎
+ *    Motor Stopping pulse: 1110탎
+ *    Max thrust output: 1915탎
+ *    Full Stick: 1940탎
+ *
+ * PWM resolution should be at least 0.1% (some are even claiming 2048 steps)
+ *
+ * With timers as above:  range observed ($08A0:%EE0)
+ * Range is   %EE0 - $08A0 == $0640 == 1600d so 1600 steps of resolution over
+ * the throttle signal range.
+ * Motor operating range would be about half of throttle range ie. 800 steps 
+ * resolution into the PWM driver.
+ *
+ * Timer operation:
  * The timer period is set to maximum and left free running and the capture-compare
  * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
  * Refer to the timer peripheral description in the STM8s10x Reference Manual (RM0016) 
@@ -336,13 +365,18 @@ static void ADC1_setup(void)
 */
 static void Servo_CC_setup(void)
 {
+ #ifdef CLOCK_16
+  const uint16_t prescaler = TIM2_PRESCALER_8;
+#else
+  const uint16_t prescaler = TIM2_PRESCALER_4;
+#endif
   const uint16_t period = 0xFFFF;
   const uint8_t ICFilter = 1;
 
   TIM2_DeInit();
 
 // The counter clock frequency fCK_CNT is equal to fCK_PSC / 2(PSC[3:0])
-  TIM2_TimeBaseInit( TIM2_PRESCALER_32, period);
+  TIM2_TimeBaseInit( prescaler, period);
 
   TIM2_ICInit(TIM2_CHANNEL_1,
               TIM2_ICPOLARITY_RISING,
@@ -373,29 +407,22 @@ static void Servo_CC_setup(void)
  * STM8s105 Discovery TIM1 not available for PWM (unless touch pad disabled by
  * removing solder bridges, i.e. PWM must be on TIM2 but TIM1 is available for input capture.
  */
-/**
- * @brief Setup timer capture for servo signal pulse input.
- *
- * @details
- * The clock prescaler is used to scale 1ms radio signal pulse measurement to a
- * range of just of 0x0300 (exceeds the PWM resolution commanded to the motor).
- * The timer period is set to maximum and left free running and the capture-compare
- * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
- * THis is explained in STM8 Reference Manual RM0016.
-*/
 static void Servo_CC_setup(void)
 {
 /*
  * counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)
  */
-  const uint16_t T1_Prescaler = 32 - 1; // 1/16Mhz * 32 * 65536 = 0.131072 (about 131ms)
-
-  const uint16_t T1_Period = 0xFFFF;
+ #ifdef CLOCK_16
+  const uint16_t prescaler = 8;
+#else
+  const uint16_t prescaler = 4;
+#endif
+  const uint16_t period = 0xFFFF;
   const uint8_t repetitionCounter = 1;
   const uint8_t ICFilter = 1;
   TIM1_DeInit();
 
-  TIM1_TimeBaseInit( T1_Prescaler, TIM1_COUNTERMODE_UP, T1_Period, repetitionCounter );
+  TIM1_TimeBaseInit( prescaler - 1 , TIM1_COUNTERMODE_UP, period, repetitionCounter );
 
   TIM1_ICInit(TIM1_CHANNEL_4,
               TIM1_ICPOLARITY_RISING,
