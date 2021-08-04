@@ -13,15 +13,43 @@
  * @{
  */
 /* Includes ------------------------------------------------------------------*/
+#include "stm8s_gpio.h"
 
 // app headers
-#include "system.h" // platform specific declarations
-
- // external declarations used internally
-#include "mcu_stm8s.h"
-#include "pwm_stm8s.h"
+#include "pwm_stm8s.h" // pwm timer channels
 
 /* Private defines -----------------------------------------------------------*/
+/**
+ * @brief GPIO macros for the /SD (enable) input pin to the half-bridge driver
+ * (PWM Timer channel pins need no such explicit GPIO initialization)
+ */
+// Phase A
+#define SDA_PORT  SDa_SD_PORT
+#define SDA_PIN   SDa_SD_PIN
+// Phase B
+#define SDB_PORT  SDb_SD_PORT
+#define SDB_PIN   SDb_SD_PIN
+// Phase C
+#define SDC_PORT  SDc_SD_PORT
+#define SDC_PIN   SDc_SD_PIN
+
+/**
+ * @brief Forward declarations of low-level term IO functions 
+ * Low-level access to support terminal IO on an available stm8s UART. Based on
+ * example code from SPL ... Project/STM8S_StdPeriph_Examples/UART/UART1_Printf/
+ * Macros for the prototypes were done evidently to support Raisonance compiler.
+ */
+#ifdef _RAISONANCE_
+#define PUTCHAR_PROTOTYPE int putchar (char c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#elif defined (_COSMIC_)
+#define PUTCHAR_PROTOTYPE char putchar (char c)
+#define GETCHAR_PROTOTYPE char getchar (void)
+#else /* _IAR_ */
+#define PUTCHAR_PROTOTYPE int putchar (int c)
+#define GETCHAR_PROTOTYPE int getchar (void)
+#endif /* _RAISONANCE_ */
+
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -30,38 +58,15 @@
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
-/*
-  * These functions retarget a few C library stdio function to the USART.
-  * Code was copied from the stm8s SPL USART examples
-  *
-  * Concerning getch():
-  * Works satisfactorily for its intended purpose, however, to me this one
-  * operates exactly like getch(), as opposed to getc(stdin).
-  *
-  * The difference between getc() and getchar() is getc() can read from any input
-  * stream, but getchar() reads from standard input. So getchar() is equivalent
-  * to getc(stdin).
-  *
-  * getch()is a nonstandard function and is present in conio.h header file (MS-DOS
-  * compilers like Turbo C). It is not part of the C standard library or ISO C,
-  * nor is it defined by POSIX.
-  * getch() reads a single character from the keyboard. But it does not use any
-  * buffer, so the entered character is immediately returned without waiting for
-  * the enter key.
-  *  https://www.geeksforgeeks.org/difference-getchar-getch-getc-getche/
-  *  https://www.geeksforgeeks.org/getch-function-in-c-with-examples/
-  *
-  * SerialKeyPressed() on the other hand, is intended to be non-blocking.
-  */
-/** @cond */ // Doxygen gets tripped up over the "prototype" macros
+
+/** @cond */
 
 #ifdef STM8S105 // S105 Dev board or DISCOVERY
 
 /**
-  * @brief Retargets the C library printf function to the UART.
+  * @brief Low-level character IO on the serial terminal
+  * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
   * @param c Character to send
-  * @details
-  * // Based on SPL UART example project
   * @retval char Character sent
   */
 PUTCHAR_PROTOTYPE
@@ -75,10 +80,10 @@ PUTCHAR_PROTOTYPE
 }
 
 /**
-  * @brief getch()-like funcction.
-  * @detail  See above.
+  * @brief Low-level character IO on the serial terminal
+  * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
   * @param None
-  * @retval char Character to Read
+  * @retval char Character to read
   */
 GETCHAR_PROTOTYPE
 {
@@ -95,11 +100,11 @@ GETCHAR_PROTOTYPE
 
 /**
 * @brief  Test to see if a key has been pressed on the terminal.
-*
-* @details Allows reading a character but non-blocking.
-* @param [out]  key  Pointer to byte for receiving character code.
-* @retval  1  a character has been read
-* @retval  0  no character has been read
+* @details Read a character non-blocking from serial terminal (c-n-p from STM8s 
+*   application note AN3259). 
+* @param [out] key Pointer to byte for receiving character code
+* @retval 1 a character has been read
+* @retval 0 no character has been read
 */
 uint8_t SerialKeyPressed(char *key)
 {
@@ -116,10 +121,9 @@ uint8_t SerialKeyPressed(char *key)
 }
 #else // stm8s003
 /**
-  * @brief Retargets the C library printf function to the UART.
+  * @brief Low-level character IO on the serial terminal
+  * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
   * @param c Character to send
-  * @details
-  * // Based on SPL UART example project
   * @retval char Character sent
   */
 PUTCHAR_PROTOTYPE
@@ -133,10 +137,10 @@ PUTCHAR_PROTOTYPE
 }
 
 /**
-  * @brief getch()-like funcction.
-	* @detail  See above.
-  * @param None
-  * @retval char Character to Read
+  * @brief Low-level character IO on the serial terminal
+  * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
+  * @param one
+  * @retval char Character to read
   */
 GETCHAR_PROTOTYPE
 {
@@ -154,7 +158,8 @@ GETCHAR_PROTOTYPE
 /**
 * @brief  Test to see if a key has been pressed on the terminal.
 *
-* @details Allows reading a character but non-blocking.
+* @details Read a character non-blocking from serial terminal (c-n-p from STM8s 
+*   application note AN3259). 
 * @param [out]  key  Pointer to byte for receiving character code.
 * @retval  1  a character has been read
 * @retval  0  no character has been read
@@ -326,7 +331,8 @@ static void ADC1_setup(void)
  * range of just of 0x0300 (exceeds the PWM resolution commanded to the motor).
  * The timer period is set to maximum and left free running and the capture-compare
  * channels 3 & 4 used to get leading and trailing edges of radio signal pulse.
- * THis is explained in STM8 Reference Manual RM0016.
+ * Refer to the timer peripheral description in the STM8s10x Reference Manual (RM0016) 
+ * for specific details of the CC functionality.
 */
 static void Servo_CC_setup(void)
 {
@@ -443,7 +449,7 @@ void MCU_set_comm_timer(uint16_t period)
 {
   TIM3->PSCR = TIM3_PSCR;
 
-  TIM3->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+  TIM3->ARRH = (uint8_t)(period >> 8); // be sure to set byte ARRH first, see data sheet
   TIM3->ARRL = (uint8_t)(period & 0xff);
 
   TIM3->IER |= TIM3_IER_UIE; // Enable Update Interrupt
@@ -455,7 +461,6 @@ void MCU_set_comm_timer(uint16_t period)
 
 /**
  * @brief Sets period of the commutation timer.
- * Prescaler value is set depending whether system is configured for 8 or 16 Mhz CPU clock.
  * @param  period  Value written to auto-reload register
  */
 #ifdef CLOCK_16
@@ -472,7 +477,7 @@ void MCU_set_comm_timer(uint16_t period)
   TIM1->PSCRH = (uint8_t)(TIM1_Prescaler >> 8);
   TIM1->PSCRL = (uint8_t)(TIM1_Prescaler);
 
-  TIM1->ARRH = (uint8_t)(period >> 8);   // be sure to set byte ARRH first, see data sheet
+  TIM1->ARRH = (uint8_t)(period >> 8); // be sure to set byte ARRH first, see data sheet
   TIM1->ARRL = (uint8_t)(period & 0xff);
 
   TIM1->IER |= TIM1_IER_UIE; // Enable Update Interrupt
@@ -576,7 +581,6 @@ void SPI_setup(void)
   SPI_Cmd(ENABLE);
 }
 #endif // SPI_ENABLE
-
 
 
 /**
