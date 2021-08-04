@@ -36,7 +36,7 @@
 // obstacle like a 3x5 index card.
 #if defined ( S105_DEV )
 //  Vcc==3.3v  33k/10k @ Vbatt==12.4v
-  #define V_SHUTDOWN_THR      0x02c0    // experimentally determined @ 12.4v
+  #define V_SHUTDOWN_THR      0x02C0    // experimentally determined @ 12.4v
 #else
   // applies presently only to the stm8s-Discovery, at 14.2v and ADCref == 5v
   #define V_SHUTDOWN_THR      0x02C0    // experimentally determined!
@@ -47,11 +47,14 @@
 
 /* Private function prototypes -----------------------------------------------*/
 
+// forward declarations for UI input handers
 static void timing_plus(void);
 static void timing_minus(void);
 static void spd_plus(void);
 static void spd_minus(void);
 static void m_stop(void);
+static void m_start(void);
+
 static void set_ctlm(void);
 
 
@@ -65,22 +68,20 @@ static void set_ctlm(void);
  */
 typedef void (*ui_handlrp_t)( void );
 
-// local enum only for setting enumerated order to UI event dispatcher
-enum
-{
-#ifdef ENABLE_MAN_TIMING
-  COMM_PLUS  = ']',
-  COMM_MINUS = '[',
-#endif
-  SPD_PLUS   = '.', //'>',
-  SPD_MINUS  = ',', //'<',
-  M_STOP     = ' '  // one space character
-};
-
 /**
  * @brief Data type for the key code lookup table.
  */
-typedef char ui_keycode_t;
+typedef enum
+{
+  COMM_PLUS   = ']',
+  COMM_MINUS  = '[',
+  M_STOP      = ' ', // space bar
+  M_START     = '/', // /
+  SPD_PLUS    = '.', // >
+  SPD_MINUS   = ',', // <
+  K_UNDEFINED = -1
+} 
+ui_keycode_t;
 
 /**
  * @brief Data type for the key handler table.
@@ -109,6 +110,9 @@ static uint8_t Log_Level;
 
 static  uint16_t Vsystem; // persistent for averaging
 
+/**
+ * @brief Lookup table for UI input handlers
+ */
 static const ui_key_handler_t ui_keyhandlers_tb[] =
 {
 #ifdef ENABLE_MAN_TIMING
@@ -117,7 +121,8 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
 #endif
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
-  {M_STOP,     m_stop}
+  {M_STOP,     m_stop},
+  {M_START,    m_start}	
 };
 
 // macros to help make the LUT slightly more encapsulated
@@ -162,11 +167,13 @@ static void dbg_println(int zrof)
   );
 }
 
-//$0768 - $044A  = $031E
 #define RF_PCNT_ZERO   0x044A
 #define RF_PCNT_100    0x0768
-#define RF_RANGE       (RF_PCNT_100 - RF_PCNT_ZERO) // 0x031E // hardcode range of pulse
+#define RF_RANGE       (RF_PCNT_100 - RF_PCNT_ZERO) // 0x031E==798
 #define RF_NORDO_THR   0x3000 // arbitrary 0x2BB0 -> 0x55C0 when receiving
+
+//#define ANLG_SLIDER
+
 /*
  * Service the slider and trim inputs for speed setting.
  * The UI Speed value is a uint8 and represents the adjustment range of e.g. a
@@ -181,11 +188,9 @@ static void set_ui_speed(void)
   uint16_t tmp_u16;
   int16_t tmp_s16;
 
-  uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
 #ifdef ANLG_SLIDER
+  uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
-#else
-  Analog_slider = 0;
 #endif
 
   UI_pulse_perd = Driver_get_pulse_perd();
@@ -208,7 +213,9 @@ static void set_ui_speed(void)
   UI_Speed = 0;
 
   tmp_s16 = Digital_trim_switch;
+#ifdef ANLG_SLIDER
   tmp_s16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
+#endif
 
   if (tmp_s16 > 0)
   {
@@ -239,7 +246,14 @@ static void timing_minus(void)
 #endif
 
 /*
- * stop key from terminal 
+ * motor start
+ */
+static void m_start(void)
+{
+}
+
+/*
+ * motor stop
  */
 static void m_stop(void)
 {
@@ -255,6 +269,9 @@ static void m_stop(void)
   dbg_println(1 /* clear line count */ );
 }
 
+/*
+ * motor speed up
+ */
 static void spd_plus(void)
 {
   // if fault/throttle-high ... diag msg?
@@ -264,6 +281,9 @@ static void spd_plus(void)
   }
 }
 
+/*
+ * motor speed down
+ */
 static void spd_minus(void)
 {
   // if fault/throttle-high ... diag msg?
@@ -274,11 +294,15 @@ static void spd_minus(void)
   }
 }
 
+/*
+ * handle terminal input - these are simple 1-key inputs for now
+ */
 static ui_handlrp_t handle_term_inp(void)
 {
   ui_handlrp_t fp = NULL;
   char key;
 
+// Uses non-blocking/non-buffered scan for key input similar to getch()
   if (SerialKeyPressed(&key))
   {
     int n;
