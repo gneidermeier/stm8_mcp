@@ -14,13 +14,9 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-
-#include <string.h>
-
 #include "mcu_stm8s.h"
 #include "bldc_sm.h"
 #include "per_task.h"
-
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -163,6 +159,9 @@ void Driver_on_capture_rise(void)
   prev_pulse_start_tm = curr_pulse_start_tm;
   curr_pulse_start_tm = get_pulse_start();
   Pulse_perd = curr_pulse_start_tm  - prev_pulse_start_tm;
+
+// set test pin
+//    GPIO_WriteHigh(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 }
 
 /**
@@ -170,10 +169,16 @@ void Driver_on_capture_rise(void)
  */
 void Driver_on_capture_fall(void)
 {
-// noise on this signal when motor running
-//    uint16_t t16 =  TIM1_GetCapture3() - TIM1_GetCapture4();
-//    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
-  Pulse_dur = get_pulse_end() - get_pulse_start();
+
+// noise on this signal when motor running?
+
+    uint16_t t16 = get_pulse_end() - curr_pulse_start_tm /* get_pulse_start() */;
+
+// apply exponential filter (simple moving average) to smoothe the signal
+    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
+
+// clear test pin
+//    GPIO_WriteLow(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 }
 
 /**
@@ -297,7 +302,7 @@ void Driver_Update(void)
     // refresh the timer with the updated commutation time period
     MCU_set_comm_timer( BL_get_timing() );
 
-#if 1
+#if 0
     /* Toggles LED to verify task timing */
     GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 #endif
