@@ -42,7 +42,63 @@
   #define V_SHUTDOWN_THR      0x02C0    // experimentally determined!
 #endif
 
-#define LOW_SPEED_THR       20     // turn off before low-speed low-voltage occurs
+
+
+/*
+ * Throttle control servo signal timings are measured with th Spektrum DX8 
+ * transmitter and AR620 6-channel air receiver. With the defailt frame rate
+ * setting, the rate is observed to be:
+ *
+ * The timer must be a 16-bit timer with the period set to maximum 0xFFFF and 
+ * remains as a free running timer with a maximum time of:
+ *
+ *   1/16Mhz * prescaler * 0xFFFF = 4.1ms * 8 ==  == 0.0327675  (32 ms)
+ *   1/16Mhz * prescaler = 1/16Mhz * 8 = 0.0000005 = 0.5uS/tick
+ *
+ *  The pulse period is measured on the scope at about 22 ms. Software observes 
+ *  a count of  $AC80 (44160d), converting to time:
+ * 
+ *    44160 * 0.5uS/tick = 22.08 ms  
+ *    1/22.08 ms = ~45Hz
+ */
+#define TCC_TICKS_PSEC       (0.5)
+#define TCC_LOW_STIK         (1104 * (1/TCC_TICKS_PSEC)) // $08A0
+//#define TCC_M_ARMED        (1152 * (1/TCC_TICKS_PSEC)) // $0900
+//#define TCC_M_STOP         (1192 * (1/TCC_TICKS_PSEC)) // $0950
+//#define TCC_M_START        (1200 * (1/TCC_TICKS_PSEC)) // $0960
+#define TCC_THRTTLE_100PCNT  (1890 * (1/TCC_TICKS_PSEC)) // $0EC4
+#define TCC_FULL_STIK        (1904 * (1/TCC_TICKS_PSEC)) // $0EE0
+/*
+ * With throttle proportional to pulse width, and the motor speed range (0%:100%)
+ * (PWM-DC) corresponsds to {0:100%) throttle (MAX_THRUST 
+ * servo pulse. M_START is at 10% of motor speed range, i.e. range of 
+ *
+ * (M_START:MAX_THRUST) would be 90% i.e (1890 - 1200) = 690
+ *  10% = 690 ms / 9 = 76.7 ms 
+ *
+ * i.e. 0 RPM correspond to ~1124 ms.
+ * 100% motor speed is signal range (1124:1890) = 767 mS
+ * 1% motor speed range = 7.67 ms.
+ * Speed % = (pulse width - TCC_0RPM) / (
+*/
+#define TCC_THRTTLE_10_PCNT  ( 690.0/9.0 + 0.5 ) // 76.7
+#define TCC_THRTTLE_0PCNT    \
+                   ( (1200 - TCC_THRTTLE_10_PCNT) * (1/TCC_TICKS_PSEC) ) // 8C5
+
+#define TCC_THRTTLE_RANGE    ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
+
+// convert to percent (must factor out a couple bits of integer scaling up front
+// to avoid overflow out of 16-bits
+#define TCC_THRTTLE_PCNT_SPD( __PULSE_WIDTH__ )  \
+( (100/4) * ( __PULSE_WIDTH__  - TCC_THRTTLE_0PCNT ) / (TCC_THRTTLE_RANGE / 4) )
+
+#define TCC_M_ARMED  TCC_THRTTLE_0PCNT // ?maybe
+
+#define TCC_GET_PULSE_DUR( __PULSE_TIME )  \
+                                 (uint16_t)( __PULSE_TIME - TCC_THRTTLE_0PCNT ) 
+
+
+//#define ANLG_SLIDER
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,11 +111,8 @@ static void spd_minus(void);
 static void m_stop(void);
 static void m_start(void);
 
-static void set_ctlm(void);
-
 
 /* Public variables  ---------------------------------------------------------*/
-
 
 /* Private types     ---------------------------------------------------------*/
 
@@ -96,9 +149,9 @@ ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t UI_pulse_dc;
-static uint16_t UI_pulse_perd;
-static uint16_t UI_pulse_dur;
+static uint16_t Servo_period;
+static uint16_t Servo_duration;
+static uint16_t Throttle_pcnt_speed;
 
 static uint16_t Analog_slider; // input var for 10-bit ADC conversions
 static uint8_t UI_Speed;       // speed setting (needs to be in terms of pcnt of servo position)
@@ -147,6 +200,8 @@ static void dbg_println(int zrof)
   uint16_t timing_error = Seq_get_timing_error();
   uint16_t comm_period = BL_get_timing();
 
+  Throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( Servo_duration );
+
   if ( 0 != zrof)
   {
     Line_Count = 0;
@@ -155,24 +210,19 @@ static void dbg_println(int zrof)
   Line_Count += 1;;
 
   printf(
-    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RC=%04X ERR=%04X \r\n",
+    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RCd=%04X RCp=%u ERR=%04X \r\n",
+//    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RCd=%04X ERR=%04X \r\n",
     Line_Count,
     ui_speed,
     comm_period,
     bl_speed,
     Vsystem,
     faults,
-    UI_pulse_dur,
+    Servo_duration,
+    Throttle_pcnt_speed,
     timing_error
   );
 }
-
-#define RF_PCNT_ZERO   0x044A
-#define RF_PCNT_100    0x0768
-#define RF_RANGE       (RF_PCNT_100 - RF_PCNT_ZERO) // 0x031E==798
-#define RF_NORDO_THR   0x3000 // arbitrary 0x2BB0 -> 0x55C0 when receiving
-
-//#define ANLG_SLIDER
 
 /*
  * Service the slider and trim inputs for speed setting.
@@ -193,20 +243,11 @@ static void set_ui_speed(void)
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 #endif
 
-  UI_pulse_perd = Driver_get_pulse_perd();
+  Servo_period = Driver_get_pulse_perd();
+  Servo_duration = Driver_get_pulse_dur();
 
-  UI_pulse_dur = Driver_get_pulse_dur();
-// lose 1 bit of precision here ....
-  tmp_u16 = ( UI_pulse_dur - RF_PCNT_ZERO ) >> 1;  //  /2
 
-//   scale factors ...     ( 1/2   +   1/2 )  /     (1/4)
-  UI_pulse_dc = (PWM_100PCNT>>1) * tmp_u16 / (RF_RANGE>>2);
-
-// if RF pulse qualified, then use it - needs more thought
-  if (UI_pulse_perd > RF_NORDO_THR)
-  {
-//	Analog_slider = UI_pulse_dc;
-  }
+// todo do something with servo input
 
 // careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
