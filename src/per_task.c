@@ -87,15 +87,23 @@
 
 #define TCC_THRTTLE_RANGE    ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
 
-// convert to percent (must factor out a couple bits of integer scaling up front
-// to avoid overflow out of 16-bits
+
+#define TCC_GET_PULSE_DUR( _PULSE_TIME_ )  \
+                                 (uint16_t)( _PULSE_TIME_ - TCC_THRTTLE_0PCNT ) 
+
+// todo: macro that retains the motor speed percent with at least 0.1% precision
+#define SPEED_PCNT_SCALE  16 
+
+/*
+ * convert to percent (must factor out a couple bits of integer scaling up front
+ * to avoid overflow out of 16-bits ... (1 / 4 == 0.25)
+*/
 #define TCC_THRTTLE_PCNT_SPD( __PULSE_WIDTH__ )  \
-( (100/4) * ( __PULSE_WIDTH__  - TCC_THRTTLE_0PCNT ) / (TCC_THRTTLE_RANGE / 4) )
+  (uint16_t)( ( SPEED_PCNT_SCALE * 100.0 / 4) * TCC_GET_PULSE_DUR( __PULSE_WIDTH__ )  \
+   / (TCC_THRTTLE_RANGE / 4) )
 
 #define TCC_M_ARMED  TCC_THRTTLE_0PCNT // ?maybe
 
-#define TCC_GET_PULSE_DUR( __PULSE_TIME )  \
-                                 (uint16_t)( __PULSE_TIME - TCC_THRTTLE_0PCNT ) 
 
 
 //#define ANLG_SLIDER
@@ -199,8 +207,9 @@ static void dbg_println(int zrof)
   uint16_t bl_speed = BL_get_speed(); 
   uint16_t timing_error = Seq_get_timing_error();
   uint16_t comm_period = BL_get_timing();
+  uint16_t display_speed_pcnt;
 
-  Throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( Servo_duration );
+  display_speed_pcnt = Throttle_pcnt_speed / SPEED_PCNT_SCALE;
 
   if ( 0 != zrof)
   {
@@ -219,7 +228,7 @@ static void dbg_println(int zrof)
     Vsystem,
     faults,
     Servo_duration,
-    Throttle_pcnt_speed,
+    display_speed_pcnt,
     timing_error
   );
 }
@@ -246,8 +255,12 @@ static void set_ui_speed(void)
   Servo_period = Driver_get_pulse_perd();
   Servo_duration = Driver_get_pulse_dur();
 
-
-// todo do something with servo input
+  if (Servo_duration > TCC_THRTTLE_0PCNT )
+  {
+    Throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( Servo_duration );
+  }
+// todo 
+// BL_set_speed( Throttle_pcnt_speed );
 
 // careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
