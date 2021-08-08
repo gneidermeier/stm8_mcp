@@ -43,69 +43,6 @@
 #endif
 
 
-
-/*
- * Throttle control servo signal timings are measured with th Spektrum DX8 
- * transmitter and AR620 6-channel air receiver. With the defailt frame rate
- * setting, the rate is observed to be:
- *
- * The timer must be a 16-bit timer with the period set to maximum 0xFFFF and 
- * remains as a free running timer with a maximum time of:
- *
- *   1/16Mhz * prescaler * 0xFFFF = 4.1ms * 8 ==  == 0.0327675  (32 ms)
- *   1/16Mhz * prescaler = 1/16Mhz * 8 = 0.0000005 = 0.5uS/tick
- *
- *  The pulse period is measured on the scope at about 22 ms. Software observes 
- *  a count of  $AC80 (44160d), converting to time:
- * 
- *    44160 * 0.5uS/tick = 22.08 ms  
- *    1/22.08 ms = ~45Hz
- */
-#define TCC_TICKS_PSEC       (0.5)
-#define TCC_LOW_STIK         (1104 * (1/TCC_TICKS_PSEC)) // $08A0
-//#define TCC_M_ARMED        (1152 * (1/TCC_TICKS_PSEC)) // $0900
-//#define TCC_M_STOP         (1192 * (1/TCC_TICKS_PSEC)) // $0950
-//#define TCC_M_START        (1200 * (1/TCC_TICKS_PSEC)) // $0960
-#define TCC_THRTTLE_100PCNT  (1890 * (1/TCC_TICKS_PSEC)) // $0EC4
-#define TCC_FULL_STIK        (1904 * (1/TCC_TICKS_PSEC)) // $0EE0
-/*
- * With throttle proportional to pulse width, and the motor speed range (0%:100%)
- * (PWM-DC) corresponsds to {0:100%) throttle (MAX_THRUST 
- * servo pulse. M_START is at 10% of motor speed range, i.e. range of 
- *
- * (M_START:MAX_THRUST) would be 90% i.e (1890 - 1200) = 690
- *  10% = 690 ms / 9 = 76.7 ms 
- *
- * i.e. 0 RPM correspond to ~1124 ms.
- * 100% motor speed is signal range (1124:1890) = 767 mS
- * 1% motor speed range = 7.67 ms.
- * Speed % = (pulse width - TCC_0RPM) / (
-*/
-#define TCC_THRTTLE_10_PCNT  ( 690.0/9.0 + 0.5 ) // 76.7
-#define TCC_THRTTLE_0PCNT    \
-                   ( (1200 - TCC_THRTTLE_10_PCNT) * (1/TCC_TICKS_PSEC) ) // 8C5
-
-#define TCC_THRTTLE_RANGE    ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
-
-
-#define TCC_GET_PULSE_DUR( _PULSE_TIME_ )  \
-                                 (uint16_t)( _PULSE_TIME_ - TCC_THRTTLE_0PCNT ) 
-
-// todo: macro that retains the motor speed percent with at least 0.1% precision
-#define SPEED_PCNT_SCALE  16 
-
-/*
- * convert to percent (must factor out a couple bits of integer scaling up front
- * to avoid overflow out of 16-bits ... (1 / 4 == 0.25)
-*/
-#define TCC_THRTTLE_PCNT_SPD( __PULSE_WIDTH__ )  \
-  (uint16_t)( ( SPEED_PCNT_SCALE * 100.0 / 4) * TCC_GET_PULSE_DUR( __PULSE_WIDTH__ )  \
-   / (TCC_THRTTLE_RANGE / 4) )
-
-#define TCC_M_ARMED  TCC_THRTTLE_0PCNT // ?maybe
-
-
-
 //#define ANLG_SLIDER
 
 
@@ -157,10 +94,6 @@ ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t Servo_period;
-static uint16_t Servo_duration;
-static uint16_t Throttle_pcnt_speed;
-
 static uint16_t Analog_slider; // input var for 10-bit ADC conversions
 static uint8_t UI_Speed;       // speed setting (needs to be in terms of pcnt of servo position)
 static int8_t Digital_trim_switch; // trim switches have + and - extents
@@ -207,9 +140,10 @@ static void dbg_println(int zrof)
   uint16_t bl_speed = BL_get_speed(); 
   uint16_t timing_error = Seq_get_timing_error();
   uint16_t comm_period = BL_get_timing();
-  uint16_t display_speed_pcnt;
-
-  display_speed_pcnt = Throttle_pcnt_speed / SPEED_PCNT_SCALE;
+  uint16_t servo_pulse_period = Driver_get_pulse_perd();
+  uint16_t servo_pulse_duration = Driver_get_pulse_dur();
+  uint16_t display_speed_pcnt = 
+	   (uint16_t)( Driver_get_motor_spd_pcnt() / SPEED_PCNT_SCALE );
 
   if ( 0 != zrof)
   {
@@ -227,7 +161,7 @@ static void dbg_println(int zrof)
     bl_speed,
     Vsystem,
     faults,
-    Servo_duration,
+    servo_pulse_duration,
     display_speed_pcnt,
     timing_error
   );
@@ -240,7 +174,11 @@ static void dbg_println(int zrof)
  * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where
  * is expected to be rescaled to suite the range/precision required for PWM timer.
  *
- * TODO: rate limit of speed input!
+ * Update the PWM/speed. Done here because in the UI is where user vs. dev mode 
+ * is set, so the logic to gate either the servo signal or the remote-UI input 
+ * to the motor-speed setting. Also possibility of analog slider. Since pertask
+ * is updating at 60Hz, it is adequate and in fact obviously faster frame-rate 
+ * than the RC radio standard (45-50Hz).
  */
 static void set_ui_speed(void)
 {
@@ -251,7 +189,7 @@ static void set_ui_speed(void)
   uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 #endif
-
+#if 0
   Servo_period = Driver_get_pulse_perd();
   Servo_duration = Driver_get_pulse_dur();
 
@@ -261,7 +199,7 @@ static void set_ui_speed(void)
   }
 // todo 
 // BL_set_speed( Throttle_pcnt_speed );
-
+#endif
 // careful with expression containing signed int ... UI Speed is defaulted
 // to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
   UI_Speed = 0;
@@ -280,6 +218,7 @@ static void set_ui_speed(void)
     }
 
     UI_Speed = (uint8_t)tmp_s16;
+    BL_set_speed(UI_Speed);
   }
 }
 
@@ -398,8 +337,6 @@ static void Periodic_task(void)
 
   // update the UI speed input slider+trim
   set_ui_speed();
-
-  BL_set_speed(UI_Speed);
 
   bl_state = BL_get_state();
 

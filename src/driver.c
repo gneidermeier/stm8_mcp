@@ -18,7 +18,22 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 
+#include "driver.h"
+
 /* Private defines -----------------------------------------------------------*/
+
+#define TCC_THRTTLE_RANGE    ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
+
+#define TCC_GET_PULSE_DUR( _PULSE_TIME_ )  \
+                                 (uint16_t)( _PULSE_TIME_ - TCC_THRTTLE_0PCNT ) 
+/*
+ * convert to percent (must factor out a couple bits of integer scaling up front
+ * to avoid overflow out of 16-bits ... (1 / 4 == 0.25)
+*/
+#define TCC_THRTTLE_PCNT_SPD( __PULSE_WIDTH__ )  \
+  (uint16_t)( ( SPEED_PCNT_SCALE * 100.0 / 4.0) * TCC_GET_PULSE_DUR( __PULSE_WIDTH__ ) \
+            / ( TCC_THRTTLE_RANGE / 4.0 ) )
+
 
 //#define PH0_ADC_TBUF_SZ  8
 
@@ -65,15 +80,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-// global for getting
 static uint16_t ADC_Global;
 
 // Accummulates a string of 10-bit ADC samples for averaging - could reduce
 // to 8 bits as possibly the 2 lsb's are not that significant anyway.
 //static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
-
 //static uint8_t  ph0_adc_tbct;
-
 //static uint16_t phase_average;
 
 static uint16_t prev_pulse_start_tm;
@@ -197,6 +209,30 @@ uint16_t Driver_get_pulse_dur(void)
   return Pulse_dur;
 }
 
+/**
+ * @brief converts servo pulse width to motor speed percent
+ * @details Commanded motor speed is derived from proportional servo pulse.
+ *  Motor speed is to be at least 0.1% i.e integer scale factor of 16 provides 
+ *  precision of 0.0625% (per bit). 
+ *  Note: it is possible that the industry requirement for PWM resolution might 
+ *  be 1024 steps - however, that could be a bit of a challenge with 16-bit 
+ *  word size.
+ * @return Motor speed percent scaled to SPEED PCNT SCALE.
+ */
+uint16_t Driver_get_motor_spd_pcnt(void)
+{
+  uint16_t throttle_pcnt_speed = 0;
+  uint16_t servo_period = Driver_get_pulse_perd();
+  uint16_t servo_duration = Driver_get_pulse_dur();
+
+  if (servo_duration > TCC_THRTTLE_0PCNT )
+  {
+    // returns motor speed scaled to SPEED PCNT SCALE 
+    throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( servo_duration );
+  }
+
+  return throttle_pcnt_speed;
+}
 
 /**
  * @brief  Hook for synchronizing to the PWM pulse.
