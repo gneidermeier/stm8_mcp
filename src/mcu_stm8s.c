@@ -366,16 +366,16 @@ static void ADC1_setup(void)
 static void Servo_CC_setup(void)
 {
  #ifdef CLOCK_16
-  const uint16_t prescaler = TIM2_PRESCALER_8;
+  const TIM2_Prescaler_TypeDef prescaler = TIM2_PRESCALER_8;
 #else
-  const uint16_t prescaler = TIM2_PRESCALER_4;
+  const TIM2_Prescaler_TypeDef prescaler = TIM2_PRESCALER_4;
 #endif
   const uint16_t period = 0xFFFF;
   const uint8_t ICFilter = 1;
 
   TIM2_DeInit();
 
-// The counter clock frequency fCK_CNT is equal to fCK_PSC / 2(PSC[3:0])
+// The counter clock frequency fCK_CNT is equal to fCK_PSC / (2^(PSC[3:0]))
   TIM2_TimeBaseInit( prescaler, period);
 
   TIM2_ICInit(TIM2_CHANNEL_1,
