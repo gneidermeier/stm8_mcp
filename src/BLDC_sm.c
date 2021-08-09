@@ -90,7 +90,7 @@ BL_State_T;
 /* Private variables ---------------------------------------------------------*/
 
 static uint16_t BL_comm_period; // persistent value of ramp timing
-static uint16_t BL_pwm_period; // input from UI - made static global for access in ISR thread
+static uint16_t BL_motor_speed; // input from UI - made static global for access in ISR thread
 static uint16_t BL_optimer; // allows for timed op state (e.g. alignment)
 static BL_State_T BL_opstate; // BL operation state
 
@@ -142,7 +142,7 @@ static uint16_t timing_ramp_control(uint16_t setpoint, uint16_t target)
 static void BL_stop(void)
 {
 // have to clear the local UI_speed since that is the transition OFF->RAMP condition
-  BL_pwm_period = 0;
+  BL_motor_speed = 0;
 
   // kill the driver signals
   All_phase_stop();
@@ -188,19 +188,33 @@ void BL_reset(void)
  * @param dc Speed input which can be in the range [0:255]
  *            TODO: needs to be in terms of percent of speed range (0:100)
  */
-void BL_set_speed(uint8_t ui_speed)
+void BL_set_speed(uint16_t ui_motor_speed)
 {
-  /*
-   * todo: convert speed (percent throttle) to PWM period (derived from PWM % duty-cycle) 
-   */
-  uint16_t ui_pwm_perd = (uint16_t) ui_speed;
+  const uint16_t startup = (uint16_t)TCC_MOTOR_STARTUP;
+  const uint16_t shutoff = (uint16_t)TCC_MOTOR_SHUTOFF;
+
+  uint16_t ui_pwm_perd = (uint16_t) ui_motor_speed;
+
+// todo
+  if ( ( ui_motor_speed > TCC_MOTOR_SHUTOFF ) 
+    && ( ui_motor_speed > TCC_MOTOR_STARTUP || 0 != BL_motor_speed ) )
+  {
+    BL_motor_speed = ui_motor_speed;
+  }
+/*
+  else
+  {
+    // commanded speed less than low limit so reset - has to ramp again to get started.
+    BL_reset();
+  }	
+  */
 
   if( ui_pwm_perd > PWM_PD_SHUTOFF )
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if( ui_pwm_perd > PWM_PD_STARTUP || 0 != BL_pwm_period  /* if Control_mode != STOPPED */ )
+    if( ui_pwm_perd > PWM_PD_STARTUP || 0 != BL_motor_speed  /* if Control_mode != STOPPED */ )
     {
-      BL_pwm_period = ui_pwm_perd;
+      BL_motor_speed = ui_pwm_perd;
     }
   }
   else
@@ -217,7 +231,7 @@ void BL_set_speed(uint8_t ui_speed)
  */
 uint16_t BL_get_speed(void)
 {
-  return BL_pwm_period;
+  return BL_motor_speed;
 }
 
 /**
@@ -270,7 +284,7 @@ void BL_set_timing(uint16_t u16)
  */
 BL_RUNSTATE_t BL_get_state(void)
 {
-  if (BL_pwm_period > PWM_PD_SHUTOFF )
+  if ( BL_motor_speed > PWM_PD_SHUTOFF )
   {
     return BL_IS_RUNNING;
   }
@@ -317,11 +331,11 @@ void BL_State_Ctrl(void)
   }
   else
   {
-    inp_dutycycle = BL_pwm_period; // set pwm period from UI
+    inp_dutycycle = BL_motor_speed; // set pwm period from UI
 
     if( BL_STOPPED == BL_get_opstate() )
     {
-      if (BL_pwm_period > 0)
+      if (BL_motor_speed > 0)
       {
         BL_set_opstate( BL_ALIGN ); // state-transition
         BL_optimer = BL_TIME_ALIGN;

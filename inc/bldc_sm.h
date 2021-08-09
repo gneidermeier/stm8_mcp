@@ -52,7 +52,7 @@ uint8_t BL_get_opstate(void);
 void BL_timing_step_slower(void);
 void BL_timing_step_faster(void);
 
-void BL_set_speed(uint8_t dc);
+void BL_set_speed(uint16_t dc);
 uint16_t BL_get_speed(void);
 
 void BL_reset(void);

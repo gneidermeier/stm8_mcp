@@ -94,9 +94,7 @@ ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t Analog_slider; // input var for 10-bit ADC conversions
-static uint8_t UI_Speed;       // speed setting (needs to be in terms of pcnt of servo position)
-static int8_t Digital_trim_switch; // trim switches have + and - extents
+static uint16_t UI_Speed;  // motor percent speed input from servo or remote UI 
 
 static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
 
@@ -169,57 +167,25 @@ static void dbg_println(int zrof)
 
 /*
  * Service the slider and trim inputs for speed setting.
- * The UI Speed value is a uint8 and represents the adjustment range of e.g. a
- * proportional RC radio control signal (eventually), and alternatively the
- * slider-pot (the developer h/w) - the UI Speed is passed to PWMDC_set() where
- * is expected to be rescaled to suite the range/precision required for PWM timer.
- *
- * Update the PWM/speed. Done here because in the UI is where user vs. dev mode 
- * is set, so the logic to gate either the servo signal or the remote-UI input 
- * to the motor-speed setting. Also possibility of analog slider. Since pertask
- * is updating at 60Hz, it is adequate and in fact obviously faster frame-rate 
- * than the RC radio standard (45-50Hz).
+ * The UI Speed value represents the percent of motor speed i.e. (0% : 100%), 
+ * which would be proportional to RC radio control servo signal. It is expected 
+ * this should have a precision of at least 0.1% as these days the standard 
+ * is likely 1024 steps PWM. The scale factor of 16 is factored into the percent
+ * motor speed related variables and once passed to BL_Set_speed(), will be recaled
+ * to fit the appropriate PWM timer scaling at e.g. 12 kHz. 
+ * The standard RC framerate is 50 Hz or 20 mS. With pertask is updating at 60Hz, 
+ * then the timely response of the system should be assured. 
  */
-static void set_ui_speed(void)
+static void ui_set_motor_spd(uint16_t pcnt_motor_speed)
 {
   uint16_t tmp_u16;
-  int16_t tmp_s16;
 
 #ifdef ANLG_SLIDER
   uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 #endif
-#if 0
-  Servo_period = Driver_get_pulse_perd();
-  Servo_duration = Driver_get_pulse_dur();
 
-  if (Servo_duration > TCC_THRTTLE_0PCNT )
-  {
-    Throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( Servo_duration );
-  }
-// todo 
-// BL_set_speed( Throttle_pcnt_speed );
-#endif
-// careful with expression containing signed int ... UI Speed is defaulted
-// to 0 and only assign from temp sum if positive and clip to INT8 MAX S8.
-  UI_Speed = 0;
-
-  tmp_s16 = Digital_trim_switch;
-#ifdef ANLG_SLIDER
-  tmp_s16 += Analog_slider; // comment out to disable analog slider (throttle hi protection is WIPO)
-#endif
-
-  if (tmp_s16 > 0)
-  {
-    // clip to INT8 MAX S8
-    if (tmp_s16 > U8_MAX)    //  TODO: limit should equate to 100% servo position (motor will die first!)
-    {
-      tmp_s16 = U8_MAX;
-    }
-
-    UI_Speed = (uint8_t)tmp_s16;
-    BL_set_speed(UI_Speed);
-  }
+    BL_set_speed( pcnt_motor_speed );
 }
 
 /*
@@ -253,8 +219,7 @@ static void m_stop(void)
   // reset the machine
   BL_reset();
 
-  // reset the simulated trim swich between system runs
-  Digital_trim_switch = TRIM_DEFAULT;
+  UI_Speed = 0;
 
   printf("###\r\n");
 
@@ -267,10 +232,15 @@ static void m_stop(void)
  */
 static void spd_plus(void)
 {
+  const uint16_t spd_pcnt_scale = (uint16_t)SPEED_PCNT_SCALE;
+  const uint16_t half_pcnt = (uint16_t)(0.5 * spd_pcnt_scale); 
+
+//  UI_pcnt_motor_spd += (uint16_t)half_pcnt;
+
   // if fault/throttle-high ... diag msg?
-  if (Digital_trim_switch < S8_MAX)
+//  if (UI_Speed < S8_MAX)
   {
-    Digital_trim_switch += 1;
+    UI_Speed += 1;
   }
 }
 
@@ -279,10 +249,16 @@ static void spd_plus(void)
  */
 static void spd_minus(void)
 {
+  const uint16_t spd_pcnt_scale = (uint16_t)SPEED_PCNT_SCALE;
+  const uint16_t half_pcnt = (uint16_t)(0.5 * spd_pcnt_scale); 
+
+//  UI_pcnt_motor_spd -= (uint16_t)half_pcnt;
+
+
   // if fault/throttle-high ... diag msg?
-  if (Digital_trim_switch > S8_MIN)
+  if (UI_Speed > 0)
   {
-    Digital_trim_switch -= 1;
+    UI_Speed -= 1;
     Log_Level = 1;
   }
 }
@@ -325,7 +301,11 @@ static void Periodic_task(void)
 {
   BL_RUNSTATE_t bl_state;
 
-// invoke the terminal input and ui speed subs, updates from their globals to occur in the CS
+// invoke the terminal input and ui speed subs, 
+// If there is a valid key input, a function pointer to the input handler is 
+// returned. This is done prior to entering a Critical Section (DI/EI) in which
+// it will then be safe to invoke the input handler function (e.g. can call 
+// subfunctions that may be messing with global variables e.g. motor speed etc.
   ui_handlrp_t fp = handle_term_inp();
 
   disableInterrupts();  //////////////// DI
@@ -335,8 +315,8 @@ static void Periodic_task(void)
     fp();
   }
 
-  // update the UI speed input slider+trim
-  set_ui_speed();
+  // passes the UI percent motor speed to the BL controller
+  ui_set_motor_spd( UI_Speed );
 
   bl_state = BL_get_state();
 

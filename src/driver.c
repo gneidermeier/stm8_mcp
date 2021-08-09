@@ -18,11 +18,9 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 
-#include "driver.h"
+#include "pwm_stm8s.h"
 
 /* Private defines -----------------------------------------------------------*/
-
-#define TCC_THRTTLE_RANGE    ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
 
 #define TCC_GET_PULSE_DUR( _PULSE_TIME_ )  \
                                  (uint16_t)( _PULSE_TIME_ - TCC_THRTTLE_0PCNT ) 

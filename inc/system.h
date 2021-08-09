@@ -140,6 +140,10 @@
 #define CTIME_SCALAR 1
 
 
+// motor speed percent is scaled to provide at leat 0.1% precision (per count)
+#define SPEED_PCNT_SCALE  16.0 
+
+
 /*
  * (un)comment macro to set PWM 8 Khz or ?
  */
