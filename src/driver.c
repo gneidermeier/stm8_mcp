@@ -22,15 +22,31 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define TCC_GET_PULSE_DUR( _PULSE_TIME_ )  \
-                                 (uint16_t)( _PULSE_TIME_ - TCC_THRTTLE_0PCNT ) 
-/*
- * convert to percent (must factor out a couple bits of integer scaling up front
- * to avoid overflow out of 16-bits ... (1 / 4 == 0.25)
-*/
-#define TCC_THRTTLE_PCNT_SPD( __PULSE_WIDTH__ )  \
-  (uint16_t)( ( SPEED_PCNT_SCALE * 100.0 / 4.0) * TCC_GET_PULSE_DUR( __PULSE_WIDTH__ ) \
-            / ( TCC_THRTTLE_RANGE / 4.0 ) )
+
+/**
+  * @brief convert throttle position timer-counts to percent motor speed
+  *
+  *   speed % = 100 % * throttle_position_counts / throttle_range_counts
+  *
+  * Range of throttle position timer counts is approx. (0:1600)
+  *
+  *   1/1600 == 0.000625 which would give the pwm step a bit more precision than 
+  * needed (most ESCs are probably providing 1024 steps of pwm resolution.
+  *
+  * Constant terms are typically grouped to put as much of the calculation in 
+  * the preprocesor as possible (including the division of factor of 4, enough
+  *	to prevent any intermediate result from overflowing out of uint16).
+  */
+
+#define _THROTTLE_POSITION_COUNT( _PULSE_TIMER_COUNTS_ )  \
+                         (uint16_t)( _PULSE_TIMER_COUNTS_ - TCC_THRTTLE_0PCNT )
+
+#define _100_PCNT        ( 100.0 / 4 )
+#define THROTTLE_RANGE   ( TCC_THRTTLE_RANGE / 4 )
+
+#define _MOTOR_PERCENT_SPEED( _THRTTLE_POSN_CNT_ )  \
+  (uint16_t)                                        \
+    ( ( SPEED_PCNT_SCALE * _100_PCNT ) * _THRTTLE_POSN_CNT_ / THROTTLE_RANGE )
 
 
 //#define PH0_ADC_TBUF_SZ  8
@@ -219,17 +235,19 @@ uint16_t Driver_get_pulse_dur(void)
  */
 uint16_t Driver_get_motor_spd_pcnt(void)
 {
-  uint16_t throttle_pcnt_speed = 0;
-  uint16_t servo_period = Driver_get_pulse_perd();
-  uint16_t servo_duration = Driver_get_pulse_dur();
+  uint16_t motor_pcnt_speed = 0;
+  uint16_t pulse_period_count = Driver_get_pulse_perd();
+  uint16_t pulse_duration_count = Driver_get_pulse_dur();
 
-  if (servo_duration > TCC_THRTTLE_0PCNT )
+  if (pulse_duration_count > TCC_THRTTLE_0PCNT)
   {
-    // returns motor speed scaled to SPEED PCNT SCALE 
-    throttle_pcnt_speed = (uint16_t )TCC_THRTTLE_PCNT_SPD( servo_duration );
-  }
+    uint16_t thr_posn_cnt = 
+      (uint16_t )_THROTTLE_POSITION_COUNT( pulse_duration_count );
 
-  return throttle_pcnt_speed;
+    // returns motor speed scaled to SPEED PCNT SCALE
+    motor_pcnt_speed =  (uint16_t )_MOTOR_PERCENT_SPEED( thr_posn_cnt );
+  }
+  return motor_pcnt_speed;
 }
 
 /**
