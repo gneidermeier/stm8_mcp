@@ -41,12 +41,6 @@
 #define _THROTTLE_POSITION_COUNT( _PULSE_TIMER_COUNTS_ )  \
                          (uint16_t)( _PULSE_TIMER_COUNTS_ - TCC_THRTTLE_0PCNT )
 
-#define _100_PCNT        ( 100.0 / 4 )
-#define THROTTLE_RANGE   ( TCC_THRTTLE_RANGE / 4 )
-
-#define _MOTOR_PERCENT_SPEED( _THRTTLE_POSN_CNT_ )  \
-  (uint16_t)                                        \
-    ( ( SPEED_PCNT_SCALE * _100_PCNT ) * _THRTTLE_POSN_CNT_ / THROTTLE_RANGE )
 
 
 //#define PH0_ADC_TBUF_SZ  8
@@ -244,8 +238,10 @@ uint16_t Driver_get_motor_spd_pcnt(void)
     uint16_t thr_posn_cnt = 
       (uint16_t )_THROTTLE_POSITION_COUNT( pulse_duration_count );
 
-    // returns motor speed scaled to SPEED PCNT SCALE
-    motor_pcnt_speed =  (uint16_t )_MOTOR_PERCENT_SPEED( thr_posn_cnt );
+// PWM percent duty-cycle is only for display purpose so some loss of precision 
+// is ok here and necessary to prevent overflow out of 16-bit unsigned
+    motor_pcnt_speed  = 
+      (uint16_t )( (100.0 / 4) * thr_posn_cnt) / (TCC_THRTTLE_RANGE / 4);
   }
   return motor_pcnt_speed;
 }
