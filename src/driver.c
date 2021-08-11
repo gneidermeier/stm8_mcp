@@ -17,31 +17,9 @@
 #include "mcu_stm8s.h"
 #include "bldc_sm.h"
 #include "per_task.h"
-
 #include "pwm_stm8s.h"
 
 /* Private defines -----------------------------------------------------------*/
-
-
-/**
-  * @brief convert throttle position timer-counts to percent motor speed
-  *
-  *   speed % = 100 % * throttle_position_counts / throttle_range_counts
-  *
-  * Range of throttle position timer counts is approx. (0:1600)
-  *
-  *   1/1600 == 0.000625 which would give the pwm step a bit more precision than 
-  * needed (most ESCs are probably providing 1024 steps of pwm resolution.
-  *
-  * Constant terms are typically grouped to put as much of the calculation in 
-  * the preprocesor as possible (including the division of factor of 4, enough
-  *	to prevent any intermediate result from overflowing out of uint16).
-  */
-
-#define _THROTTLE_POSITION_COUNT( _PULSE_TIMER_COUNTS_ )  \
-                         (uint16_t)( _PULSE_TIMER_COUNTS_ - TCC_THRTTLE_0PCNT )
-
-
 
 //#define PH0_ADC_TBUF_SZ  8
 
@@ -226,13 +204,10 @@ uint16_t Driver_get_pulse_dur(void)
  */
 uint16_t Driver_get_servo_position_counts(void)
 {
-  uint16_t pulse_duration_count = Driver_get_pulse_dur();
-  uint16_t thr_posn_cnt = 0;
+  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
+  uint16_t thr_posn_cnt = 
+												PWM_get_servo_position_counts( pulse_duration_counts );
 
-  if (pulse_duration_count > TCC_THRTTLE_0PCNT)
-  {
-    thr_posn_cnt = (uint16_t )_THROTTLE_POSITION_COUNT( pulse_duration_count );
-}
   return thr_posn_cnt;
 }
 
@@ -245,15 +220,13 @@ uint16_t Driver_get_servo_position_counts(void)
 uint16_t Driver_get_motor_spd_pcnt(void)
 {
   uint16_t motor_pcnt_speed = 0;
-  uint16_t pulse_period_count = Driver_get_pulse_perd();
-  uint16_t pulse_duration_count = Driver_get_pulse_dur();
-
-  uint16_t thr_posn_cnt = Driver_get_servo_position_counts();
+  uint16_t pulse_period_counts = Driver_get_pulse_perd();
+  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
 
 // PWM percent duty-cycle is only for display purpose so some loss of precision 
 // is ok here and necessary to prevent overflow out of 16-bit unsigned
-  motor_pcnt_speed  = 
-        (uint16_t )( ( (100.0 / 4) * thr_posn_cnt) / (TCC_THRTTLE_RANGE / 4) );
+  motor_pcnt_speed  = PWM_get_motor_spd_pcnt(
+																		pulse_period_counts, pulse_duration_counts);
 
   return motor_pcnt_speed;
 }

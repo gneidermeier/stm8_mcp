@@ -25,15 +25,6 @@
 // if this is defined, stays in aligment state w/ 0 PWM
 //#define TEST_ALIGNMENT
 
-/**
- * @brief Compute PWM timer period from percent duty-cycle
- *
- * @details Should be PWM_PCNT_TO_PERIOD or something like that.
- *
- * @note 100 percent PWM time:
- *   fMaster * timer_prescaler * 250 counts = (1/16Mhz) * 8 * 250 -> 0.000125 S
- */
-#define PWM_X_PCNT( _PCNT_ )   (uint16_t)( ( _PCNT_ * PWM_100PCNT ) / 100.0 )
 
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
@@ -43,27 +34,27 @@
 #define PWM_DC_STARTUP   14.4
 #define PWM_DC_SHUTOFF    7.2 // stalls if slower
 
-#define PWM_PD_ALIGN     PWM_X_PCNT( PWM_DC_ALIGN )
-#define PWM_PD_RAMPUP    PWM_X_PCNT( PWM_DC_RAMPUP )
-#define PWM_PD_STARTUP   PWM_X_PCNT( PWM_DC_STARTUP )
-#define PWM_PD_SHUTOFF   PWM_X_PCNT( PWM_DC_SHUTOFF )
+// define pwm pulse times for operation states 
+#define PWM_PD_ALIGN     PWM_GET_PULSE_COUNTS( PWM_DC_ALIGN )
+#define PWM_PD_RAMPUP    PWM_GET_PULSE_COUNTS( PWM_DC_RAMPUP )
+#define PWM_PD_STARTUP   PWM_GET_PULSE_COUNTS( PWM_DC_STARTUP )
+#define PWM_PD_SHUTOFF   PWM_GET_PULSE_COUNTS( PWM_DC_SHUTOFF )
 
-
-/**
- * @brief Scale Factor in commutation timing constant terms
- * @details
- *  All related timing constant terms have Time Scale factored into them. Time 
- *  Scale would be set (#defined) to 1.0 if additional scaling is not needed. 
- */
  
  // commutation period at start of ramp (est. @ 12v) - exp. det.
 #define BL_CT_RAMP_START  (5632.0 * CTIME_SCALAR) // $1600
 
-// Integer ramp step (per control-frame) is derived from control rate. 
-// Ramp could probably faster if there was an alignment step starting off.
+/**
+ * @brief Control rate scalar
+ * @details Scale factor relating the commutation-timing ramp data and variables
+ *     with the control task rate
+ */
+#define CTRL_RATEM  4
+
+// The control-frame rate becomes factored into the integer ramp-step
 #define BL_ONE_RAMP_UNIT  (1.5 * CTRL_RATEM * CTIME_SCALAR)
 
-// how long the alignment step should last
+// length of alignment step (experimentally determined w/ 1100kv @12.5v)
 #define BL_TIME_ALIGN  (200 * 1) // N frames @ 1 ms / frame
 
 
@@ -90,7 +81,7 @@ BL_State_T;
 /* Private variables ---------------------------------------------------------*/
 
 static uint16_t BL_comm_period; // persistent value of ramp timing
-static uint16_t BL_motor_speed; // input from UI - made static global for access in ISR thread
+static uint16_t BL_motor_speed; // persistent value of motor speed
 static uint16_t BL_optimer; // allows for timed op state (e.g. alignment)
 static BL_State_T BL_opstate; // BL operation state
 
@@ -188,33 +179,14 @@ void BL_reset(void)
  * @param dc Speed input which can be in the range [0:255]
  *            TODO: needs to be in terms of percent of speed range (0:100)
  */
-void BL_set_speed(uint16_t ui_motor_speed)
+void BL_set_speed(uint16_t ui_mspeed_counts)
 {
-  const uint16_t startup = (uint16_t)TCC_MOTOR_STARTUP;
-  const uint16_t shutoff = (uint16_t)TCC_MOTOR_SHUTOFF;
-
-  uint16_t ui_pwm_perd = (uint16_t) ui_motor_speed;
-
-// todo
-  if ( ( ui_motor_speed > TCC_MOTOR_SHUTOFF ) 
-    && ( ui_motor_speed > TCC_MOTOR_STARTUP || 0 != BL_motor_speed ) )
-  {
-    BL_motor_speed = ui_motor_speed;
-  }
-/*
-  else
-  {
-    // commanded speed less than low limit so reset - has to ramp again to get started.
-    BL_reset();
-  }	
-  */
-
-  if( ui_pwm_perd > PWM_PD_SHUTOFF )
+  if( ui_mspeed_counts > PWM_PD_SHUTOFF )
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if( ui_pwm_perd > PWM_PD_STARTUP || 0 != BL_motor_speed  /* if Control_mode != STOPPED */ )
+    if( ui_mspeed_counts > PWM_PD_STARTUP || 0 != BL_motor_speed  /* if Control_mode != STOPPED */ )
     {
-      BL_motor_speed = ui_pwm_perd;
+      BL_motor_speed = ui_mspeed_counts;
     }
   }
   else
@@ -335,7 +307,7 @@ void BL_State_Ctrl(void)
 
     if( BL_STOPPED == BL_get_opstate() )
     {
-      if (BL_motor_speed > 0)
+      if (inp_dutycycle > 0)
       {
         BL_set_opstate( BL_ALIGN ); // state-transition
         BL_optimer = BL_TIME_ALIGN;
@@ -419,7 +391,7 @@ void BL_State_Ctrl(void)
   }
 
   // pwm duty-cycle will be upated to the timer peripheral at next commutation step.
-  set_dutycycle( inp_dutycycle );
+  PWM_set_dutycycle( inp_dutycycle );
 }
 
 /**

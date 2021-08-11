@@ -19,6 +19,40 @@
 /* Public defines -----------------------------------------------------------*/
 
 /*
+ * (un)comment macro to set PWM 8 Khz or ?
+ */
+#define PWM_8K
+
+
+// 1/8000  = 0.000125 = 12.5 * 10^(-5)
+// 1/12000 = 0.000083 = 8.3 * 10^(-5)
+
+// With TIM2 prescale value of 1, period TIM2 == period fMaster
+// @8Mhz, fMASTER period == 0.000000125 S
+// fMASTER * TIM1_PS = 0.125us * 4 = 0.5us
+
+// @8k:
+//  0.000125 / 0.5 us = 250 counts
+
+// @12k:
+//  0.000083 / 0.5 us  = 166.67 counts
+
+#ifdef PWM_8K
+  #define PWM_PERIOD_CNTS    250   // 125uS
+#else // 12kHz
+  #define PWM_PERIOD_CNTS    166   //  83uS
+#endif
+
+#define  PWM_100_PCNT  PWM_PERIOD_CNTS
+
+/**
+ * @brief Compute PWM timer period from percent duty-cycle
+ */
+#define PWM_GET_PULSE_COUNTS( _PCNT_ ) \
+                   (uint16_t)( ( _PCNT_ * PWM_PERIOD_CNTS ) / 100.0 )
+
+
+/*
  * Throttle control servo signal timings are measured with th Spektrum DX8 
  * transmitter and AR620 6-channel air receiver. With the defailt frame rate
  * setting, the rate is observed to be:
@@ -35,13 +69,13 @@
  *    44160 * 0.5uS/tick = 22.08 ms  
  *    1/22.08 ms = ~45Hz
  */
-#define TCC_TICKS_PSEC       (0.5)
-#define TCC_LOW_STIK         (1104.0 * (1.0 / TCC_TICKS_PSEC)) // $08A0
-//#define TCC_M_ARMED        (1152.0 * (1.0 / TCC_TICKS_PSEC)) // $0900
-//#define TCC_M_STOP         (1192.0 * (1.0 / TCC_TICKS_PSEC)) // $0950
-//#define TCC_M_START        (1200.0 * (1.0 / TCC_TICKS_PSEC)) // $0960
-#define TCC_THRTTLE_100PCNT  (1890.0 * (1.0 / TCC_TICKS_PSEC)) // $0EC4
-#define TCC_FULL_STIK        (1904.0 * (1.0 / TCC_TICKS_PSEC)) // $0EE0
+#define TCC_TICK_TIME_MSEC   (0.5)
+#define TCC_LOW_STIK         (1104.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $08A0
+//#define TCC_M_ARMED        (1152.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0900
+//#define TCC_M_STOP         (1192.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0950
+//#define TCC_M_START        (1200.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0960
+#define TCC_THRTTLE_100PCNT  (1890.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0EC4
+#define TCC_FULL_STIK        (1904.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0EE0
 /*
  * With throttle proportional to pulse width, and the motor speed range (0%:100%)
  * (PWM-DC) corresponsds to {0:100%) throttle (MAX_THRUST 
@@ -57,27 +91,42 @@
 */
 #define TCC_THRTTLE_10_PCNT  ( 690.0 / 9.0 + 0.5 ) // 76.7
 #define TCC_THRTTLE_0PCNT    \
-                   ( (1200.0 - TCC_THRTTLE_10_PCNT) * (1.0 / TCC_TICKS_PSEC) ) // 8C5
+                   ( (1200.0 - TCC_THRTTLE_10_PCNT) * (1.0 / TCC_TICK_TIME_MSEC) ) // 8C5
 
 
 #define TCC_M_ARMED  TCC_THRTTLE_0PCNT
 
 #define TCC_THRTTLE_RANGE  ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
 
-#define TCC_THRTTLE_XPCNT( _PCNT_SPEED_ )  \
-                                 ( _PCNT_SPEED_ * TCC_THRTTLE_RANGE / 100.0 )
+//#define TCC_THRTTLE_XPCNT( _PCNT_SPEED_ )  \
+//                                 ( _PCNT_SPEED_ * TCC_THRTTLE_RANGE / 100.0 )
 
-// motor startup at 10% throttle
-#define TCC_MOTOR_STARTUP   TCC_THRTTLE_XPCNT( 10.0) 
+/**
+ * @brief integer scale factor for pwm percent
+ * @details speed percent is not used for setting PWM but rather for 
+ *  calculations involving percent motor speed (0.5%/bit precision)
+ * e.g. 
+ *  %DC = (PWM_DC_SCALE * PWM_PULSE_CNT) / PWM_PULSE_100_PCNT
+ *
+ * As u16, and using 1600 for 100% pulse time (period)
+ *   65535 / 1600 = 40 
+ *
+ * Therefore use p-o-2 scale of 2^5
+ */
+#define PWM_MSPEED_PCNT_SCALE  2.0
 
-// motor shutoff at 9% throttle
-#define TCC_MOTOR_SHUTOFF   TCC_THRTTLE_XPCNT( 9.0) 
-
-
-
-// motor speed percent is scaled to provide at leat 0.1% precision (per count)
-//#define SPEED_PCNT_SCALE  16.0 
-
+/**
+ * @brief convert raw servo position counts to integer percent
+ *
+ * @details Percent PWM is used only for information/logging as the 
+ *          resolution is limited to  0.5% PWM / timer count
+ *
+ *   mspeed_pcnt = 100_pcnt  * servo_position_counts / servo_range_counts
+ *                 (2 * 100) *     (1600)            /  (1600)
+ *                 (200) *         (1600)            /  (1600)
+ */
+#define PWM_MSPEED_PERCENT( _SERVO_POSITION_COUNTS_ )  \
+   ( ( ( (100.0 * PWM_MSPEED_PCNT_SCALE ) / 4 ) * ( _SERVO_POSITION_COUNTS_ / 2) ) / ( TCC_THRTTLE_RANGE / 8 ) )
 
 
 
@@ -208,8 +257,11 @@ void PWM_PhA_Enable(void);
 void PWM_PhB_Enable(void);
 void PWM_PhC_Enable(void);
 
-void set_dutycycle(uint16_t);
+void PWM_set_dutycycle(uint16_t);
 
 void PWM_setup(void);
+
+uint16_t PWM_get_motor_spd_pcnt(uint16_t, uint16_t);
+uint16_t PWM_get_servo_position_counts( uint16_t );
 
 #endif // PWM_STM_S_H
