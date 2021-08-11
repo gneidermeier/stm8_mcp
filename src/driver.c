@@ -218,14 +218,29 @@ uint16_t Driver_get_pulse_dur(void)
 }
 
 /**
+ * @brief Converts servo pulse width to servo position
+ * @details 100% of servo throttle range resides in the portion of the servo
+ *    pulse i.e. (1.1 ms : 1.9 ms) i.e. 
+ *      servo position = servo pulse time - 1.1 ms
+ * @return servo pulse width (integer).
+ */
+uint16_t Driver_get_servo_position_counts(void)
+{
+  uint16_t pulse_duration_count = Driver_get_pulse_dur();
+  uint16_t thr_posn_cnt = 0;
+
+  if (pulse_duration_count > TCC_THRTTLE_0PCNT)
+  {
+    thr_posn_cnt = (uint16_t )_THROTTLE_POSITION_COUNT( pulse_duration_count );
+}
+  return thr_posn_cnt;
+}
+
+/**
  * @brief converts servo pulse width to motor speed percent
- * @details Commanded motor speed is derived from proportional servo pulse.
- *  Motor speed is to be at least 0.1% i.e integer scale factor of 16 provides 
- *  precision of 0.0625% (per bit). 
- *  Note: it is possible that the industry requirement for PWM resolution might 
- *  be 1024 steps - however, that could be a bit of a challenge with 16-bit 
- *  word size.
- * @return Motor speed percent scaled to SPEED PCNT SCALE.
+ * @details Commanded motor speed is derived from proportional servo pulse
+ *  so it is converted to percent of throttle/speed range.
+ * @return Motor speed percent (integer).
  */
 uint16_t Driver_get_motor_spd_pcnt(void)
 {
@@ -233,16 +248,13 @@ uint16_t Driver_get_motor_spd_pcnt(void)
   uint16_t pulse_period_count = Driver_get_pulse_perd();
   uint16_t pulse_duration_count = Driver_get_pulse_dur();
 
-  if (pulse_duration_count > TCC_THRTTLE_0PCNT)
-  {
-    uint16_t thr_posn_cnt = 
-      (uint16_t )_THROTTLE_POSITION_COUNT( pulse_duration_count );
+  uint16_t thr_posn_cnt = Driver_get_servo_position_counts();
 
 // PWM percent duty-cycle is only for display purpose so some loss of precision 
 // is ok here and necessary to prevent overflow out of 16-bit unsigned
-    motor_pcnt_speed  = 
-      (uint16_t )( (100.0 / 4) * thr_posn_cnt) / (TCC_THRTTLE_RANGE / 4);
-  }
+  motor_pcnt_speed  = 
+        (uint16_t )( ( (100.0 / 4) * thr_posn_cnt) / (TCC_THRTTLE_RANGE / 4) );
+
   return motor_pcnt_speed;
 }
 
