@@ -28,7 +28,18 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-#define TRIM_DEFAULT  0
+/*
+ * motor speed received from remote UI with integer scaling would ideally provide 1024 
+ * steps of precision, however to fit uint16, scale factor limited to 65535/100 so 
+ * slightly less precision than actual radio signal (timer capture) but acceptable  
+ * i.e.
+ *  pwm_motor_speed =   pwm_period_counts * (ui_speed_pcnt / 512) / 100 
+ *
+ * The UI motor speed is for now scaled to the range of the PWM period in 
+ * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
+ */
+#define UI_MSPEED_PCNT_SCALE  512.0  // 0.002% per bit ... note use power of 2 scale factor
+
 
 // Threshold is set low enuogh that the machine doesn't stall
 // thru the lower speed transition into closed-loop control.
@@ -94,13 +105,10 @@ ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 
-static uint16_t UI_Speed;  // motor percent speed input from servo or remote UI 
-
-static uint8_t TaskRdy;  // flag for timer interrupt for BG task timing
-
+static uint8_t TaskRdy; // flag for timer interrupt for BG task timing
 static uint8_t Log_Level;
-
-static  uint16_t Vsystem; // persistent for averaging
+static uint16_t Vsystem;
+static uint16_t UI_Speed; // motor percent speed input from servo or remote UI 
 
 /**
  * @brief Lookup table for UI input handlers
@@ -127,10 +135,12 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
 
 /**
  * @brief Print one line to the debug serial port.
+ * @note: NOT appropriate in either an ISR or critical section because of printf
+ *  to serial terminal is blocking.
  *
- * @param clearf set 1 to zero the line count
+ * @param zeroflag set 1 to zero the line count
  */
-static void dbg_println(int zrof)
+static void Log_println(int zrof)
 {
   static uint16_t Line_Count = 0;
   int faults = (int)Faultm_get_status();
@@ -138,45 +148,47 @@ static void dbg_println(int zrof)
   uint16_t bl_speed = BL_get_speed(); 
   uint16_t timing_error = Seq_get_timing_error();
   uint16_t comm_period = BL_get_timing();
-  uint16_t servo_pulse_period = Driver_get_pulse_perd();
+//  uint16_t servo_pulse_period = Driver_get_pulse_perd();
   uint16_t servo_pulse_duration = Driver_get_pulse_dur();
-  uint16_t display_speed_pcnt = 
-	   (uint16_t)( Driver_get_motor_spd_pcnt() / SPEED_PCNT_SCALE );
+  uint16_t display_speed_pcnt = (uint16_t)Driver_get_motor_spd_pcnt();
+  uint16_t servo_posn_counts = Driver_get_servo_position_counts();
 
+  // if flag is set then reset line counter
   if ( 0 != zrof)
   {
     Line_Count = 0;
   }
 
-  Line_Count += 1;;
-
-  printf(
-    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RCd=%04X RCp=%u ERR=%04X \r\n",
-//    "{%04X) UI=%X CT=%04X DC=%04X Vs=%04X SF=%X RCd=%04X ERR=%04X \r\n",
-    Line_Count,
-    ui_speed,
-    comm_period,
-    bl_speed,
-    Vsystem,
-    faults,
-    servo_pulse_duration,
-    display_speed_pcnt,
-    timing_error
-  );
+  // if logger is enabled (level>0) then invoke its output
+  if ( Log_Level > 0)
+  {
+    printf(
+      "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u ERR=%04X \r\n",
+      Line_Count++,  // increment line countet
+      ui_speed, comm_period, bl_speed, Vsystem, faults, 
+      servo_pulse_duration, servo_posn_counts, display_speed_pcnt,
+      timing_error
+    );
+     Log_Level -= 1;
+  }
 }
 
 /*
  * Service the slider and trim inputs for speed setting.
- * The UI Speed value represents the percent of motor speed i.e. (0% : 100%), 
- * which would be proportional to RC radio control servo signal. It is expected 
- * this should have a precision of at least 0.1% as these days the standard 
- * is likely 1024 steps PWM. The scale factor of 16 is factored into the percent
- * motor speed related variables and once passed to BL_Set_speed(), will be recaled
- * to fit the appropriate PWM timer scaling at e.g. 12 kHz. 
+ * The UI Speed value represents percent of motor speed (0% : 100%), which is
+ * proportional to RC radio control servo signal. 
+ *
+ * Servo input will have range of (0:1600) which can directly be used as the 
+ * pwm input if the timer prescaler is set such that 16Mhz works out to a 
+ * PWM period of    0.0000000625 * 1600 = 100 uS so 10 kHz .
+ * 
+ * The UI motor speed is for now scaled to the range of the PWM period in 
+ * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
+ *
  * The standard RC framerate is 50 Hz or 20 mS. With pertask is updating at 60Hz, 
  * then the timely response of the system should be assured. 
  */
-static void ui_set_motor_spd(uint16_t pcnt_motor_speed)
+static void ui_set_motor_spd(uint16_t ui_motor_speed)
 {
   uint16_t tmp_u16;
 
@@ -185,7 +197,7 @@ static void ui_set_motor_spd(uint16_t pcnt_motor_speed)
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 #endif
 
-    BL_set_speed( pcnt_motor_speed );
+    BL_set_speed( ui_motor_speed );
 }
 
 /*
@@ -223,8 +235,8 @@ static void m_stop(void)
 
   printf("###\r\n");
 
-  Log_Level = 1; // stop the logger output
-  dbg_println(1 /* clear line count */ );
+  Log_Level = 1; // allow one more status line printfd to terminal then stops log output
+  Log_println(1 /* clear line count */ );
 }
 
 /*
@@ -232,12 +244,7 @@ static void m_stop(void)
  */
 static void spd_plus(void)
 {
-  const uint16_t spd_pcnt_scale = (uint16_t)SPEED_PCNT_SCALE;
-  const uint16_t half_pcnt = (uint16_t)(0.5 * spd_pcnt_scale); 
-
-//  UI_pcnt_motor_spd += (uint16_t)half_pcnt;
-
-  // if fault/throttle-high ... diag msg?
+// tbd: steps of 0.5% (scale factor of 512)
 //  if (UI_Speed < S8_MAX)
   {
     UI_Speed += 1;
@@ -249,13 +256,7 @@ static void spd_plus(void)
  */
 static void spd_minus(void)
 {
-  const uint16_t spd_pcnt_scale = (uint16_t)SPEED_PCNT_SCALE;
-  const uint16_t half_pcnt = (uint16_t)(0.5 * spd_pcnt_scale); 
-
-//  UI_pcnt_motor_spd -= (uint16_t)half_pcnt;
-
-
-  // if fault/throttle-high ... diag msg?
+// tbd: steps of 0.5% (scale factor of 512)
   if (UI_Speed > 0)
   {
     UI_Speed -= 1;
@@ -331,19 +332,6 @@ static void Periodic_task(void)
     Faultm_upd(VOLTAGE_NG, (faultm_assert_t)( Vsystem < V_SHUTDOWN_THR) );
   }
 #endif
-  /*
-   * debug logging to terminal - note: globals that are updated from ISR context
-   * are not going to be read inside a CS (don't want printf inside a CS)
-   */
-  if (Log_Level > 0)
-  {
-    // if log level less than <threshold> then decrement the count
-    if (Log_Level < 255)
-    {
-      Log_Level -= 1;
-    }
-    dbg_println(0); // note: would not want to put printf inside a CS (DI/EI)
-  }
 }
 
 /**
@@ -369,6 +357,8 @@ uint8_t Task_Ready(void)
 
     if ( ! ((framecount++) % 0x20) )
     {
+      Log_println(0); // note: no printf to serial terminal inside a CS
+
 #if SPI_ENABLED == SPI_STM8_MASTER
       SPI_controld();
 #endif
