@@ -80,6 +80,19 @@ PUTCHAR_PROTOTYPE
 }
 
 /**
+  * @brief Send byte over UART2
+  * @details 
+  * @param 
+  * @retval
+  */
+
+void UARTsend(uint8_t value)
+{
+    UART2_SendData8(value);
+    while ( 0 == (UART2->SR & UART2_SR_TXE) );
+}
+
+/**
   * @brief Low-level character IO on the serial terminal
   * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
   * @param None
