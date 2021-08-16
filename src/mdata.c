@@ -15,7 +15,25 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "system.h" // dependency of motor data on cpu clock specific timer rate
+#include "pwm_stm8s.h"
+#include "mdata.h"
+
+
+// table size originated from 250 step PWM confiugration
+#define MDATA_TBL_SIZE            250
+
+/**
+ * @brief rescale index parameter to scale of original table
+ * @details
+ *   PWM period counts must be a multiple of original table size
+ *
+ *   rescaled_index = index * PWM_PERIOD_COUNTS / MDATA_TBL_SIZE
+
+ */
+#define PWM_PERIOD_SCALAR    (PWM_PERIOD_COUNTS / MDATA_TBL_SIZE)
+ 
+#define MDATA_TBL_INDEX_PCNT_SCALE( _index_ ) \
+                                     ( _index_ / PWM_PERIOD_SCALAR )
 
 /*
  * The table is indexed by PWM duty cycle counts (i.e. [0:1:250)
@@ -113,9 +131,12 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
  * @return LUT value @ index
  * @retval -1 error
  */
-uint16_t Get_OL_Timing(uint16_t index)
+uint16_t Get_OL_Timing(uint16_t table_index)
 {
     uint16_t t16 = (U16_MAX); // error
+
+    // rescxale index range to that of  original table size
+    uint16_t index = MDATA_TBL_INDEX_PCNT_SCALE(table_index);
 
     // assert index < OL_TIMING_TBL_SIZE
     if ( index < OL_TIMING_TBL_SIZE )
