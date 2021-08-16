@@ -38,18 +38,19 @@
 //  0.000083 / 0.5 us  = 166.67 counts
 
 #ifdef PWM_8K
-  #define PWM_PERIOD_CNTS    250   // 125uS
-#else // 12kHz
-  #define PWM_PERIOD_CNTS    166   //  83uS
+  #define PWM_PERIOD_COUNTS   250 // 1/16 Mhz * PS * 2500 = 0.000125 sec
+#else // 
+  #define PWM_PERIOD_COUNTS   500 // tbd
 #endif
 
-#define  PWM_100_PCNT  PWM_PERIOD_CNTS
 
 /**
- * @brief Compute PWM timer period from percent duty-cycle
+ * @brief Compute PWM timer counts from percent duty-cycle
+ * @param Percent duty-cycle, range (0:100.0)
+ * @return PWM timer counts 
  */
 #define PWM_GET_PULSE_COUNTS( _PCNT_ ) \
-                   (uint16_t)( ( _PCNT_ * PWM_PERIOD_CNTS ) / 100.0 )
+                   (uint16_t)( ( _PCNT_ * (PWM_PERIOD_COUNTS / 4.0) ) / (100.0 / 4.0) )
 
 
 /*

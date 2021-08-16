@@ -94,12 +94,10 @@ void PWM_set_dutycycle(uint16_t global_dutycycle)
  *               0.000125 S / (1/16Mhz) * 1600 = 0.0001
  *               1 / 0.0001 = 10000  
  */
-#ifdef CLOCK_16
-#define TIM2_PRESCALER TIM2_PRESCALER_8
-//#define TIM2_PRESCALER TIM2_PRESCALER_1  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#ifdef PWM_8K
+  #define TIM2_PRESCALER   TIM2_PRESCALER_8   //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
-// todo ; purge 8 mhz support
-//#define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+  #define //  TIM2_PRESCALER   TIM2_PRESCALER_1 // tbd
 #endif
 
 #define PWM_TIMER_CHAN_A  TIM2_CHANNEL_1
@@ -112,7 +110,7 @@ void PWM_setup(void)
   TIM2_DeInit();
 
   /* Set TIM2 Frequency to 2Mhz */  /*  5/6/21 :  argument TIM2_Prescaler is 8-bit */
-  TIM2_TimeBaseInit(TIM2_PRESCALER, PWM_100_PCNT);
+  TIM2_TimeBaseInit(TIM2_PRESCALER, PWM_PERIOD_COUNTS);
   /* Channel 1 PWM configuration */
   TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
 //  TIM2_OC1PreloadConfig(ENABLE);
@@ -170,11 +168,11 @@ void PWM_PhC_Enable(void)
 
 #elif defined ( S105_DEV )
 
-#ifdef CLOCK_16
-#define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#ifdef PWM_8K
+  #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
-#define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
-#endif // CLOCK_16
+  #define // tbd 
+#endif
 
 #define PWM_MODE  TIM1_OCMODE_PWM2
 
@@ -184,7 +182,7 @@ void PWM_PhC_Enable(void)
 
 void PWM_setup(void)
 {
-    const uint16_t T1_Period = PWM_100_PCNT;
+    const uint16_t T1_Period = PWM_PERIOD_COUNTS;
 
 //    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);  // with clocks setup
 
@@ -192,7 +190,7 @@ void PWM_setup(void)
 /*
  * The counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)  (RM0016)
  */
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0); // ISR at and of "idle" time
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0);
 
     /* Channel 2 PWM configuration */
     TIM1_OC2Init( PWM_MODE,

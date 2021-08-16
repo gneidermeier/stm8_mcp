@@ -247,7 +247,7 @@ static void spd_plus(void)
 // tbd: steps of 0.5% (scale factor of 512)
 //  if (UI_Speed < S8_MAX)
   {
-    UI_Speed += 1;
+    UI_Speed += (uint16_t)MSPEED_PCNT_INCREM_STEP;
   }
 }
 
@@ -259,9 +259,9 @@ static void spd_minus(void)
 // tbd: steps of 0.5% (scale factor of 512)
   if (UI_Speed > 0)
   {
-    UI_Speed -= 1;
-    Log_Level = 1;
+    UI_Speed -= (uint16_t)MSPEED_PCNT_INCREM_STEP;
   }
+  Log_Level = 1;
 }
 
 /*

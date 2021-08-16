@@ -206,7 +206,7 @@ uint16_t Driver_get_servo_position_counts(void)
 {
   uint16_t pulse_duration_counts = Driver_get_pulse_dur();
   uint16_t thr_posn_cnt = 
-												PWM_get_servo_position_counts( pulse_duration_counts );
+                            PWM_get_servo_position_counts( pulse_duration_counts );
 
   return thr_posn_cnt;
 }
@@ -226,7 +226,7 @@ uint16_t Driver_get_motor_spd_pcnt(void)
 // PWM percent duty-cycle is only for display purpose so some loss of precision 
 // is ok here and necessary to prevent overflow out of 16-bit unsigned
   motor_pcnt_speed  = PWM_get_motor_spd_pcnt(
-																		pulse_period_counts, pulse_duration_counts);
+                                    pulse_period_counts, pulse_duration_counts);
 
   return motor_pcnt_speed;
 }
@@ -240,6 +240,9 @@ uint16_t Driver_get_motor_spd_pcnt(void)
  */
 void Driver_on_PWM_edge(void)
 {
+  /* Toggles LED to verify task timing */
+//  GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+
 #if 0 // BUFFER_ADC_BEMF
   ph0_adc_tbct += 1 ; // advance the buffer index
 #endif
@@ -320,8 +323,8 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Update(void)
 {
-  static const uint8_t UI_FRAME = 0x20; // UI task every 32 steps (even)
-  static const uint8_t CT_FRAME = 0x01; // control task on odd steps
+  static const uint8_t UI_FRAME = 0x20; // UI task every 32 steps (even) i.e. 32 * 0.5 ms
+  static const uint8_t CT_FRAME = 0x01; // control task on odd steps i.e. @ 1 ms
 
   static uint8_t trate = 0;
   trate += 1;
