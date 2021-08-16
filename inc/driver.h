@@ -64,4 +64,6 @@ uint16_t Driver_get_pulse_dur(void);
 uint16_t Driver_get_pulse_perd(void);
 uint16_t Driver_get_servo_position_counts(void);
 
+void Get_Rx_IT(void);
+
 #endif // DRIVER_H
