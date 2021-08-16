@@ -255,6 +255,9 @@ static void UART_setup(void)
              UART2_PARITY_NO,
              UART2_SYNCMODE_CLOCK_DISABLE,
              UART2_MODE_TXRX_ENABLE);
+  
+  UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE); 
+  enableInterrupts();
 
   UART2_Cmd(ENABLE);
 
