@@ -361,7 +361,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
     Driver_Step();
     // reset interrupt flag
 //    TIM3_ClearITPendingBit(TIM3_IT_UPDATE);
-    TIM3->SR1 &= ~TIM3_SR1_UIF;
+    TIM3->SR1 &= (uint8_t)~TIM3_SR1_UIF;
 #endif
  }
 

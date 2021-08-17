@@ -17,35 +17,27 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "system.h"
+#include "pwm_stm8s.h"
+#include "mdata.h"
 
-
-/* defines -----------------------------------------------------------*/
-
-
-
-
-
-/* Private types -----------------------------------------------------------*/
-
+/* defines -------------------------------------------------------------------*/
 /*
- * defines
+ * 100% / 250 counts == 0.4% per count
+ * 250 * .004 == 1
  */
+#define PWM_PERCENT_PER_COUNT_250  0.004 //  ( 100.0 / MDATA_TBL_SIZE ) // .4% i.e. .004
+
+// table size originated from 250 step PWM confiugration
+#define MSPEED_PCNT_INCREM_STEP   ( PWM_PERIOD_COUNTS * PWM_PERCENT_PER_COUNT_250 )
 
 
-/*
- * types
- */
 
 
-/*
- * variables
- */
+/* types --------------------------------------------------------------------*/
 
 
-/*
- * prototypes
- */
+
+/* prototypes ---------------------------------------------------------------*/
 
 void Driver_Step(void);
 void Driver_Update(void);

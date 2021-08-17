@@ -21,7 +21,7 @@
 /*
  * (un)comment macro to set PWM 8 Khz or ?
  */
-#define PWM_8K
+//#define PWM_8K
 
 
 // 1/8000  = 0.000125 = 12.5 * 10^(-5)
@@ -38,18 +38,19 @@
 //  0.000083 / 0.5 us  = 166.67 counts
 
 #ifdef PWM_8K
-  #define PWM_PERIOD_CNTS    250   // 125uS
-#else // 12kHz
-  #define PWM_PERIOD_CNTS    166   //  83uS
+  #define PWM_PERIOD_COUNTS   250 // 1/16 Mhz * PS * 2500 = 0.000125 sec
+#else // 
+  #define PWM_PERIOD_COUNTS  1024
 #endif
 
-#define  PWM_100_PCNT  PWM_PERIOD_CNTS
 
 /**
- * @brief Compute PWM timer period from percent duty-cycle
+ * @brief Compute PWM timer counts from percent duty-cycle
+ * @param Percent duty-cycle, range (0:100.0)
+ * @return PWM timer counts 
  */
 #define PWM_GET_PULSE_COUNTS( _PCNT_ ) \
-                   (uint16_t)( ( _PCNT_ * PWM_PERIOD_CNTS ) / 100.0 )
+    (uint16_t)( ( _PCNT_ * (PWM_PERIOD_COUNTS / 4.0) ) / (100.0 / 4.0) )
 
 
 /*
@@ -68,14 +69,21 @@
  * 
  *    44160 * 0.5uS/tick = 22.08 ms  
  *    1/22.08 ms = ~45Hz
+ *
+ * Reference:
+ *  https://www.kdedirect.com/blogs/news/understanding-throttle-calibration-esc-deadbands-and-pwm
+ *
+ *  Motor Arming pulse: 1100탎
+ *  Motor Spinning pulse: 1125탎
+ *  Motor Stopping pulse: 1110탎
+ *  Max thrust output: 1915탎
+ *  Full Stick: 1940탎
  */
+
 #define TCC_TICK_TIME_MSEC   (0.5)
-#define TCC_LOW_STIK         (1104.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $08A0
-//#define TCC_M_ARMED        (1152.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0900
-//#define TCC_M_STOP         (1192.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0950
-//#define TCC_M_START        (1200.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0960
-#define TCC_THRTTLE_100PCNT  (1890.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0EC4
-#define TCC_FULL_STIK        (1904.0 * (1.0 / TCC_TICK_TIME_MSEC)) // $0EE0
+#define TCC_TIME_ARMING      (uint16_t)(1100.0 * (1.0 / TCC_TICK_TIME_MSEC))
+#define TCC_TIME_MAX_THRUST  (uint16_t)(1900.0 * (1.0 / TCC_TICK_TIME_MSEC))
+
 /*
  * With throttle proportional to pulse width, and the motor speed range (0%:100%)
  * (PWM-DC) corresponsds to {0:100%) throttle (MAX_THRUST 
@@ -89,14 +97,9 @@
  * 1% motor speed range = 7.67 ms.
  * Speed % = (pulse width - TCC_0RPM) / (
 */
-#define TCC_THRTTLE_10_PCNT  ( 690.0 / 9.0 + 0.5 ) // 76.7
-#define TCC_THRTTLE_0PCNT    \
-                   ( (1200.0 - TCC_THRTTLE_10_PCNT) * (1.0 / TCC_TICK_TIME_MSEC) ) // 8C5
-
-
-#define TCC_M_ARMED  TCC_THRTTLE_0PCNT
-
-#define TCC_THRTTLE_RANGE  ( TCC_THRTTLE_100PCNT - TCC_THRTTLE_0PCNT ) // 5FE
+#define TCC_LOW_STIK TCC_TIME_ARMING
+#define TCC_FULL_STIK TCC_TIME_MAX_THRUST
+#define TCC_THRTTLE_RANGE  ( TCC_FULL_STIK - TCC_LOW_STIK )
 
 //#define TCC_THRTTLE_XPCNT( _PCNT_SPEED_ )  \
 //                                 ( _PCNT_SPEED_ * TCC_THRTTLE_RANGE / 100.0 )
@@ -118,17 +121,17 @@
 /**
  * @brief convert raw servo position counts to integer percent
  *
- * @details Percent PWM is used only for information/logging as the 
- *          resolution is limited to  0.5% PWM / timer count
+ * @details 
+ *   100% * SERVO_POSN / SERVO_RANGE
  *
- *   mspeed_pcnt = 100_pcnt  * servo_position_counts / servo_range_counts
- *                 (2 * 100) *     (1600)            /  (1600)
- *                 (200) *         (1600)            /  (1600)
+ *  factor of 2 is factored out of num. and denomnator terms to avoid overflow of 16-bits
+ *
+ *
+ * @param  SERVO_POSITION_COUNTS, range (0:3600)
+ * 
  */
 #define PWM_MSPEED_PERCENT( _SERVO_POSITION_COUNTS_ )  \
-   ( ( ( (100.0 * PWM_MSPEED_PCNT_SCALE ) / 4 ) * ( _SERVO_POSITION_COUNTS_ / 2) ) / ( TCC_THRTTLE_RANGE / 8 ) )
-
-
+  ( (100.0 / 2 ) * ( _SERVO_POSITION_COUNTS_ ) / ( TCC_THRTTLE_RANGE / 2 ) )
 
 /**
  * The MCU drives 3 GPIO as output to IR2104 /SD pins. There is no significance 
