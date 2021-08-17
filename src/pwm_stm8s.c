@@ -23,25 +23,6 @@
 
 /* Private defines -----------------------------------------------------------*/
 
-/**
-  * @brief convert throttle position timer-counts to percent motor speed
-  *
-  *   speed % = 100 % * throttle_position_counts / throttle_range_counts
-  *
-  * Range of throttle position timer counts is approx. (0:1600)
-  *
-  *   1/1600 == 0.000625 which would give the pwm step a bit more precision than 
-  * needed (most ESCs are probably providing 1024 steps of pwm resolution.
-  *
-  * Constant terms are typically grouped to put as much of the calculation in 
-  * the preprocesor as possible (including the division of factor of 4, enough
-  *	to prevent any intermediate result from overflowing out of uint16).
-  */
-// todo move to pwm
-#define PWM_GET_THROTTLE_POSITION_COUNTS( _PULSE_TIMER_COUNTS_ )  \
-                         (uint16_t)( _PULSE_TIMER_COUNTS_ - TCC_THRTTLE_0PCNT )
-
-
 /* Private types -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
@@ -94,12 +75,10 @@ void PWM_set_dutycycle(uint16_t global_dutycycle)
  *               0.000125 S / (1/16Mhz) * 1600 = 0.0001
  *               1 / 0.0001 = 10000  
  */
-#ifdef CLOCK_16
-#define TIM2_PRESCALER TIM2_PRESCALER_8
-//#define TIM2_PRESCALER TIM2_PRESCALER_1  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#ifdef PWM_8K
+  #define TIM2_PRESCALER   TIM2_PRESCALER_8   //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
-// todo ; purge 8 mhz support
-//#define TIM2_PRESCALER TIM2_PRESCALER_4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
+  #define TIM2_PRESCALER   TIM2_PRESCALER_2
 #endif
 
 #define PWM_TIMER_CHAN_A  TIM2_CHANNEL_1
@@ -112,7 +91,7 @@ void PWM_setup(void)
   TIM2_DeInit();
 
   /* Set TIM2 Frequency to 2Mhz */  /*  5/6/21 :  argument TIM2_Prescaler is 8-bit */
-  TIM2_TimeBaseInit(TIM2_PRESCALER, PWM_100_PCNT);
+  TIM2_TimeBaseInit(TIM2_PRESCALER, PWM_PERIOD_COUNTS);
   /* Channel 1 PWM configuration */
   TIM2_OC1Init(TIM2_OCMODE_PWM2, TIM2_OUTPUTSTATE_ENABLE, 0, TIM2_OCPOLARITY_LOW );
 //  TIM2_OC1PreloadConfig(ENABLE);
@@ -170,11 +149,11 @@ void PWM_PhC_Enable(void)
 
 #elif defined ( S105_DEV )
 
-#ifdef CLOCK_16
-#define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
+#ifdef PWM_8K
+  #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
 #else
-#define TIM1_PRESCALER 4  //    (1/8Mhz)  * 4 * 250 -> 0.000125 S
-#endif // CLOCK_16
+  #define TIM1_PRESCALER 2
+#endif
 
 #define PWM_MODE  TIM1_OCMODE_PWM2
 
@@ -184,7 +163,7 @@ void PWM_PhC_Enable(void)
 
 void PWM_setup(void)
 {
-    const uint16_t T1_Period = PWM_100_PCNT;
+    const uint16_t T1_Period = PWM_PERIOD_COUNTS;
 
 //    CLK_PeripheralClockConfig (CLK_PERIPHERAL_TIMER1, ENABLE);  // with clocks setup
 
@@ -192,7 +171,7 @@ void PWM_setup(void)
 /*
  * The counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)  (RM0016)
  */
-    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0); // ISR at and of "idle" time
+    TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0);
 
     /* Channel 2 PWM configuration */
     TIM1_OC2Init( PWM_MODE,
@@ -272,16 +251,16 @@ void PWM_PhC_Enable(void)
  * @details 100% of servo throttle range resides in the portion of the servo
  *    pulse i.e. (1.1 ms : 1.9 ms) i.e. 
  *      servo position = servo pulse time - 1.1 ms
- * @return servo pulse width (integer).
+ *
+ * @return duration of servo pulse expressed as timer counts, range (0:1600)
  */
 uint16_t PWM_get_servo_position_counts( uint16_t pulse_duration_counts )
 {
   uint16_t servo_position_counts = 0;
 
-  if (pulse_duration_counts > TCC_THRTTLE_0PCNT)
+  if (pulse_duration_counts > TCC_TIME_ARMING)
   {
-    servo_position_counts = 
-        (uint16_t )PWM_GET_THROTTLE_POSITION_COUNTS( pulse_duration_counts );
+    servo_position_counts = pulse_duration_counts - TCC_TIME_ARMING;
   }
   return servo_position_counts;
 }
@@ -290,9 +269,11 @@ uint16_t PWM_get_servo_position_counts( uint16_t pulse_duration_counts )
  * @brief converts servo pulse width to motor speed percent
  * @details Commanded motor speed is derived from proportional servo pulse
  *  so it is converted to percent of throttle/speed range.
+ *
  * @param pulse_period_count  servo pulse period in timer counts
  * @param pulse_duration_count servo pulse duration in timer counts 
- * @return Motor speed percent (integer).
+ *
+ * @return Motor speed percent, integer range (0:1:100)
  */
 uint16_t PWM_get_motor_spd_pcnt(
          uint16_t pulse_period_counts, uint16_t pulse_duration_counts)
@@ -305,8 +286,6 @@ uint16_t PWM_get_motor_spd_pcnt(
 // is ok here and necessary to prevent overflow out of 16-bit unsigned
 
   motor_pcnt_speed = (uint16_t)PWM_MSPEED_PERCENT( servo_position_counts );
-  // UI does not have include stm8_pwm.h  for _MSPEED_PCNT_SCALE
-  motor_pcnt_speed /= (uint16_t)PWM_MSPEED_PCNT_SCALE; // 0.5% PWM / bit
 
   return motor_pcnt_speed;
 }
