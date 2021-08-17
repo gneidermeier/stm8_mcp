@@ -82,8 +82,8 @@ static uint16_t curr_pulse_start_tm;
 static uint16_t Pulse_perd;
 static uint16_t Pulse_dur;
 
-static uint8_t Rx_Receive[RX_BUFFER_SIZE];
-static uint8_t Rx_Pos;
+static uint8_t rxReceive[RX_BUFFER_SIZE];
+static uint8_t rxPos;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -416,13 +416,13 @@ void Driver_Step(void)
  
 void Driver_Get_Rx_It(void)
 {
-    Rx_Receive[Rx_Pos] = UART2_ReceiveData8();
+    rxReceive[rxPos] = UART2_ReceiveData8();
 		
-		Rx_Pos++;
+		rxPos++;
 		
-		if(Rx_Pos > RX_BUFFER_SIZE - 1)
+		if(rxPos > RX_BUFFER_SIZE - 1)
 		{
-		    Rx_Pos = 0;
+		    rxPos = 0;
 		}
 }
 
