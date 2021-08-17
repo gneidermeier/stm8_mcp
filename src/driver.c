@@ -416,8 +416,16 @@ void Driver_Step(void)
  
 void Driver_Get_Rx_It(void)
 {
-    rxReceive[rxPos] = UART2_ReceiveData8();
+	  #if defined( S105_DEV ) || defined( S105_DISCOVERY )
 		
+		    rxReceive[rxPos] = UART2_ReceiveData8();
+				
+		#elif defined( S003_DEV )
+		
+		    rxReceive[rxPos] = UART1_ReceiveData8();
+				
+		#endif
+	
 		rxPos++;
 		
 		if(rxPos > RX_BUFFER_SIZE - 1)
