@@ -86,7 +86,7 @@ PUTCHAR_PROTOTYPE
   * @retval
   */
 
-void UARTsend(uint8_t value)
+void UartSend(uint8_t value)
 {
     UART2_SendData8(value);
     while ( 0 == (UART2->SR & UART2_SR_TXE) );

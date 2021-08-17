@@ -411,7 +411,7 @@ void Driver_Step(void)
  * @details  Invoked from Rx ISR
  */
  
-void Get_Rx_IT(void)
+void Driver_Get_Rx_It(void)
 {
     Rx_Receive[Rx_Pos] = UART2_ReceiveData8();
 		

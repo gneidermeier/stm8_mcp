@@ -467,7 +467,7 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
        it is recommended to set a breakpoint on the following instruction.
     */
 	
-    Get_Rx_IT();
+    Driver_Get_Rx_It();
 
     UART2_ClearITPendingBit(UART2_IT_RXNE);
     UART2_ClearFlag(UART2_FLAG_RXNE);	
