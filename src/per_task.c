@@ -24,6 +24,7 @@
 #include "faultm.h"
 #include "driver.h"
 #include "spi_stm8s.h"
+#include "pdu_manager.h"
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -344,6 +345,8 @@ static void Periodic_task(void)
 uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
+  
+  Pdu_Manager_Handle_Rx();
 
   if (0 != TaskRdy)
   {
