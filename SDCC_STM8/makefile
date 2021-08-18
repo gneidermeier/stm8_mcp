@@ -1,8 +1,10 @@
 # STM8 device (STM8S105 Discovery)
 DEVICE       =STM8S105
 MCU          =stm8s105?6
+BOARD        =S105_DEV # TODO: S105_DISCOVERY
 
-STLINK = stlink # stlinkv2
+STLINK = stlink # stm8s Discovery built-in stlink
+#STLINK = stlinkv2
 
 SDCC         =sdcc
 
