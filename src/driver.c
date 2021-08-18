@@ -59,6 +59,8 @@
 
 #define FOUR_SECTORS  4 // each commutation sector of 60-degrees spans 4x TIM3 periods
 
+#define RX_BUFFER_SIZE  16  //how big should this be?
+
 
 /* Private types -----------------------------------------------------------*/
 
@@ -79,6 +81,9 @@ static uint16_t curr_pulse_start_tm;
 
 static uint16_t Pulse_perd;
 static uint16_t Pulse_dur;
+
+static uint8_t rxReceive[RX_BUFFER_SIZE];
+static uint8_t rxPos;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -402,4 +407,31 @@ void Driver_Step(void)
     GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 #endif
 }
+
+/**
+ * @brief  Fill Rx Buffer in ISR Context
+ *
+ * @details  Invoked from Rx ISR
+ */
+ 
+void Driver_Get_Rx_It(void)
+{
+    #if defined( S105_DEV ) || defined( S105_DISCOVERY )
+
+        rxReceive[rxPos] = UART2_ReceiveData8();
+
+    #elif defined( S003_DEV )
+
+        rxReceive[rxPos] = UART1_ReceiveData8();
+				
+    #endif
+	
+    rxPos++;
+		
+    if(rxPos > RX_BUFFER_SIZE - 1)
+    {
+        rxPos = 0;
+    }
+}
+
 /**@}*/ // defgroup

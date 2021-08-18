@@ -80,6 +80,19 @@ PUTCHAR_PROTOTYPE
 }
 
 /**
+  * @brief Send byte over UART2
+  * @details 
+  * @param 
+  * @retval
+  */
+
+void UartSend(uint8_t value)
+{
+    UART2_SendData8(value);
+    while ( 0 == (UART2->SR & UART2_SR_TXE) );
+}
+
+/**
   * @brief Low-level character IO on the serial terminal
   * @details Based on SPL example from STM8S_StdPeriph_Examples/UART/UART1_Printf/
   * @param None
@@ -255,7 +268,9 @@ static void UART_setup(void)
              UART2_PARITY_NO,
              UART2_SYNCMODE_CLOCK_DISABLE,
              UART2_MODE_TXRX_ENABLE);
-
+ #ifdef UART_IT_RXNE_ENABLE
+  UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE); 
+ #endif
   UART2_Cmd(ENABLE);
 
 #elif defined( S003_DEV )
@@ -269,7 +284,9 @@ static void UART_setup(void)
     UART1_PARITY_NO,
     UART1_SYNCMODE_CLOCK_DISABLE,
     UART1_MODE_TXRX_ENABLE);
-
+ #ifdef UART_IT_RXNE_ENABLE		
+  UART1_ITConfig(UART1_IT_RXNE_OR, ENABLE); 
+ #endif
     UART1_Cmd(ENABLE);
 #endif
 }

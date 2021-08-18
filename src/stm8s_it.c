@@ -466,6 +466,22 @@ INTERRUPT_HANDLER(I2C_IRQHandler, 19)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+	
+    Driver_Get_Rx_It();
+
+    #if defined( S105_DEV ) || defined( S105_DISCOVERY )
+		
+        UART2_ClearITPendingBit(UART2_IT_RXNE);
+        UART2_ClearFlag(UART2_FLAG_RXNE);	
+		
+    #elif defined( S003_DEV )
+		
+        UART1_ClearITPendingBit(UART1_IT_RXNE);
+        UART1_ClearFlag(UART1_FLAG_RXNE);	
+		
+    #endif
+
+    
  }
 #endif /* (STM8S105) || (STM8AF626x) */
 
