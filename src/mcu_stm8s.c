@@ -268,10 +268,9 @@ static void UART_setup(void)
              UART2_PARITY_NO,
              UART2_SYNCMODE_CLOCK_DISABLE,
              UART2_MODE_TXRX_ENABLE);
-  
+ #ifdef UART_IT_RXNE_ENABLE
   UART2_ITConfig(UART2_IT_RXNE_OR, ENABLE); 
-  enableInterrupts();
-
+ #endif
   UART2_Cmd(ENABLE);
 
 #elif defined( S003_DEV )
@@ -285,10 +284,9 @@ static void UART_setup(void)
     UART1_PARITY_NO,
     UART1_SYNCMODE_CLOCK_DISABLE,
     UART1_MODE_TXRX_ENABLE);
-		
+ #ifdef UART_IT_RXNE_ENABLE		
   UART1_ITConfig(UART1_IT_RXNE_OR, ENABLE); 
-  enableInterrupts();	
-
+ #endif
     UART1_Cmd(ENABLE);
 #endif
 }
