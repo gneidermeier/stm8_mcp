@@ -189,9 +189,7 @@ static void Log_println(int zrof)
  * then the timely response of the system should be assured. 
  */
 static void ui_set_motor_spd(uint16_t ui_motor_speed)
-{
-  uint16_t tmp_u16;
-
+{	
 #ifdef ANLG_SLIDER
   uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
@@ -278,9 +276,9 @@ static ui_handlrp_t handle_term_inp(void)
     int n;
     for (n = 0; n < _SIZE_K_LUT ; n++)
     {
-      if (key == _GET_KEY_CODE( n ))
+      if (key == (char)_GET_KEY_CODE( n ))
       {
-//any terminal output specific to the key or handelr need to be done here and
+// any terminal output specific to the key or handelr need to be done here and
 // not in the handler itself because the handler is to be called from w/i the CS
         fp =_GET_UI_HDLRP( n );
         break;
