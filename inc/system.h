@@ -28,6 +28,12 @@
 #define SPI_STM8_SLAVE          2
 
 
+#if defined ( __SDCC )
+//  #define  S105_DEV 1 // TODO: needs improved and coordiated w/ makefile
+#define S105_DISCOVERY   1
+#endif
+
+
 /**
  * the STM8 variant is defined in the project file, along with the appropriate 
  * compiler settings for the particular MCU (memory model etc.)
