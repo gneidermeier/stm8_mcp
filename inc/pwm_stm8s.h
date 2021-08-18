@@ -101,8 +101,6 @@
 #define TCC_FULL_STIK TCC_TIME_MAX_THRUST
 #define TCC_THRTTLE_RANGE  ( TCC_FULL_STIK - TCC_LOW_STIK )
 
-//#define TCC_THRTTLE_XPCNT( _PCNT_SPEED_ )  \
-//                                 ( _PCNT_SPEED_ * TCC_THRTTLE_RANGE / 100.0 )
 
 /**
  * @brief integer scale factor for pwm percent
@@ -181,7 +179,7 @@
   #define SDb_PWM_PORT  GPIOD
   #define SDc_PWM_PORT  GPIOA
 
-#else if defined( S105_DEV )
+#elif defined( S105_DEV )
 /**
  * TIM2 not available, uses TIM1
  */
