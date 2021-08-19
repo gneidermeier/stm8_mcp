@@ -38,27 +38,6 @@
     ( ADC_Global - DC_HALF_REF )
 
 
-/*
- * These constants are the number of timer counts (TIM3) to achieve a given
- *  commutation step period.
- * See TIM3 setup - base period is 0.000000250 seconds (0.25 usec) in order to
- * provide high precision for controlling the commutation time, and each commutation step
- * unit is 4x TIM3 periods for back-EMF sampling at 1/4 and 3/4 in the commutation period.
- *
- * For the theoretical 1100kv motor @ 13.8v -> ~15000 RPM:
- *   15000 / 60 = 250 rps
- *   "Electrical cycles" per sec = 250 * (12/2) = 1500 ... where (12/2) is nr. of pole-pairs.
- *   Time of 1 cycle = 1/1500 = 0.000667 seconds  (360 degrees of 1 electrical cycle)
- *
- *   1 commutation sector is 60 degrees.
- *   Using TIM3 to get 4 updates per sector, and 360/15degrees=24 so ..
- *
- *   0.000667 seconds / 24 = 0.00002778 sec  (the "1/4 sector time" is 27.78us )
- *   ... divided by TIM3 base period (0.25 us)  -> 111 counts
- */
-
-#define FOUR_SECTORS  4 // each commutation sector of 60-degrees spans 4x TIM3 periods
-
 #define RX_BUFFER_SIZE  16  //how big should this be?
 
 
@@ -89,6 +68,7 @@ static uint8_t rxPos;
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+
 #if 0 // BUFFER_ADC_BEMF
 /*
  * averag 8 samples .. could be inline or macro
@@ -114,44 +94,156 @@ static void udpate_phase_average(void)
 
 /** @cond */
 
+/*
+ * accessors ********************************
+ */
 #if defined( S105_DEV )
 
 uint16_t get_pulse_start(void)
 {
-    return TIM2_GetCapture1();
+  return TIM2_GetCapture1();
 }
 
 uint16_t get_pulse_end(void)
 {
-    return TIM2_GetCapture2();
+  return TIM2_GetCapture2();
 }
 
 #elif defined(S105_DISCOVERY)
 
 uint16_t get_pulse_start(void)
 {
-    return TIM1_GetCapture4();
+  return TIM1_GetCapture4();
 }
 
 uint16_t get_pulse_end(void)
 {
-    return TIM1_GetCapture3();
+  return TIM1_GetCapture3();
 }
 
 #else // unimplemented ... stm8s003
 
 uint16_t get_pulse_start(void)
 {
-    return (uint16_t)-1;
+  return (uint16_t)-1;
 }
 
 uint16_t get_pulse_end(void)
 {
-    return (uint16_t)-1;
+  return (uint16_t)-1;
 }
 #endif
 /** @endcond */
 
+/**
+ * @brief Accessor for measured pulse period.
+ */
+uint16_t Driver_get_pulse_perd(void)
+{
+  return Pulse_perd;
+}
+
+/**
+ * @brief Accessor for measured pulse duration.
+ */
+uint16_t Driver_get_pulse_dur(void)
+{
+  return Pulse_dur;
+}
+
+/**
+ * @brief Converts servo pulse width to servo position
+ * @details 100% of servo throttle range resides in the portion of the servo
+ *    pulse i.e. (1.1 ms : 1.9 ms) i.e.
+ *      servo position = servo pulse time - 1.1 ms
+ *
+ * @return duration of servo pulse expressed as timer counts
+ */
+uint16_t Driver_get_servo_position_counts(void)
+{
+  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
+  uint16_t thr_posn_cnt =
+    PWM_get_servo_position_counts( pulse_duration_counts );
+
+  return thr_posn_cnt;
+}
+
+/**
+ * @brief converts servo pulse width to motor speed percent
+ * @details Commanded motor speed is derived from proportional servo pulse
+ *  so it is converted to percent of throttle/speed range.
+ * @return Motor speed percent (integer).
+ */
+uint16_t Driver_get_motor_spd_pcnt(void)
+{
+  uint16_t motor_pcnt_speed = 0;
+  uint16_t pulse_period_counts = Driver_get_pulse_perd();
+  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
+
+// PWM percent duty-cycle is only for display purpose so some loss of precision
+// is ok here and necessary to prevent overflow out of 16-bit unsigned
+  motor_pcnt_speed  = PWM_get_motor_spd_pcnt(
+                        pulse_period_counts, pulse_duration_counts);
+
+  return motor_pcnt_speed;
+}
+
+#if 0 // BUFFER_ADC_BEMF
+/** @cond */
+/**
+ * @brief Get Back-EMF buffer averaged.
+ *
+ * @details 4 samples are captured within a single commutation sector.
+ *
+ * @return  Calculated average of 4 samples stored in back-EMF frame buffer
+ */
+uint16_t Driver_Get_Back_EMF_Avg(void)
+{
+  return phase_average;
+}
+/** @endcond */
+#endif
+
+/**
+ * @brief Accessor for system voltage measurement.
+ * @details Phase voltage measurement from ADC Channel 0 is to be used as
+ * back-EMF sensing or system voltage.
+ * @return  Most recent captured ADC conversion value from Channel 0
+ */
+uint16_t Driver_Get_ADC(void)
+{
+  return ADC_Global;
+}
+
+/**
+ * @brief  Fill Rx Buffer in ISR Context
+ *
+ * @details  Invoked from Rx ISR
+ */
+void Driver_Get_Rx_It(void)
+{
+#if defined( S105_DEV ) || defined( S105_DISCOVERY )
+
+  rxReceive[rxPos] = UART2_ReceiveData8();
+
+#elif defined( S003_DEV )
+
+  rxReceive[rxPos] = UART1_ReceiveData8();
+
+#endif
+
+  rxPos++;
+
+  if(rxPos > RX_BUFFER_SIZE - 1)
+  {
+    rxPos = 0;
+  }
+}
+
+/*
+ * event handlers ********************************
+ */
+ 
 /**
  * @brief Call from timer/capture ISR on capture of rising edge of servo pulse
  *
@@ -175,65 +267,13 @@ void Driver_on_capture_fall(void)
 
 // noise on this signal when motor running?
 
-    uint16_t t16 = get_pulse_end() - curr_pulse_start_tm /* get_pulse_start() */;
+  uint16_t t16 = get_pulse_end() - curr_pulse_start_tm /* get_pulse_start() */;
 
 // apply exponential filter (simple moving average) to smoothe the signal
-    Pulse_dur = (Pulse_dur + t16) >> 1; // sma
+  Pulse_dur = (Pulse_dur + t16) >> 1; // sma
 
 // clear test pin
 //    GPIO_WriteLow(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-}
-
-/**
- * @brief Accessor for measured pulse period.
- */
-uint16_t Driver_get_pulse_perd(void)
-{
-  return Pulse_perd;
-}
-
-/**
- * @brief Accessor for measured pulse duration.
- */
-uint16_t Driver_get_pulse_dur(void)
-{
-  return Pulse_dur;
-}
-
-/**
- * @brief Converts servo pulse width to servo position
- * @details 100% of servo throttle range resides in the portion of the servo
- *    pulse i.e. (1.1 ms : 1.9 ms) i.e. 
- *      servo position = servo pulse time - 1.1 ms
- * @return servo pulse width (integer).
- */
-uint16_t Driver_get_servo_position_counts(void)
-{
-  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
-  uint16_t thr_posn_cnt = 
-                            PWM_get_servo_position_counts( pulse_duration_counts );
-
-  return thr_posn_cnt;
-}
-
-/**
- * @brief converts servo pulse width to motor speed percent
- * @details Commanded motor speed is derived from proportional servo pulse
- *  so it is converted to percent of throttle/speed range.
- * @return Motor speed percent (integer).
- */
-uint16_t Driver_get_motor_spd_pcnt(void)
-{
-  uint16_t motor_pcnt_speed = 0;
-  uint16_t pulse_period_counts = Driver_get_pulse_perd();
-  uint16_t pulse_duration_counts = Driver_get_pulse_dur();
-
-// PWM percent duty-cycle is only for display purpose so some loss of precision 
-// is ok here and necessary to prevent overflow out of 16-bit unsigned
-  motor_pcnt_speed  = PWM_get_motor_spd_pcnt(
-                                    pulse_period_counts, pulse_duration_counts);
-
-  return motor_pcnt_speed;
 }
 
 /**
@@ -277,54 +317,27 @@ void Driver_on_ADC_conv(void)
 #endif
 }
 
-#if 0 // BUFFER_ADC_BEMF
-/** @cond */
 /**
- * @brief Get Back-EMF buffer averaged.
+ * @brief  System Timer event handler
  *
- * @details 4 samples are captured within a single commutation sector.
+ * @details
+ *   Event handler for System Timer ISR. The event handler multiplexes the
+ *   BL Control Task and the Periodic Task which occur at different rates.
+ *   Responsible for updating the Commutation Timer period - invokes accessors
+ *   from both MCU and BL classes.
  *
- * @return  Calculated average of 4 samples stored in back-EMF frame buffer
- */
-uint16_t Driver_Get_Back_EMF_Avg(void)
-{
-  return phase_average;
-}
-/** @endcond */
-#endif
-
-/**
- * @brief Accessor for system voltage measurement.
- * @details Phase voltage measurement from ADC Channel 0 is to be used as
- * back-EMF sensing or system voltage.
- * @return  Most recent captured ADC conversion value from Channel 0
- */
-uint16_t Driver_Get_ADC(void)
-{
-  return ADC_Global;
-}
-
-/**
- * @brief  Invoke background task and control task.
- *
- * @details  Called from timer ISR. The timer reload register value is refreshed
- * from latest calculated commutation time period.
- *
- * Driven by PWM timer ISR
- *  e.g.
- *   timer period = fMaster * PS * 100%DC 
+ *   System Timer period = fMaster * PS * 100%DC
  *                                   = (1/16 Mhz) * 8 * 250 counts -> 0.000125 S
  *
- * The ISR multiplexes the PWM capture with Driver upate, but the driver update 
- * only requires x/hz
  *
- *   timer period * ISR Frame Count * CT_FRAME 
- *                               = 0.000125 * 4 ISRs * 2 count -> 0.001 seconds 
+ *    BL Control Timer frequency                            =
+ *      timer period * ISR frame count * CT_FRAME       =
+ *      0.000125 sec * 4 ISRs          * 2 timer events = 0.001 seconds (1000 Hz)
  *
- * The Periodic Task (UI) update is targetted to ~60 Hz (.0167 ms) i.e.
- *   timer period * ISR Frame Count * UI_FRAME 
- *                              = 0.000125 * 4 ISRs * 32 count -> 0.016 seconds 
- *   
+ *    Periodic Task Timer frequency                     =
+ *      timer period * ISR frame count * UI_FRAME       =
+ *      0.000125     * 4 ISRs          * 32 timer events = 0.0167 seconds (60 Hz)
+ *
  */
 void Driver_Update(void)
 {
@@ -338,7 +351,7 @@ void Driver_Update(void)
   // timer rate) presently ths update done every 1.024mS so the controller rate ~1Khz
   if ( 0 != (trate & CT_FRAME))
   {
-    BL_State_Ctrl();  // update commutation timing controller 
+    BL_State_Ctrl();  // update commutation timing controller
 
     // refresh the timer with the updated commutation time period
     MCU_set_comm_timer( BL_get_timing() );
@@ -359,33 +372,25 @@ void Driver_Update(void)
   }
 }
 
-
 /**
  * @brief  Top-level task for commutation switching sequence
  *
  * @details  Invoked from timer ISR
- * Each SequenceStep() is at 60-electrical-degrees.
- * Timing is established by:
- *  timer period * commutation period 
- * The Sequence Step is called every 4th iteration (equivalent to 60-degrees)
- *  ( i.e. the timer period is 1/4 the time duration of 60-degrees).
- * e.g.
- *  frame time = fMaster * PS * timer period
- *  60 electrical degrees = timer period * 4 frames
+ *
+ *   Every 4th timer event constitutes a 60-degree commutation "sector" at which
+ *   time _Commutation_Step() is invoked.
+ *   The timer was set up 4x faster than the commutation rate as a provision to
+ *   coordinate PWM sampling for zero-crossing detection (still TBD).
  */
 void Driver_Step(void)
 {
-  static const int SectorC = FOUR_SECTORS;
+  static const uint8_t Modulus = 4;
   static int index = 0;
 
 // Since the modulus being used (4) is a power of 2, then a bitwise & can be used
 // instead of a MOD (%) to save a few instructions, which is actually significant
 // as this is a very high frequency ISR!
-  index = (index + 1) & (SectorC - 1);
-
-// Distribute the work done in the ISR by partitioning
-//  sequence_step, memcpy,  get_ADC into  separate sub-steps
-// Logically the call to Sequence_Step() occurs following the memcpy()
+  index = (index + 1) & (Modulus - 1);
 
   switch(index)
   {
@@ -399,39 +404,14 @@ void Driver_Step(void)
   case 1:
   case 2:
   case 3:
+  default:
     break;
   }
 
 #if 0
-    /* Toggles LED */
-    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
+  /* Toggles LED */
+  GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 #endif
-}
-
-/**
- * @brief  Fill Rx Buffer in ISR Context
- *
- * @details  Invoked from Rx ISR
- */
- 
-void Driver_Get_Rx_It(void)
-{
-    #if defined( S105_DEV ) || defined( S105_DISCOVERY )
-
-        rxReceive[rxPos] = UART2_ReceiveData8();
-
-    #elif defined( S003_DEV )
-
-        rxReceive[rxPos] = UART1_ReceiveData8();
-				
-    #endif
-	
-    rxPos++;
-		
-    if(rxPos > RX_BUFFER_SIZE - 1)
-    {
-        rxPos = 0;
-    }
 }
 
 /**@}*/ // defgroup

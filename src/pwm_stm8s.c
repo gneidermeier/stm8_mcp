@@ -270,8 +270,8 @@ uint16_t PWM_get_servo_position_counts( uint16_t pulse_duration_counts )
  * @details Commanded motor speed is derived from proportional servo pulse
  *  so it is converted to percent of throttle/speed range.
  *
- * @param pulse_period_count  servo pulse period in timer counts
- * @param pulse_duration_count servo pulse duration in timer counts 
+ * @param pulse_period_counts  servo pulse period in timer counts
+ * @param pulse_duration_counts servo pulse duration in timer counts 
  *
  * @return Motor speed percent, integer range (0:1:100)
  */
