@@ -28,3 +28,10 @@ See module descriptions below as well as software documents in the code.
 * @subpage faultm
 
 ## Data Structures Design
+
+* @subpage data_dict
+
+## Communication Protocol Design
+
+* @subpage pdu_man
+

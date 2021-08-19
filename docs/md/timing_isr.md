@@ -1,42 +1,42 @@
 # Timing Concurrency Multitaking {#timing_isr}
 
-Timing domains in motor control are highly synchronized.
+Timing domains in motor control must be highly synchronized.
 
-## Update and Background Task Timing
+## System Update and Background Task timing
 
-TIM4 ISR is utilized as a scheduling trigger (period of 0.512 ms ) for
-BLDC_Update() which embodies the software state machine and control-loop logic/timing.
-
-Periodic Background Task timing synchronous to the ISR - TaskRdy flag
-
-\startuml
-
-stm8_isr -> Driver: Driver_update()
-Driver ->  BLDC_sm: BLDC_update()
-Driver -> BG_task: Task_set_ready()
-
-\enduml
-
-blah blah
-
-## Sequencer Timing
-
-TIM3 is configured to interrupt at 4-times the intended commutation switching
--rate, such that TIM3 ISR shall occur 4 times during each commutation period
-(i.e. at 15 degree intervals within a given 60-degree commutation sector).
+The event handler for System Timer ISR multiplexes the BL Control Task and the 
+Periodic Task, which occur at different rates. 
+ 
+Periodic Task provides an extern function to flag it for invocation from the 
+Background Task.
 
 \startuml
 
-stm8_isr -> Driver: step()
-Driver -> Stepper: Step()
-Stepper -->  Driver: Driver_get_ADC()
-Stepper ->  MCU_stm8: Phase_control()
+System Timer ISR -> Driver: Update()
+Driver ->  BL: Update()
+Driver -> Periodic Task: Task_set_ready()
 
 \enduml
 
-foo bar period the end.
 
-## PWM Sample Sequence Timing
+## Commutation Sequencer timing
+
+The Commutation Timer period varies inversely with the motor output so there must be 
+a Commutation Timer event to occur at least at each 60-degree sector. In order to 
+synchronize PWM capture for zero-crossing detection, the Commutation Timer is configured 
+to interrupt at at 15 degree intervals within a given 60-degree commutation sector.
+
+\startuml
+
+Commutation Timer ISR -> Driver: Step()
+Driver -> BL: Step()
+BL ->  Sequencer: Step()
+Sequencer-> PWM: Phase_control()
+
+\enduml
+
+
+## PWM Sample sequence timing
 
 You could try ....
 

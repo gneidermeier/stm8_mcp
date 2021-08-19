@@ -21,11 +21,6 @@ commutation sequence, PWM and ADC sampling sequence.
 Also the time spent in critical sections implemented (DI/EI) must be minimized as
 this also adds to the interrupt latency.
 
-The Background task updates the state machine actions and transitions, so they are
-maintained at a periodic rate. Within the state machine actions there may be expected
-to accommodate any non-deterministic behavior of the software related to e.g. the
-servicing the communication stack, the UI, fault management. These sub-tasks are pushed
-into the background task but in the worst case, should not exceed the Timer period (hence a frame-overrun).
 
 \startuml
 

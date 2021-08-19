@@ -6,113 +6,106 @@ The class diagram illustrates dependency and various interactions between module
 
 \startuml
 
-class           BLDC_sm {
-  BLDC_STATE_T BLDC_state
-  uint16_t BLDC_commut_pd
-  uint16_t Set_speed
-  uint16_t UI_speed
-  void BLDC_stop()
-  uint16_t BLDC_get_commut_pd()
-  BLDC_STATE_T BLDC_get_state()
-  void BLDC_update()
+class           CPU_abstraction {
+  void ISR_System_timer(void)
+  void ISR_Commutation_timer(void)
+  void ISR_PWM_edge(void)
 }
-class           BG_task{
-  uint16_t Analog_slider
-  uint8_t UI_speed
-  int8_t Digital_trim
-  uint8_t Task_rdy_flag
-  uint16_t Vsystem
-  void Task_set_rdy()
-  void Task_Chk_rdy()
+class           Sys_Driver {
+  void On_PWM_edge(void)
+  void On_Time_Capture(void)
+  void On_system_timer(void)
+  void On_commutation_timer(void)
 }
-class           Stepper{
-  uint8_t Sequence_step
-  uint16_t BEMF_fall
-  uint16_t BEMF_rise
-  uint16_t Get_sys_voltage()
-  void Stepper()
+class           BL_machine {
+  void BL_reset(void)
+  void BL_On_systick(void)
 }
-class           Driver{
-  uint16_t ADC_instant
-  uint16_t BEMF_fbuf[4]
-  void Driver_update()
-  void Driver_step()
-  void Driver_post_ADC()
-  uint16_t Driver_get_ADC()
-  uint16_t Driver_get_BEMF()
+class           Phase_Switcher {
+  Sequence_Step(void)
+  void Sequence_Step_0(void)
 }
-class           Faultm{
-  fault_status_t Status_word
-  faultm_mat_t fault_matrix[ NR_DEFINED_FAULTS ]
-  void Faultm_set(faultm_ID_t)
-  fault_status_t Faultm_get_status()
-  void Faultm_upd(faultm_ID_t, faultm_assert_t)
-  void Faultm_init()
+class           MCU_Interface {
+  void MCU_init(void)
+  int putchar(char c)
+  int getchar(void)
 }
-class           MCU_stm8{
-  void Set_PWM_DC(uint16_t)
-  void Stop_PWM()
-  void Phase_control()
+class           PWM_Phase {
+  void PWM_PhX_Disable(void)
+  void PWM_PhX_Enable(void)
+  void PWM_set_dutycycle(uint16_t)
+  void PWM_setup(void)
 }
-class           stm8_isr{
-  void TIM2_UPD_OVF_BRK_IRQHandler()
-  void TIM3_UPD_OVF_BRK_IRQHandler()
-  void TIM4_UPD_OVF_IRQHandler()
-  void ADC2_IRQHandler()
+class           Fault_Mon {
+  void Faultm_init(void)
+  void Faultm_upd(faultm_ID_t faultm_ID, faultm_assert_t tcondition)
+  void Faultm_set(faultm_ID_t faultm_ID)
+  void Faultm_clr(faultm_ID_t faultm_ID)
+  fault_status_reg_t Faultm_get_status(void)
+}
+class           BG_Task {
+  void BG_task_wake()
+  void BG_task_exec()  
+}
+class           Term_IO {
+}
+class           Data_Dictionary {
+    void * Sys_vars_LUT[16]
+}
+class           PDU_Manager {
+}
+class           User_Interface {
+  void Log_print()
 }
 
-stm8_isr ..> Driver
+CPU_abstraction ..> Sys_Driver
 note on link
-Driver_update()
-Driver_step()
-Driver_post_ADC_con()
+  On_PWM_edge()
+  On_timer_Capture()
+  On_system_timer()
+  On_commutation_timer()
 end note
 
-Driver .down.> Stepper
-note on link: Stepper()
+Sys_Driver ..> BL_machine
+note on link: BL_On_systick()
 
-Driver ..> BLDC_sm
-note on link: BLDC_update
+Sys_Driver ..> BG_task
+note on link: BG_task_wake()
 
-Driver .> BG_task
-note on link: Task_set_ready()
+BL_machine ..> PWM_Phase
+note on link: PWM_set_dutycycle()
 
-BG_task ..> Faultm
+BL_machine ..> Phase_Switcher
+note on link: Sequence_Step()
+
+BL_machine ..> Fault_Mon
 note on link
-    Faultm_upd()
-    Faultm_set()
-end note
-
-BG_task ..> BLDC_sm
-note on link: BLDC_get_state()
-BG_task ..> Stepper
-note on link: Get_sys_voltage()
-BG_task ..> Driver
-note on link
-    Driver_get_pulse_perd()
-    Driver_get_pulse_dur()
-end note
-
-BLDC_sm ..> Faultm
-note on link
-    Faultm_get_status()
     Faultm_init()
+    Faultm_get_status()	
 end note
 
-BLDC_sm ..> MCU_stm8
+Phase_Switcher ..> PWM_Phase
+
+PWM_Phase ..> MCU_Interface
+
+Term_IO ..> MCU_Interface
 note on link
-    Set_PWM_DC()
-    Stop_PWM()
-end note
+  putchar()
+  getchar()
+end note 
 
-Stepper .up.> Driver
-note on link
-    Driver_get_ADC()
-    Driver_get_BEMF()
-end note
+User_Interface ..> Term_IO
+note on link: printf()
 
-Stepper ..> MCU_stm8
-note on link: Phase_control()
+BG_task ..> User_Interface
+note on link: Log_print()
+
+User_Interface ..> Data_Dictionary
+User_Interface ..> PDU_Manager
+
+Data_Dictionary ..> BL_machine
+Data_Dictionary ..> Fault_Mon
+Data_Dictionary ..> Phase_Switcher
 
 \enduml
 

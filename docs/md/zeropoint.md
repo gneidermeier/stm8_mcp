@@ -1,7 +1,7 @@
 ## Zero Crossing Point Estimation {#zeropoint}
 
 There are a number of ways that the zero-crossing point can be estimated from
-the back-EMF voltage measurement. Safe to say there is no 1 silver bullet!
+the back-EMF voltage measurement.
 
 ### Hardware comparator
 
@@ -40,24 +40,15 @@ is done between the btdc samples and the atdc samples. The ratio between the ave
 the atdc and  btdc sides of the trapezoid ranges from 1/1 when the motor is in time and
 proportionately above or below one to the amount of timing error ( error = atdc/btdc - 1).
 
-TIM3 is configured to interrupt at 4-times the intended commutation switching
-rate, such that TIM3 ISR shall occur 4 times during each commutation period (i.e.
+The Commutation Timer is configured to interrupt at 4-times the intended commutation switching
+rate, such that the Timer ISR shall occur 4 times during each commutation period (i.e.
 at 15 degree intervals within a given 60-degree commutation sector).
 
-ADC start conversion is triggered by TIM2 ISR (PWM rising edge). Number of PWM
-pulses (i.e. samples) within the floating period is inverse to motor speed so the  
-number of samples collected over the 60-degrees time would need to be counted.
-So a counter in either the TIM2 (PWM rising edge) ISR, or the ADC conversion complete
-ISR. Counter need to be 0'd start of each commtation period.
-
-Alternatively, always intiialze buffer to 1/2 DC point (neutral point voltge) and
-always average across X samples (number of samples needed at lowest motor speed at which
-the closed loop is effective).
+ADC start conversion is triggered by the System Timer (PWM rising edge). 
 
 The battery voltage measurement is obtained by taking the A/D measurement during 
 the active PWM driving section of the commutation period.
 
-<b>TODO: This  shall NOT be at 15-degree intervals to use approach 3</b>
 
 \startuml
 
