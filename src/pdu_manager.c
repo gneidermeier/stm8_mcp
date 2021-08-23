@@ -97,5 +97,6 @@ void Pdu_Manager_Handle_Rx(void)
     if(NO_FRAME != frameLocation)
     {
         Read_Data();
+        Driver_Clear_Rx_Buffer_Element(frameLocation);
     }
 }

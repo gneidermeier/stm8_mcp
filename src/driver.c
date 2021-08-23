@@ -272,6 +272,15 @@ uint8_t Driver_Return_Rx_Buffer(void)
     return tmp;
 }
 
+/**
+ * @brief  Clear Rx Buffer Element
+ */
+
+void Driver_Clear_Rx_Buffer_Element(uint8_t Location)
+{
+    rxReceive[Location] = 0;
+}
+
 /*
  * event handlers ********************************
  */

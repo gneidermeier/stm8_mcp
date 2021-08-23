@@ -58,5 +58,6 @@ uint16_t Driver_get_servo_position_counts(void);
 
 void Driver_Get_Rx_It(void);
 uint8_t Driver_Return_Rx_Buffer(void);
+void Driver_Clear_Rx_Buffer_Element(uint8_t);
 
 #endif // DRIVER_H
