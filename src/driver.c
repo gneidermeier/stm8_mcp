@@ -222,22 +222,30 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Get_Rx_It(void)
 {
-#if defined( S105_DEV ) || defined( S105_DISCOVERY )
+    static uint8_t firstFlag = TRUE;
+    
+    if(firstFlag)
+    {
+        firstFlag = FALSE;
+        rxPos = 0;
+    }
+    
+    #if defined( S105_DEV ) || defined( S105_DISCOVERY )
 
-  rxReceive[rxPos] = UART2_ReceiveData8();
+        rxReceive[rxPos] = UART2_ReceiveData8();
 
-#elif defined( S003_DEV )
+    #elif defined( S003_DEV )
 
-  rxReceive[rxPos] = UART1_ReceiveData8();
-
-#endif
-
-  rxPos++;
-
-  if(rxPos > RX_BUFFER_SIZE - 1)
-  {
-    rxPos = 0;
-  }
+        rxReceive[rxPos] = UART1_ReceiveData8();
+				
+    #endif
+	
+    rxPos++;
+		
+    if(rxPos > RX_BUFFER_SIZE - 1)
+    {
+        rxPos = 0;
+    }
 }
 
 /*
