@@ -1,5 +1,8 @@
 # Fault Monitor  {#faultm}
 
+Fault Monitor is repsonsible for immplementing and servicing a table of monitored 
+operating conditions and their status.
+
 ## Fault Matrix
 
 fault_matrix is an array of faultm_mat_t that implements the fault tracking table.

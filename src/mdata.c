@@ -125,10 +125,14 @@ static const uint16_t OL_Timing[ /* TABLE_SIZE */ ] =
 
 /**
  * @brief Table lookup for open-loop commutation timing
+ * @details 
+ *   The table definition depends on the PWM duty-cycle being 250 steps.
+ *   PWM now had 1024 steps so the macro is used to rescale it to lookup the
+ *   commutation timing.
  *
- * @param index  Index into the table - motor speed i.e. PWM duty-cycle
+ * @param table_index Index into the table
  *
- * @return LUT value @ index
+ * @return Commutation period expressed in timer counts
  * @retval -1 error
  */
 uint16_t Get_OL_Timing(uint16_t table_index)

@@ -34,6 +34,10 @@
 
 
 /* Private types -----------------------------------------------------------*/
+
+/**
+ * @brief Enum typedef for setting the 6-step sequence pointer
+ */
 typedef enum
 {
   SECTOR_0 = 0,

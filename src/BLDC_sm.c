@@ -176,8 +176,7 @@ void BL_reset(void)
  *  UI Speed is shared with background task so this function should
  *  be invoked only from within a CS.
  *
- * @param dc Speed input which can be in the range [0:255]
- *            TODO: needs to be in terms of percent of speed range (0:100)
+ * @param ui_mspeed_counts The desired motor output in tetms of timer counts
  */
 void BL_set_speed(uint16_t ui_mspeed_counts)
 {

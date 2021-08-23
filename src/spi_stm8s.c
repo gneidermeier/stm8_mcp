@@ -234,3 +234,5 @@ static void SPI_periphd(void)
 
 #endif // SPI_ENABLED
 
+/**@}*/ // defgroup
+

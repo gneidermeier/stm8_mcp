@@ -6,29 +6,32 @@ state-machine.
 From powerup, the software initializes the state-machine to RESET.
 In RESET, the system attempts to reinitialize and clear faults.
 
-Applying speed signal greater than 0 initiates RAMP - the motor is induced
-to start turning by initiating the commutation sequence at the maximum timing
-period at the fixed RampupDC PWM value - progressively shortening the length of the
-commutation period causes the motor to spin faster.
+Applying speed signal greater than 0 initiates ALIGNMENT, where the controller 
+applies one commutation step with the active motor phase driven with a PWM 
+duty-cycle that induces current to energize it enough to pull the rotor 
+into place. 
 
-Transition to RUNNING occurs when the commutation time period length converges
-on the period length value from the open-loop timing table (indexed by the Duty
-Cycle value.
+The state-machine transitioned to RAMP, where motor output is ramped 
+to stable, minimal operating speed by progressively shortening the length of the
+commutation period causing the motor to spin faster. Some motors may respond
+better to an exponential ramp as opposed to a linear one.
 
-There is no provision for reversing the sequence (airplane ESCs don't have reverse).
+Transition to RUNNING occurs once the motor attains a stable, minimal operating 
+speed and the software is able to detect the zero-crossing point and control the
+motor timing by closed-loop control.
 
-Presently there is no specific requirement for alignment state (stepping
-the motor to a known position from which either the forward
-or reverse commutation switch sequence can be initiated).
+Transition to STOP occurs when 1) user speed-control input falls below minimum 
+motor operating speed  2) error condition such as stalled motor detected.
 
 \startuml
 
 [*] -> RESET: powerup
-RESET -down-> READY: [UI_speed > 0]
-READY -down-> RAMP: [UI_speed > _RampupDC_]
-RAMP -down-> RUNNING: [ BLDC_OL_comm_tm <= Get_OL_Timing( _RampupDC_ )]
-RUNNING -> RESET: BLDC_Stop()
+RESET -down-> STOPPED:
+STOPPED -down-> ALIGN: [servo input > ARMED]
+ALIGN -down-> RAMP:
+RAMP -down-> RUNNING:
+RUNNING -> STOPPED: BLDC_Stop()
 RUNNING -> FAULT
-FAULT -> RESET : BLDC_Stop()
+FAULT -> RESET
 
 \enduml
