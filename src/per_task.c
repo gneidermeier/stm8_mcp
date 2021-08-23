@@ -346,7 +346,9 @@ uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
   
-  Pdu_Manager_Handle_Rx();
+  #ifdef UART_IT_RXNE_ENABLE
+    Pdu_Manager_Handle_Rx();
+  #endif
 
   if (0 != TaskRdy)
   {
