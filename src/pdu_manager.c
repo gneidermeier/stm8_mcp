@@ -24,6 +24,8 @@
 #define RX_BUFFER_SIZE  16  //how big should this be? Also, shouldn't be defined in two places.
 #define MAX_RX_DATA_SIZE 8  //how big should this be?
 
+#define NO_FRAME 255
+
 /* Private types -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
@@ -33,7 +35,7 @@
 static uint8_t size;
 static uint8_t command;
 static uint8_t data[MAX_RX_DATA_SIZE];
-static uint8_t crc8;
+static uint8_t checkSum;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -52,10 +54,10 @@ uint8_t Find_Frame(void)
     {
        if(SOF == Driver_Return_Rx_Buffer())
        {
-           return TRUE;
+           return count;
        }       
     }
-    return FALSE;
+    return NO_FRAME;
 }
 
 /**
@@ -74,7 +76,10 @@ uint8_t Read_Data(void)
     {
         data[i] = Driver_Return_Rx_Buffer();
     }
+    
+    checkSum = Driver_Return_Rx_Buffer();
 }
+
 
 /* External functions ---------------------------------------------------------*/
 
@@ -85,7 +90,11 @@ uint8_t Read_Data(void)
 
 void Pdu_Manager_Handle_Rx(void)
 {
-    if(Find_Frame())
+    uint8_t frameLocation;
+  
+    frameLocation = Find_Frame();
+  
+    if(NO_FRAME != frameLocation)
     {
         Read_Data();
     }
