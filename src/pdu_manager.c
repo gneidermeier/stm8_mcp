@@ -35,7 +35,7 @@
 static uint8_t size;
 static uint8_t command;
 static uint8_t data[MAX_RX_DATA_SIZE];
-static uint8_t checkSum;
+static uint8_t receivedCheckSum;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -61,23 +61,43 @@ uint8_t Find_Frame(void)
 }
 
 /**
- * @brief Reads data off Rx buffer
+ * @brief Reads data off Rx buffer and adds together checkSum
  *
 */
 
 uint8_t Read_Data(void)
 {
     uint8_t i;
+    uint8_t activeCheck;
     
     size = Driver_Return_Rx_Buffer();
     command = Driver_Return_Rx_Buffer();
     
+    activeCheck = size + command;
+    
     for(i = 0; i < size; i++)
     {
         data[i] = Driver_Return_Rx_Buffer();
+        activeCheck += data[i];
     }
     
-    checkSum = Driver_Return_Rx_Buffer();
+    receivedCheckSum = Driver_Return_Rx_Buffer();
+    
+    return activeCheck;
+}
+
+/**
+ * @brief Checksum data off Rx buffer
+ *
+*/
+
+uint8_t Check_Data(uint8_t activeCheck)
+{
+    if(activeCheck == receivedCheckSum)
+    {
+        return TRUE;
+    }
+    return FALSE;
 }
 
 
@@ -91,12 +111,16 @@ uint8_t Read_Data(void)
 void Pdu_Manager_Handle_Rx(void)
 {
     uint8_t frameLocation;
+    uint8_t checkSum;
   
     frameLocation = Find_Frame();
   
     if(NO_FRAME != frameLocation)
     {
-        Read_Data();
-        Driver_Clear_Rx_Buffer_Element(frameLocation);
+        checkSum = Read_Data();
+        if(Check_Data(checkSum))  //return TRUE if good
+        {
+            Driver_Clear_Rx_Buffer_Element(frameLocation);
+        }
     }
 }
