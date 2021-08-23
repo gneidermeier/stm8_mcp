@@ -63,7 +63,7 @@ static uint16_t Pulse_dur;
 
 static uint8_t rxReceive[RX_BUFFER_SIZE];
 static uint8_t rxPos;
-
+static uint8_t rxReadLoc;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -246,6 +246,34 @@ void Driver_Get_Rx_It(void)
     {
         rxPos = 0;
     }
+}
+
+/**
+ * @brief  Return Rx Buffer
+ */
+ 
+uint8_t Driver_Return_Rx_Buffer(void)
+{
+    uint8_t tmp = rxReceive[rxReadLoc];
+    
+    static uint8_t firstFlag = TRUE;
+    
+    if(firstFlag)
+    {
+        firstFlag = FALSE;
+        rxReadLoc = 0;
+    }
+    
+    rxReceive[rxReadLoc] = 0;
+    
+    rxReadLoc++;
+    
+    if(rxPos > RX_BUFFER_SIZE - 1)
+    {
+        rxReadLoc = 0;
+    }
+    
+    return tmp;
 }
 
 /*
