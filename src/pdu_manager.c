@@ -19,6 +19,8 @@
 
 /* Private defines -----------------------------------------------------------*/
 
+#define SOF 52
+
 /* Private types -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
@@ -29,6 +31,23 @@
 
 /* Private functions ---------------------------------------------------------*/
 
+/**
+ * @brief Find SOF of Rx buffer
+ *
+*/
+
+uint8_t Find_Frame(void)
+{
+    if(SOF != Driver_Return_Rx_Buffer())
+    {
+        return FALSE;
+    }
+    else
+    {
+        return TRUE;
+    }
+}
+
 /* External functions ---------------------------------------------------------*/
 
 /**
@@ -38,5 +57,9 @@
 
 void Pdu_Manager_Handle_Rx(void)
 {
-    //TODO: HANDLE RX
+    uint8_t size;
+  
+    while(FALSE != Find_Frame());
+    
+    size = Driver_Return_Rx_Buffer();
 }
