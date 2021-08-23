@@ -21,11 +21,18 @@
 
 #define SOF 52
 
+#define RX_BUFFER_SIZE  16  //how big should this be? Also, shouldn't be defined in two places.
+
 /* Private types -----------------------------------------------------------*/
 
 /* Public variables  ---------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+
+static uint8_t size;
+static uint8_t command;
+static uint8_t data[DATA_MAX];
+static uint8_t crc8;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -38,28 +45,30 @@
 
 uint8_t Find_Frame(void)
 {
-    if(SOF != Driver_Return_Rx_Buffer())
+    uint8_t count;
+    
+    for(count = 0; count < RX_BUFFER_SIZE; count++)
     {
-        return FALSE;
+       if(SOF == Driver_Return_Rx_Buffer())
+       {
+           return TRUE;
+       }       
     }
-    else
-    {
-        return TRUE;
-    }
+    return FALSE;
 }
+
+
 
 /* External functions ---------------------------------------------------------*/
 
 /**
- * @brief Call from timer/capture ISR on capture of rising edge of servo pulse
+ * @brief Handle Rx Buffer
  *
 */
 
 void Pdu_Manager_Handle_Rx(void)
 {
-    uint8_t size;
+    uint8_t frameFound;
   
-    while(FALSE != Find_Frame());
-    
-    size = Driver_Return_Rx_Buffer();
+    frameFound = Find_Frame();
 }

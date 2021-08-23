@@ -36,10 +36,8 @@
 
 #define GET_BACK_EMF_ADC( ) \
     ( ADC_Global - DC_HALF_REF )
-
-
-#define RX_BUFFER_SIZE  16  //how big should this be?
-
+    
+#define RX_BUFFER_SIZE  16  //how big should this be? Also, shouldn't be defined in two places.
 
 /* Private types -----------------------------------------------------------*/
 
@@ -237,11 +235,11 @@ void Driver_Get_Rx_It(void)
     #elif defined( S003_DEV )
 
         rxReceive[rxPos] = UART1_ReceiveData8();
-				
+
     #endif
-	
+
     rxPos++;
-		
+
     if(rxPos > RX_BUFFER_SIZE - 1)
     {
         rxPos = 0;
@@ -263,8 +261,6 @@ uint8_t Driver_Return_Rx_Buffer(void)
         firstFlag = FALSE;
         rxReadLoc = 0;
     }
-    
-    rxReceive[rxReadLoc] = 0;
     
     rxReadLoc++;
     

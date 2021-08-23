@@ -315,6 +315,11 @@ Next=Root.Source Files...\..\src\mdata.c
 [Root.Source Files...\..\src\mdata.c]
 ElemType=File
 PathName=..\..\src\mdata.c
+Next=Root.Source Files...\..\src\pdu_manager.c
+
+[Root.Source Files...\..\src\pdu_manager.c]
+ElemType=File
+PathName=..\..\src\pdu_manager.c
 Next=Root.Source Files...\..\src\per_task.c
 
 [Root.Source Files...\..\src\per_task.c]
