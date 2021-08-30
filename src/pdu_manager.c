@@ -21,7 +21,6 @@
 
 #define SOF 52
 
-#define RX_BUFFER_SIZE  16  //how big should this be? Also, shouldn't be defined in two places.
 #define MAX_RX_DATA_SIZE 8  //how big should this be?
 
 #define NO_FRAME 255

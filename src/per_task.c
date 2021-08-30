@@ -339,16 +339,16 @@ static void Periodic_task(void)
  * @details
  * Called in non-ISR context - checks the background task ready flag which if !0
  * will invoke the Periodic Task function.
- * @note  Referred to as Pertask_chk_ready
+ * @note  Called at ~60 Hz (0.0167 ms) - see Driver_Update()
  * @return  True if task ran (allows caller to also sync w/ the time period)
  */
 uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
   
-  #ifdef UART_IT_RXNE_ENABLE
-    Pdu_Manager_Handle_Rx();
-  #endif
+#ifdef UART_IT_RXNE_ENABLE
+  Pdu_Manager_Handle_Rx();
+#endif
 
   if (0 != TaskRdy)
   {

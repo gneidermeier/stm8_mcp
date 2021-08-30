@@ -30,7 +30,7 @@
 // table size originated from 250 step PWM confiugration
 #define MSPEED_PCNT_INCREM_STEP   ( PWM_PERIOD_COUNTS * PWM_PERCENT_PER_COUNT_250 )
 
-
+#define RX_BUFFER_SIZE  16  //how big should this be?
 
 
 /* types --------------------------------------------------------------------*/
