@@ -30,7 +30,7 @@
 // table size originated from 250 step PWM confiugration
 #define MSPEED_PCNT_INCREM_STEP   ( PWM_PERIOD_COUNTS * PWM_PERCENT_PER_COUNT_250 )
 
-
+#define RX_BUFFER_SIZE  16  //how big should this be?
 
 
 /* types --------------------------------------------------------------------*/
@@ -57,5 +57,7 @@ uint16_t Driver_get_pulse_perd(void);
 uint16_t Driver_get_servo_position_counts(void);
 
 void Driver_Get_Rx_It(void);
+uint8_t Driver_Return_Rx_Buffer(void);
+void Driver_Clear_Rx_Buffer_Element(uint8_t);
 
 #endif // DRIVER_H

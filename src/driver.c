@@ -18,6 +18,7 @@
 #include "bldc_sm.h"
 #include "per_task.h"
 #include "pwm_stm8s.h"
+#include "driver.h"
 
 /* Private defines -----------------------------------------------------------*/
 
@@ -36,10 +37,6 @@
 
 #define GET_BACK_EMF_ADC( ) \
     ( ADC_Global - DC_HALF_REF )
-
-
-#define RX_BUFFER_SIZE  16  //how big should this be?
-
 
 /* Private types -----------------------------------------------------------*/
 
@@ -62,8 +59,6 @@ static uint16_t Pulse_perd;
 static uint16_t Pulse_dur;
 
 static uint8_t rxReceive[RX_BUFFER_SIZE];
-static uint8_t rxPos;
-
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -222,22 +217,53 @@ uint16_t Driver_Get_ADC(void)
  */
 void Driver_Get_Rx_It(void)
 {
-#if defined( S105_DEV ) || defined( S105_DISCOVERY )
+  static uint8_t rxPos = 0;
+    
+  #if defined( S105_DEV ) || defined( S105_DISCOVERY )
 
-  rxReceive[rxPos] = UART2_ReceiveData8();
+    rxReceive[rxPos] = UART2_ReceiveData8();
 
-#elif defined( S003_DEV )
+  #elif defined( S003_DEV )
 
-  rxReceive[rxPos] = UART1_ReceiveData8();
+    rxReceive[rxPos] = UART1_ReceiveData8();
 
-#endif
+  #endif
 
   rxPos++;
 
-  if(rxPos > RX_BUFFER_SIZE - 1)
+  if (rxPos > (RX_BUFFER_SIZE - 1))
   {
     rxPos = 0;
   }
+}
+
+/**
+ * @brief  Return Rx Buffer
+ */
+ 
+uint8_t Driver_Return_Rx_Buffer(void)
+{
+  static uint8_t rxReadLoc = 0;
+  
+  uint8_t tmp = rxReceive[rxReadLoc];
+    
+  rxReadLoc += 1;
+    
+  if (rxReadLoc > (RX_BUFFER_SIZE - 1))
+  {
+    rxReadLoc = 0;
+  }
+    
+  return tmp;
+}
+
+/**
+ * @brief  Clear Rx Buffer Element
+ */
+
+void Driver_Clear_Rx_Buffer_Element(uint8_t Location)
+{
+    rxReceive[Location] = 0;
 }
 
 /*
