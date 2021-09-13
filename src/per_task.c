@@ -12,11 +12,9 @@
  * @brief Background task / periodic task
  * @{
  */
-
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <stddef.h> // NULL
-
 // app headers
 #include "mcu_stm8s.h"
 #include "sequence.h"
@@ -26,21 +24,18 @@
 #include "spi_stm8s.h"
 #include "pdu_manager.h"
 
-
 /* Private defines -----------------------------------------------------------*/
-
 /*
- * motor speed received from remote UI with integer scaling would ideally provide 1024 
- * steps of precision, however to fit uint16, scale factor limited to 65535/100 so 
- * slightly less precision than actual radio signal (timer capture) but acceptable  
+ * motor speed received from remote UI with integer scaling would ideally provide 1024
+ * steps of precision, however to fit uint16, scale factor limited to 65535/100 so
+ * slightly less precision than actual radio signal (timer capture) but acceptable
  * i.e.
- *  pwm_motor_speed =   pwm_period_counts * (ui_speed_pcnt / 512) / 100 
+ *  pwm_motor_speed =   pwm_period_counts * (ui_speed_pcnt / 512) / 100
  *
- * The UI motor speed is for now scaled to the range of the PWM period in 
+ * The UI motor speed is for now scaled to the range of the PWM period in
  * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
  */
 #define UI_MSPEED_PCNT_SCALE  512.0  // 0.002% per bit ... note use power of 2 scale factor
-
 
 // Threshold is set low enuogh that the machine doesn't stall
 // thru the lower speed transition into closed-loop control.
@@ -48,18 +43,15 @@
 // obstacle like a 3x5 index card.
 #if defined ( S105_DEV )
 //  Vcc==3.3v  33k/10k @ Vbatt==12.4v
-  #define V_SHUTDOWN_THR      0x02C0    // experimentally determined @ 12.4v
+#define V_SHUTDOWN_THR      0x02C0    // experimentally determined @ 12.4v
 #else
-  // applies presently only to the stm8s-Discovery, at 14.2v and ADCref == 5v
-  #define V_SHUTDOWN_THR      0x02C0    // experimentally determined!
+// applies presently only to the stm8s-Discovery, at 14.2v and ADCref == 5v
+#define V_SHUTDOWN_THR      0x02C0    // experimentally determined!
 #endif
-
 
 //#define ANLG_SLIDER
 
-
 /* Private function prototypes -----------------------------------------------*/
-
 // forward declarations for UI input handers
 static void timing_plus(void);
 static void timing_minus(void);
@@ -68,11 +60,9 @@ static void spd_minus(void);
 static void m_stop(void);
 static void m_start(void);
 
-
 /* Public variables  ---------------------------------------------------------*/
 
 /* Private types     ---------------------------------------------------------*/
-
 /**
  * @brief Data type for the key handler function.
  */
@@ -90,7 +80,7 @@ typedef enum
   SPD_PLUS    = '.', // >
   SPD_MINUS   = ',', // <
   K_UNDEFINED = -1
-} 
+}
 ui_keycode_t;
 
 /**
@@ -100,16 +90,14 @@ typedef struct
 {
   ui_keycode_t   key_code;  /**< Key code. */
   ui_handlrp_t   phandler;  /**< Pointer to handler function. */
-} 
+}
 ui_key_handler_t;
 
-
 /* Private variables ---------------------------------------------------------*/
-
 static uint8_t TaskRdy; // flag for timer interrupt for BG task timing
 static uint8_t Log_Level;
 static uint16_t Vsystem;
-static uint16_t UI_Speed; // motor percent speed input from servo or remote UI 
+static uint16_t UI_Speed; // motor percent speed input from servo or remote UI
 
 /**
  * @brief Lookup table for UI input handlers
@@ -123,7 +111,7 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
   {M_STOP,     m_stop},
-  {M_START,    m_start}	
+  {M_START,    m_start}
 };
 
 // macros to help make the LUT slightly more encapsulated
@@ -133,7 +121,6 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
 
 
 /* Private functions ---------------------------------------------------------*/
-
 /**
  * @brief Print one line to the debug serial port.
  * @note: NOT appropriate in either an ISR or critical section because of printf
@@ -146,7 +133,7 @@ static void Log_println(int zrof)
   static uint16_t Line_Count = 0;
   int faults = (int)Faultm_get_status();
   uint16_t ui_speed = UI_Speed;
-  uint16_t bl_speed = BL_get_speed(); 
+  uint16_t bl_speed = BL_get_speed();
   uint16_t timing_error = Seq_get_timing_error();
   uint16_t comm_period = BL_get_timing();
 //  uint16_t servo_pulse_period = Driver_get_pulse_perd();
@@ -164,39 +151,40 @@ static void Log_println(int zrof)
   if ( Log_Level > 0)
   {
     printf(
-      "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u ERR=%04X \r\n",
+      "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u ERR=%04X ST=%u BR=%04X BF=%04X \r\n",
       Line_Count++,  // increment line countet
-      ui_speed, comm_period, bl_speed, Vsystem, faults, 
+      ui_speed, comm_period, bl_speed, Vsystem, faults,
       servo_pulse_duration, servo_posn_counts, display_speed_pcnt,
-      timing_error
+      timing_error, (uint16_t)BL_get_opstate(),
+      Seq_Get_bemfR(), Seq_Get_bemfF()
     );
-     Log_Level -= 1;
+    Log_Level -= 1;
   }
 }
 
 /*
  * Service the slider and trim inputs for speed setting.
  * The UI Speed value represents percent of motor speed (0% : 100%), which is
- * proportional to RC radio control servo signal. 
+ * proportional to RC radio control servo signal.
  *
- * Servo input will have range of (0:1600) which can directly be used as the 
- * pwm input if the timer prescaler is set such that 16Mhz works out to a 
+ * Servo input will have range of (0:1600) which can directly be used as the
+ * pwm input if the timer prescaler is set such that 16Mhz works out to a
  * PWM period of    0.0000000625 * 1600 = 100 uS so 10 kHz .
- * 
- * The UI motor speed is for now scaled to the range of the PWM period in 
+ *
+ * The UI motor speed is for now scaled to the range of the PWM period in
  * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
  *
- * The standard RC framerate is 50 Hz or 20 mS. With pertask is updating at 60Hz, 
- * then the timely response of the system should be assured. 
+ * The standard RC framerate is 50 Hz or 20 mS. With pertask is updating at 60Hz,
+ * then the timely response of the system should be assured.
  */
 static void ui_set_motor_spd(uint16_t ui_motor_speed)
-{	
+{
 #ifdef ANLG_SLIDER
   uint16_t adc_tmp16 = ADC1_GetBufferValue( ADC1_CHANNEL_3 ); // ISR safe ... hmmmm
   Analog_slider = adc_tmp16 / 4; // [ 0: 1023 ] -> [ 0: 255 ]
 #endif
 
-    BL_set_speed( ui_motor_speed );
+  BL_set_speed( ui_motor_speed );
 }
 
 /*
@@ -301,10 +289,10 @@ static void Periodic_task(void)
 {
   BL_RUNSTATE_t bl_state;
 
-// invoke the terminal input and ui speed subs, 
-// If there is a valid key input, a function pointer to the input handler is 
+// invoke the terminal input and ui speed subs,
+// If there is a valid key input, a function pointer to the input handler is
 // returned. This is done prior to entering a Critical Section (DI/EI) in which
-// it will then be safe to invoke the input handler function (e.g. can call 
+// it will then be safe to invoke the input handler function (e.g. can call
 // subfunctions that may be messing with global variables e.g. motor speed etc.
   ui_handlrp_t fp = handle_term_inp();
 
@@ -345,7 +333,7 @@ static void Periodic_task(void)
 uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
-  
+
 #ifdef UART_IT_RXNE_ENABLE
   Pdu_Manager_Handle_Rx();
 #endif
@@ -382,5 +370,4 @@ void Periodic_Task_Wake(void)
 {
   TaskRdy = TRUE; // notify background process
 }
-
 /**@}*/ // defgroup
