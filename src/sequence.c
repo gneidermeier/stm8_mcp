@@ -19,7 +19,6 @@
 #include "driver.h"
 #include "bldc_sm.h"
 
-
 /* Private defines -----------------------------------------------------------*/
 /**
  * Plausibility of back-EMF measurement: the threshold (somewhat arbitrary) is
@@ -31,7 +30,6 @@
 #define  BACK_EMF_PLAUS_THR  0x03F8
 
 /* Private types -----------------------------------------------------------*/
-
 
 /* Private types -----------------------------------------------------------*/
 
@@ -60,9 +58,7 @@ Seq_sector_t;
 */
 typedef void (*step_ptr_t)( void );
 
-
 /* Private function prototypes -----------------------------------------------*/
-
 static void sector_0(void);
 static void sector_1(void);
 static void sector_2(void);
@@ -70,10 +66,8 @@ static void sector_3(void);
 static void sector_4(void);
 static void sector_5(void);
 
-
 /* Public variables  ---------------------------------------------------------*/
-
-/** 
+/**
  * @brief state variable for the sequencer
  */
 Seq_sector_t Seq_step;
@@ -186,9 +180,7 @@ static int16_t comm_tm_err_ratio;
 #define SCALE_64_LSH   6
 #define SCALE_64_ONE  (1 << SCALE_64_LSH)
 
-
 /* Private functions ---------------------------------------------------------*/
-
 /*
  * Sector 0:  A_PWM_HS | B_OFF_LS | C_FLOAT_NEG
  *
@@ -326,7 +318,6 @@ static void sector_5(void)
 //  PWM_PhC_Enable();  // NO
 //  PWM_PhC_HB_ENABLE(); NO-OP?
 
-
 // update the timing error once per frame
 //  comm_timing_error = (comm_timing_error + TIMING_ERROR_TERM) > 1; // sma
 
@@ -347,15 +338,15 @@ static void sector_5(void)
  * @details If the motor timing is advanced, the control error should be
  *  positive i.e. increasing commutation period slows the motor.
  *
- * @return  Signed integer error.
+ * @return boolean true (!=0) if plausible, false (0) if not plausible
  */
 int8_t Seq_get_timing_error_p(void)
 {
   if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
   {
-    return (int8_t)0;
+    return (int8_t)1;
   }
-  return (int8_t)(-1);
+  return (int8_t)0;
 }
 
 /**
@@ -364,8 +355,7 @@ int8_t Seq_get_timing_error_p(void)
  * @details If the motor timing is advanced, the control error should be
  *  positive i.e. increasing commutation period slows the motor.
  *
- * @return signed error which at its extreme should be equal to or less than the
- *  range of the initial ADC measurement i.e. 0x0400
+ * @return signed error
  */
 int16_t Seq_get_timing_error(void)
 {
@@ -399,14 +389,13 @@ uint16_t Seq_Get_Vbatt(void)
   return Vbatt_;
 }
 
-
 /**
  * @brief Public accessor for step 0 in the commutation sequence function table
- * 
+ *
  * @details The sequence is initialized by the Alignment to Ramp transition. The
  *     Alignment sets the Sector to 0 and waits some time for the motor to align.
  *     After alignment, the control state machine enables the sequence which will
- *     be pointed to Sector 1 as the next step. 
+ *     be pointed to Sector 1 as the next step.
  */
 void Sequence_Step_0(void)
 {
@@ -444,5 +433,4 @@ void Sequence_Step(void)
     Back_EMF_Riseing_PhX = Back_EMF_Falling_PhX = Vbatt_ = 0;
   }
 }
-
 /**@}*/ // defgroup
