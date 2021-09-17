@@ -42,7 +42,7 @@
  */
 #if defined ( S105_DEV )
 
-#define ENABLE_MAN_TIMING
+//#define ENABLE_MAN_TIMING
 
   #define ESTOP_BTN_IN_PORT  GPIOF
   #define ESTOP_BTN_IN_PIN   GPIO_PIN_4

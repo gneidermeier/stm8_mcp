@@ -60,6 +60,7 @@ static uint8_t Find_Frame(void)
  * @brief Reads data off Rx buffer and adds together checkSum
  *
 */
+static  uint8_t receivedCheckSum;
 
 static uint8_t Read_Data(void)
 {
@@ -67,7 +68,6 @@ static uint8_t Read_Data(void)
   uint8_t activeCheck;
   uint8_t size;
   uint8_t command;
-  uint8_t receivedCheckSum;
     
   size = Driver_Return_Rx_Buffer();
   command = Driver_Return_Rx_Buffer();

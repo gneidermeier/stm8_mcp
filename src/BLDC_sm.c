@@ -290,6 +290,9 @@ bool BL_cl_control(uint16_t current_setpoint)
   return FALSE;
 }
 
+// controllability threshold for closed-loop (time allowed of lost control)
+#define CLOOP_CTRL_THRD 32
+
 /**
  * @brief  Implement control task (fixed exec rate of ~1ms).
  */
@@ -361,17 +364,18 @@ void BL_State_Ctrl(void)
     }
     else if( BL_CLS_LOOP == BL_get_opstate() )
     {
-      static uint8_t leaky_bucket = 32;
+      static int8_t fault_counter = CLOOP_CTRL_THRD;
 
       // controller returns false upon failed control step
       if (FALSE == BL_cl_control(BL_get_timing()))
       {
         // leaky bucket has not been validated or demonstrated, it just seemed like a Pretty Good Idea
-        leaky_bucket -= 1;
-        if (leaky_bucket <= 0)
+        fault_counter -= 1;
+        if (fault_counter <= 0)
         {
+          // transition back to open loop and reset counter
           BL_set_opstate( BL_OPN_LOOP );
-          leaky_bucket = 32;
+          fault_counter = CLOOP_CTRL_THRD;
         }
       }
       inp_dutycycle = BL_motor_speed; // set pwm period from UI
