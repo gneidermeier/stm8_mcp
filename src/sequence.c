@@ -27,7 +27,7 @@
  * [ (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR ]
  * The open-loop ramp-to speed should ensure this condition.
  */
-#define  BACK_EMF_PLAUS_THR  0x03F8
+#define  BACK_EMF_PLAUS_THR  (0x0190 * 2) // TBD
 
 /* Private types -----------------------------------------------------------*/
 
@@ -340,13 +340,13 @@ static void sector_5(void)
  *
  * @return boolean true (!=0) if plausible, false (0) if not plausible
  */
-int8_t Seq_get_timing_error_p(void)
+bool Seq_get_timing_error_p(void)
 {
   if ( (Back_EMF_Falling_PhX + Back_EMF_Riseing_PhX) > BACK_EMF_PLAUS_THR )
   {
-    return (int8_t)1;
+    return TRUE;
   }
-  return (int8_t)0;
+  return FALSE;
 }
 
 /**

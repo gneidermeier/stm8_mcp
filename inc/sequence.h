@@ -25,7 +25,7 @@ uint16_t Seq_Get_bemfF(void);
 
 uint16_t Seq_Get_Vbatt(void);
 int16_t Seq_get_timing_error(void);
-int8_t Seq_get_timing_error_p(void);
+bool Seq_get_timing_error_p(void);
 void Sequence_Step(void);
 
 void Sequence_Step_0(void);

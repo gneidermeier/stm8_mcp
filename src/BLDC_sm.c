@@ -195,17 +195,17 @@ uint16_t BL_get_speed(void)
 /**
  * @brief adjust commutation timing by step amount
  */
-void BL_timing_step_slower(void)
+void _BL_timing_step_slower(uint16_t current_setpoint)
 {
-  BL_comm_period += (uint16_t)BL_ONE_RAMP_UNIT; // slower
+  BL_set_timing(current_setpoint + (uint16_t)BL_ONE_RAMP_UNIT);
 }
 
 /**
  * @brief adjust commutation timing by step amount
  */
-void BL_timing_step_faster(void)
+void _BL_timing_step_faster(uint16_t current_setpoint)
 {
-  BL_comm_period -= (uint16_t)BL_ONE_RAMP_UNIT; // faster
+  BL_set_timing(current_setpoint - (uint16_t)BL_ONE_RAMP_UNIT);
 }
 
 /**
@@ -265,6 +265,32 @@ uint8_t BL_get_opstate(void)
 }
 
 /**
+ * @ brief closed loop controller
+ * @ return boolean true (success) false (fail)
+ */
+bool BL_cl_control(uint16_t current_setpoint)
+{
+  // returns true if plausible conditions for transition to closed-loop
+  if ( TRUE == Seq_get_timing_error_p() )
+  {
+    const int16_t ERROR_MAX = 32; // allowed range of controllable error (TBD)
+    const int16_t ERROR_MIN = -32; // allowed range of controllable error (TBD)
+    int16_t timing_error = Seq_get_timing_error();
+
+    if ((timing_error > ERROR_MIN) && (timing_error < ERROR_MAX))
+    {
+      const uint8_t kP = (uint8_t)(1 / 0.10); // proportional constant (TBD)
+
+      int16_t correction = timing_error / kP;
+      BL_set_timing(BL_get_timing() + correction);
+
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
  * @brief  Implement control task (fixed exec rate of ~1ms).
  */
 void BL_State_Ctrl(void)
@@ -307,50 +333,52 @@ void BL_State_Ctrl(void)
     else if( BL_RAMPUP == BL_get_opstate() )
     {
       // grab the current commutation period setpoint to handoff to ramp control
-      uint16_t comm_perd_sp = BL_get_timing();
-      // table-lookup for the target commutation timing period for the PWM duty-cycle (low speed-startup)
-      uint16_t olt = Get_OL_Timing( PWM_PD_STARTUP );
-#if 1
+      uint16_t bl_timing_setpt = BL_get_timing();
+      // table-lookup for the target commutation timing period at end of ramp
+      uint16_t tgt_timing_setpt = Get_OL_Timing( PWM_PD_STARTUP );
       // only needs to ramp in 1 direction
-      timing_ramp_control(comm_perd_sp, olt);
-#else
-      BL_timing_step_faster(); // decrement commutation-period by 1 ramp-step
-#endif
+      timing_ramp_control(bl_timing_setpt, tgt_timing_setpt);
       // Set duty-cycle for rampup somewhere between 10-25% (tbd)
       inp_dutycycle = PWM_PD_RAMPUP;
 
-      if( comm_perd_sp <= olt )
+      if (bl_timing_setpt <= tgt_timing_setpt)
       {
         BL_set_opstate( BL_OPN_LOOP );
       }
     }
     else if( BL_OPN_LOOP == BL_get_opstate() )
     {
+      // get the present BL commutation timing setpoint
+      uint16_t bl_timing_setpt = BL_get_timing();
       // update the commutation time period
-      timing_ramp_control(BL_get_timing(), Get_OL_Timing(inp_dutycycle));
-
+      timing_ramp_control(bl_timing_setpt, Get_OL_Timing(inp_dutycycle));
       inp_dutycycle = BL_motor_speed; // set pwm period from UI
-
-      // returns true if plausible conditions for transition to closed-loop
-      if ( 0 != Seq_get_timing_error_p() )
+      // controller returns true upon successful control step
+      if (TRUE == BL_cl_control(bl_timing_setpt))
       {
-        const uint16_t ERROR_RANGE = 16; // allowed range of controllable error (TBD)
-        int16_t timing_error = Seq_get_timing_error();
-
-        if ((timing_error > -ERROR_RANGE) && (timing_error < ERROR_RANGE))
-        {
-          // BL_set_opstate( BL_CLS_LOOP ); // tbd
-        }
+        BL_set_opstate( BL_CLS_LOOP );
       }
     }
     else if( BL_CLS_LOOP == BL_get_opstate() )
     {
-      // tbd
+      static uint8_t leaky_bucket = 32;
+
+      // controller returns false upon failed control step
+      if (FALSE == BL_cl_control(BL_get_timing()))
+      {
+        // leaky bucket has not been validated or demonstrated, it just seemed like a Pretty Good Idea
+        leaky_bucket -= 1;
+        if (leaky_bucket <= 0)
+        {
+          BL_set_opstate( BL_OPN_LOOP );
+          leaky_bucket = 32;
+        }
+      }
+      inp_dutycycle = BL_motor_speed; // set pwm period from UI
     }
-    // else ...check for conditions if necessary to unlatch CL control mode?
   }
 
-  // pwm duty-cycle will be propogated to the timer peripheral at next commutation step.
+  // pwm duty-cycle is propogated to timer peripheral at next commutation step
   PWM_set_dutycycle( inp_dutycycle );
 }
 
