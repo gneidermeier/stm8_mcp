@@ -38,8 +38,8 @@
 
 // commutation period at start of ramp (est. @ 12v) - exp. det.
 #define BL_CT_RAMP_START  (5632.0 * CTIME_SCALAR) // $1600
-
-//#define BL_CT_RAMP_END    (1528.0 * CTIME_SCALAR) // $5f8
+#define BL_CT_RAMP_END    (1760.0 * CTIME_SCALAR) // $06E0
+#define BL_CT_STARTUP     (1866.0 * CTIME_SCALAR) // $074A
 
 /**
  * @brief Control rate scalar
@@ -125,11 +125,10 @@ static void timing_ramp_control(uint16_t current_setpoint, uint16_t target_setpo
  */
 static void BL_stop(void)
 {
-// have to clear the local UI_speed since that is the transition OFF->RAMP condition
-  BL_motor_speed = 0;
-
   // kill the driver signals
   All_phase_stop();
+// have to clear the local UI_speed since that is the transition OFF->RAMP condition
+  BL_motor_speed = 0;	
 }
 
 /* Public functions ---------------------------------------------------------*/
@@ -344,7 +343,8 @@ void BL_State_Ctrl(void)
       // grab the current commutation period setpoint to handoff to ramp control
       uint16_t bl_timing_setpt = BL_get_timing();
       // table-lookup for the target commutation timing period at end of ramp
-      uint16_t tgt_timing_setpt = Get_OL_Timing( PWM_PD_STARTUP );
+      uint16_t tgt_timing_setpt = (uint16_t)BL_CT_RAMP_END;
+
       // only needs to ramp in 1 direction
       timing_ramp_control(bl_timing_setpt, tgt_timing_setpt);
       // Set duty-cycle for rampup somewhere between 10-25% (tbd)
@@ -359,9 +359,10 @@ void BL_State_Ctrl(void)
     {
       // get the present BL commutation timing setpoint
       uint16_t bl_timing_setpt = BL_get_timing();
-      // update the commutation time period
-      timing_ramp_control(bl_timing_setpt, Get_OL_Timing(inp_dutycycle));
-      inp_dutycycle = BL_motor_speed; // set pwm period from UI
+      // control setpoint is Startup Speed, update the commutation timing
+      timing_ramp_control(bl_timing_setpt, (uint16_t)BL_CT_STARTUP);
+      inp_dutycycle = PWM_PD_STARTUP; // BL_motor_speed;
+
       // controller returns true upon successful control step
       if (TRUE == BL_cl_control(bl_timing_setpt) /* (BL_motor_speed > PWM_PD_CLOOP) */ )
       {
@@ -370,11 +371,14 @@ void BL_State_Ctrl(void)
     }
     else if( BL_CLS_LOOP == BL_get_opstate() )
     {
+      static const uint8_t CL_FAULT_CNTR = 100;
       static uint8_t fault_counter = 100;
+      static uint8_t fault_increment = 2;
+      static uint8_t fault_decrement = 2;
       // controller returns false upon failed control step
       if (TRUE == BL_cl_control(BL_get_timing()))
       {
-        if (fault_counter < 100)
+        if (fault_counter < CL_FAULT_CNTR)
         {
           fault_counter += 2;
         }

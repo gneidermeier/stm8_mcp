@@ -310,11 +310,6 @@ Next=Root.Source Files...\..\src\mcu_stm8s.c
 [Root.Source Files...\..\src\mcu_stm8s.c]
 ElemType=File
 PathName=..\..\src\mcu_stm8s.c
-Next=Root.Source Files...\..\src\mdata.c
-
-[Root.Source Files...\..\src\mdata.c]
-ElemType=File
-PathName=..\..\src\mdata.c
 Next=Root.Source Files...\..\src\per_task.c
 
 [Root.Source Files...\..\src\per_task.c]
