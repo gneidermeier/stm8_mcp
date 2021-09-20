@@ -170,7 +170,7 @@ void BL_set_speed(uint16_t ui_mspeed_counts)
   if( ui_mspeed_counts > PWM_PD_SHUTOFF )
   {
     // Update the dc if speed input greater than ramp start, OR if system already running
-    if( ui_mspeed_counts > PWM_PD_STARTUP || 0 != BL_motor_speed  /* if Control_mode != STOPPED */ )
+    if( ui_mspeed_counts > PWM_PD_STARTUP || 0 != BL_motor_speed)
     {
       BL_motor_speed = ui_mspeed_counts;
     }
@@ -273,16 +273,14 @@ bool BL_cl_control(uint16_t current_setpoint)
   // returns true if plausible conditions for transition to closed-loop
   if ( TRUE == Seq_get_timing_error_p() )
   {
-    const int16_t ERROR_MAX = 32; // allowed range of controllable error (TBD)
-    const int16_t ERROR_MIN = -32; // allowed range of controllable error (TBD)
+    const int16_t ERROR_MAX = 25; // allowed range of controllable error (TBD)
+    const int16_t ERROR_MIN = -25; // allowed range of controllable error (TBD)
     int16_t timing_error = Seq_get_timing_error();
 
     if ((timing_error > ERROR_MIN) && (timing_error < ERROR_MAX))
     {
-      const uint8_t kP = (uint8_t)(1 / 0.10); // proportional constant (TBD)
-
-      int16_t correction = timing_error / kP;
-      BL_set_timing(BL_get_timing() + correction);
+      int16_t correction = (timing_error * 10) / 100 ; // kP = 0.100
+      BL_set_timing(current_setpoint + correction);
 
       return TRUE;
     }
@@ -291,7 +289,7 @@ bool BL_cl_control(uint16_t current_setpoint)
 }
 
 // controllability threshold for closed-loop (time allowed of lost control)
-#define CLOOP_CTRL_THRD 32
+#define CLOOP_CTRL_THRD 40
 
 /**
  * @brief  Implement control task (fixed exec rate of ~1ms).
@@ -367,15 +365,24 @@ void BL_State_Ctrl(void)
       static int8_t fault_counter = CLOOP_CTRL_THRD;
 
       // controller returns false upon failed control step
-      if (FALSE == BL_cl_control(BL_get_timing()))
+      if (TRUE == BL_cl_control(BL_get_timing()))
       {
-        // leaky bucket has not been validated or demonstrated, it just seemed like a Pretty Good Idea
-        fault_counter -= 1;
-        if (fault_counter <= 0)
+        fault_counter =
+          (fault_counter < CLOOP_CTRL_THRD) ? (fault_counter + 1) : 0;
+      }
+      else // fault logic could be integrated with cl_control() and also (inp_dutycycle > PWM_PD_STARTUP) or else transition to open-loop
+      {
+        // todo this logic has not been validated or demonstrated, it just seemed like a Pretty Good Idea
+        if (fault_counter > 0)
+        {
+          fault_counter -= 1;
+        }
+        else // if (fault_counter <= 0)
         {
           // transition back to open loop and reset counter
-          BL_set_opstate( BL_OPN_LOOP );
+          // BL_set_opstate( BL_OPN_LOOP ); // only if speed too low
           fault_counter = CLOOP_CTRL_THRD;
+          BL_stop(); // set a fault?
         }
       }
       inp_dutycycle = BL_motor_speed; // set pwm period from UI
