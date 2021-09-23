@@ -48,7 +48,6 @@ compile:
 	$(OUTPUT_DIR)/driver.rel  \
 	$(OUTPUT_DIR)/faultm.rel  \
 	$(OUTPUT_DIR)/mcu_stm8s.rel  \
-	$(OUTPUT_DIR)/mdata.rel  \
 	$(OUTPUT_DIR)/per_task.rel  \
 	$(OUTPUT_DIR)/pwm_stm8s.rel  \
 	$(OUTPUT_DIR)/sequence.rel  \
@@ -78,7 +77,6 @@ compile_obj:
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/driver.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/faultm.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/mcu_stm8s.c
-	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/mdata.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/per_task.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/pwm_stm8s.c
 	$(SDCC) $(CFLAGS) $(INCLUDEPATH) -D $(DEVICE) -o $(OUTPUT_DIR)/ -c $(SOURCE_DIR)/src/sequence.c
