@@ -53,6 +53,14 @@ void All_phase_stop(void)
 }
 
 /**
+ * @brief Accessor to get the duty cycle of the running PWM timer
+ */
+uint16_t PWM_get_dutycycle(void)
+{
+    return global_uDC;
+}
+
+/**
  * @brief Accessor to update the duty cycle of the running PWM timer
  */
 void PWM_set_dutycycle(uint16_t global_dutycycle)
@@ -66,7 +74,6 @@ void PWM_set_dutycycle(uint16_t global_dutycycle)
  * The S105 dev board unfortunately does not let the TIM2 CH3 pin (unless by alt. fundtion)
  */
 #if defined ( S105_DISCOVERY ) || defined ( S003_DEV )
-
 /*
  * Setup TIM2 PWM
  * Reference: AN3332
@@ -75,11 +82,7 @@ void PWM_set_dutycycle(uint16_t global_dutycycle)
  *               0.000125 S / (1/16Mhz) * 1600 = 0.0001
  *               1 / 0.0001 = 10000  
  */
-#ifdef PWM_8K
-  #define TIM2_PRESCALER   TIM2_PRESCALER_8   //    (1/16Mhz) * 8 * 250 -> 0.000125 S
-#else
-  #define TIM2_PRESCALER   TIM2_PRESCALER_2
-#endif
+#define TIM2_PRESCALER   TIM2_PRESCALER_2
 
 #define PWM_TIMER_CHAN_A  TIM2_CHANNEL_1
 #define PWM_TIMER_CHAN_B  TIM2_CHANNEL_2
@@ -149,11 +152,7 @@ void PWM_PhC_Enable(void)
 
 #elif defined ( S105_DEV )
 
-#ifdef PWM_8K
-  #define TIM1_PRESCALER 8  //    (1/16Mhz) * 8 * 250 -> 0.000125 S
-#else
-  #define TIM1_PRESCALER 2
-#endif
+#define TIM1_PRESCALER 2
 
 #define PWM_MODE  TIM1_OCMODE_PWM2
 
@@ -169,7 +168,7 @@ void PWM_setup(void)
 
     TIM1_DeInit();
 /*
- * The counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1)  (RM0016)
+ * The counter clock frequency fCK_CNT is equal to fCK_PSC / (PSCR[15:0]+1) (RM0016)
  */
     TIM1_TimeBaseInit(( TIM1_PRESCALER - 1 ), TIM1_COUNTERMODE_UP, T1_Period, 0);
 
@@ -240,7 +239,6 @@ void PWM_PhC_Enable(void)
     TIM1_SetCompare4( global_uDC );
     TIM1_CCxCmd( PWM_TIMER_CHAN_C, ENABLE );
 }
-
 #endif // S105
 
 /** @endcond */

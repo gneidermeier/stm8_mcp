@@ -19,29 +19,13 @@
 /* Public defines -----------------------------------------------------------*/
 
 /*
- * (un)comment macro to set PWM 8 Khz or ?
+ *  1/16 Mhz = 0.0000000625 sec
+ *  1/16 Mhz * 1024 = 0.000064 sec
+ * w/ PS=2
+ *  0.000064 sec * PS = 0.000128
+ * 1 / 0.000128 = 7812.5 i.e 7.8 kHz
  */
-//#define PWM_8K
-
-
-// 1/8000  = 0.000125 = 12.5 * 10^(-5)
-// 1/12000 = 0.000083 = 8.3 * 10^(-5)
-
-// With TIM2 prescale value of 1, period TIM2 == period fMaster
-// @8Mhz, fMASTER period == 0.000000125 S
-// fMASTER * TIM1_PS = 0.125us * 4 = 0.5us
-
-// @8k:
-//  0.000125 / 0.5 us = 250 counts
-
-// @12k:
-//  0.000083 / 0.5 us  = 166.67 counts
-
-#ifdef PWM_8K
-  #define PWM_PERIOD_COUNTS   250 // 1/16 Mhz * PS * 2500 = 0.000125 sec
-#else // 
-  #define PWM_PERIOD_COUNTS  1024
-#endif
+#define PWM_PERIOD_COUNTS  1024
 
 
 /**
@@ -81,6 +65,8 @@
  */
 
 #define TCC_TICK_TIME_MSEC   (0.5)
+// verify minimum time sensed w/ stick at 0
+#define TCC_TIME_DETECT      (uint16_t)(1000.0 * (1.0 / TCC_TICK_TIME_MSEC)) // tbd
 #define TCC_TIME_ARMING      (uint16_t)(1100.0 * (1.0 / TCC_TICK_TIME_MSEC))
 #define TCC_TIME_MAX_THRUST  (uint16_t)(1900.0 * (1.0 / TCC_TICK_TIME_MSEC))
 
@@ -259,6 +245,7 @@ void PWM_PhB_Enable(void);
 void PWM_PhC_Enable(void);
 
 void PWM_set_dutycycle(uint16_t);
+uint16_t PWM_get_dutycycle(void);
 
 void PWM_setup(void);
 
