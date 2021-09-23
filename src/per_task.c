@@ -95,7 +95,7 @@ ui_key_handler_t;
 
 /* Private variables ---------------------------------------------------------*/
 static uint8_t TaskRdy; // flag for timer interrupt for BG task timing
-static uint8_t Log_Level;
+static uint8_t Log_Level = 10;
 static uint16_t Vsystem;
 static uint16_t UI_Speed; // motor percent speed input from servo or remote UI
 
@@ -134,12 +134,13 @@ static void Log_println(int zrof)
   int faults = (int)Faultm_get_status();
   uint16_t ui_speed = UI_Speed;
   uint16_t bl_speed = BL_get_speed();
-  uint16_t timing_error = Seq_get_timing_error();
-  uint16_t comm_period = BL_get_timing();
+  uint16_t bl_timing = BL_get_timing();
 //  uint16_t servo_pulse_period = Driver_get_pulse_perd();
   uint16_t servo_pulse_duration = Driver_get_pulse_dur();
-  uint16_t display_speed_pcnt = (uint16_t)Driver_get_motor_spd_pcnt();
+  uint16_t motor_spd_pcnt = (uint16_t)Driver_get_motor_spd_pcnt();
   uint16_t servo_posn_counts = Driver_get_servo_position_counts();
+  uint16_t timing_error = Seq_get_timing_error();
+  uint16_t PWM_dc = PWM_get_dutycycle();
 
   // if flag is set then reset line counter
   if ( 0 != zrof)
@@ -151,12 +152,19 @@ static void Log_println(int zrof)
   if ( Log_Level > 0)
   {
     printf(
-      "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u ERR=%04X ST=%u BR=%04X BF=%04X \r\n",
-      Line_Count++,  // increment line countet
-      ui_speed, comm_period, bl_speed, Vsystem, faults,
-      servo_pulse_duration, servo_posn_counts, display_speed_pcnt,
-      timing_error, (uint16_t)BL_get_opstate(),
-      Seq_Get_bemfR(), Seq_Get_bemfF()
+      "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u PWMdc=%04X ERR=%04X ST=%u BR=%04X BF=%04X \r\n",
+      Line_Count++,  // increment line count
+      UI_Speed, BL_get_timing(), BL_get_speed(),
+      Vsystem,
+      (int)Faultm_get_status(),
+      Driver_get_pulse_dur(),
+      Driver_get_servo_position_counts(), // servo posn counts -> motor speed (PWM pulse duration)
+      Driver_get_motor_spd_pcnt(),
+      PWM_get_dutycycle(),
+      Seq_get_timing_error(),
+      (uint16_t)BL_get_opstate(),
+      Seq_Get_bemfR(),
+      Seq_Get_bemfF()
     );
     Log_Level -= 1;
   }
@@ -174,7 +182,7 @@ static void Log_println(int zrof)
  * The UI motor speed is for now scaled to the range of the PWM period in
  * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
  *
- * The standard RC framerate is 50 Hz or 20 mS. With pertask is updating at 60Hz,
+ * The standard RC framerate is 50 Hz or 20 mS. With pertask updating at 60Hz,
  * then the timely response of the system should be assured.
  */
 static void ui_set_motor_spd(uint16_t ui_motor_speed)
@@ -287,6 +295,9 @@ static ui_handlrp_t handle_term_inp(void)
  */
 static void Periodic_task(void)
 {
+  static uint8_t powerup_radio_detect_window = 10; // 10 * 0.167 mS
+  static bool rf_enabled = FALSE;
+
   BL_RUNSTATE_t bl_state;
 
 // invoke the terminal input and ui speed subs,
@@ -303,10 +314,41 @@ static void Periodic_task(void)
     fp();
   }
 
-  // passes the UI percent motor speed to the BL controller
-  ui_set_motor_spd( UI_Speed );
-
   bl_state = BL_get_state();
+
+  // passes the UI percent motor speed to the BL controller
+  if (powerup_radio_detect_window > 0)
+  {
+    powerup_radio_detect_window -= 1;
+  }
+  else
+  {
+    uint16_t cmd_speed;
+    if ((FALSE == rf_enabled) && (Driver_get_pulse_dur() > TCC_TIME_DETECT))
+    {
+      // enable RF/RC throttle input, disable throttle input from terminal
+//      rf_enabled = TRUE;
+    }
+
+    cmd_speed = UI_Speed;
+
+    if (rf_enabled)
+    {
+      if (Driver_get_pulse_dur() > TCC_TIME_DETECT)
+      {
+        cmd_speed = Driver_get_servo_position_counts();
+        // Need to detect lost radio - the PWM edge ISRs would stop which would
+        // be difficult to discern unless the stored value is flushed each time.
+        Driver_set_pulse_dur(0);
+      }
+      else
+      {
+        // we have a problem
+        m_stop();
+      }
+    }
+    ui_set_motor_spd(cmd_speed);
+  }
 
   Vsystem = Seq_Get_Vbatt();
 
@@ -343,13 +385,19 @@ uint8_t Task_Ready(void)
     TaskRdy = FALSE;
     Periodic_task();
 
-// periodic task is enabled at ~60 Hz ... the modulus provides a time reference of
-// approximately 2 Hz at which time the master attempts to read a few bytes from SPI
+    framecount += 1;
 
-    if ( ! ((framecount++) % 0x20) )
+    // periodic task @ ~60 Hz - modulus 0x10 -> 16 * 0.016 s = 0.267 seconds (~4 Hz)
+    if (0 == (framecount % 0x10))
     {
-      Log_println(0); // note: no printf to serial terminal inside a CS
+      /* Toggles LED to verify task timing */
+      //GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 
+      Log_println(0); // note: no printf to serial terminal inside a CS
+    }
+    else if (4 == (framecount % 0x80)) // don't let it fall on the modulus of Log Print
+    {
+      // SPI can TX more frequently than Log Print but don't let both on the same frames
 #if SPI_ENABLED == SPI_STM8_MASTER
       SPI_controld();
 #endif
