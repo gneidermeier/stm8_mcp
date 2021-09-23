@@ -50,8 +50,9 @@ void main(int argc, char **argv)
   MCU_Init();
 
   BL_reset();
+  BL_set_opstate( BL_ARMING );  // set the initial control-state 
 
-  printf("\n\rProgram Startup.......\n\r");
+  printf("\n\rProgram Startup (%d)\n\r", (uint16_t)BL_get_opstate() );
 
   enableInterrupts(); // interrupts are globally disabled by default
 

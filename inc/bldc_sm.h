@@ -39,6 +39,22 @@ typedef enum
 BL_RUNSTATE_t;
 
 /**
+ * @brief Type for BL operating state.
+ */
+typedef enum
+{
+  BL_NONE,
+  BL_ARMING,
+  BL_STOPPED,
+  BL_ALIGN,
+  BL_RAMPUP,
+  BL_OPN_LOOP,
+  BL_CLS_LOOP,
+  BL_INVALID
+}
+BL_State_T;
+
+/**
   * @brief Accessor for commutation period.
   *
   * @return commutation period

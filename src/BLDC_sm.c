@@ -23,13 +23,15 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
+#define PWM_PCNT_ARMING    10.0 // TBD
 #define PWM_PCNT_ALIGN     25.0
 #define PWM_PCNT_RAMPUP    14.0
 #define PWM_PCNT_STARTUP   12.0
 #define PWM_PCNT_CLOOP     PWM_PCNT_STARTUP
-#define PWM_PCNT_SHUTOFF    7.2 // stalls if slower
+#define PWM_PCNT_SHUTOFF    9.0 // stalls at ~8%
 
 // define pwm pulse times for operation states
+#define PWM_PD_ARMING    PWM_GET_PULSE_COUNTS( PWM_PCNT_ARMING )
 #define PWM_PD_ALIGN     PWM_GET_PULSE_COUNTS( PWM_PCNT_ALIGN )
 #define PWM_PD_RAMPUP    PWM_GET_PULSE_COUNTS( PWM_PCNT_RAMPUP )
 #define PWM_PD_STARTUP   PWM_GET_PULSE_COUNTS( PWM_PCNT_STARTUP )
@@ -55,20 +57,6 @@
 #define BL_TIME_ALIGN  (200 * 1) // N frames @ 1 ms / frame
 
 /* Private types -----------------------------------------------------------*/
-/**
- * @brief Type for BL operating state.
- */
-typedef enum
-{
-  BL_MANUAL,
-  BL_ALIGN,
-  BL_RAMPUP,
-  BL_OPN_LOOP,
-  BL_CLS_LOOP,
-  BL_STOPPED,
-  BL_INVALID
-}
-BL_State_T;
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -118,7 +106,7 @@ static void timing_ramp_control(uint16_t current_setpoint, uint16_t target_setpo
  * @Brief common sub for stopping and fault states
  *
  * @Detail
- * Allows motor to be stopped in a fault condition, while allowing the system to
+ * Allows motor to be stopped in a fault condition, leaving the system to
  * remain in whatever operating state - does not reset the control state, fault
  * manageer etc. This is a developers "feature" allowing the fault state and
  * other info to be examined.
@@ -127,8 +115,9 @@ static void BL_stop(void)
 {
   // kill the driver signals
   All_phase_stop();
-// have to clear the local UI_speed since that is the transition OFF->RAMP condition
-  BL_motor_speed = 0;	
+
+  // have to clear the local UI_speed since that is the transition OFF->RAMP condition
+  BL_motor_speed = 0;
 }
 
 /* Public functions ---------------------------------------------------------*/
@@ -181,7 +170,7 @@ void BL_set_speed(uint16_t ui_mspeed_counts)
   else
   {
     // commanded speed less than low limit so reset - has to ramp again to get started.
-    BL_reset();
+    BL_stop();
   }
 }
 
@@ -282,14 +271,17 @@ bool BL_cl_control(uint16_t current_setpoint)
   // returns true if plausible conditions for transition to closed-loop
   if ( TRUE == Seq_get_timing_error_p() )
   {
+#define ERROR_LIMIT 50
     // needs to be small enough to be stable upon transition from to closed-loop
-    const int16_t ERROR_MAX = 25;
-    const int16_t ERROR_MIN = -25;  //  -ERROR_MIN
+    const int16_t ERROR_MAX = ERROR_LIMIT;
+    const int16_t ERROR_MIN = -(ERROR_LIMIT);
     int16_t timing_error = Seq_get_timing_error();
 
     if ((timing_error > ERROR_MIN) && (timing_error < ERROR_MAX))
     {
-      int16_t correction = timing_error / 10 ; // kP = 0.100 ^H^H^H  0.0625 (Po2)
+      static const uint8_t PROP_GAIN = 10; // inverse of kP
+      int16_t correction = timing_error / PROP_GAIN ;
+
       BL_set_timing(current_setpoint + correction);
 
       return TRUE;
@@ -313,20 +305,52 @@ void BL_State_Ctrl(void)
   }
   else
   {
-    inp_dutycycle = BL_motor_speed; // set pwm period from UI
+    BL_State_T bl_opstate = BL_get_opstate();
+    inp_dutycycle = BL_get_speed(); // default pwm use speed input from UI
 
-    if( BL_STOPPED == BL_get_opstate() )
+    if( BL_ARMING == bl_opstate )
+    {
+      static uint16_t atimer = 0;
+
+      BL_set_timing( 0x0010 ); // set to some small value (sampling vBatt measurement)
+
+#define ARMING_TIME_100  0x08FF
+
+      if (atimer < ARMING_TIME_100)
+      {
+        atimer += 1;
+        inp_dutycycle = 0;
+        // brief delay after poweron
+        if (atimer > 0x0200)
+        {
+          // hold the current/PWM at fixed level
+          inp_dutycycle = PWM_PD_ARMING;
+        }
+        // turn off at regular interval to make distint beeping (more like clicking!) sound
+//        if (atimer & 0x00C0)
+        if (atimer & 0x01C0)
+        {
+          inp_dutycycle = 0;
+        }
+      }
+      else
+      {
+        BL_reset();// reset again to be sure motor-drive/PWM reinitialied
+//        BL_set_opstate( BL_STOPPED ); // assert stopped state (_reset() puts state to arming)
+      }
+    }
+    else  if( BL_STOPPED == BL_get_opstate() )
     {
       if (inp_dutycycle > 0)
       {
-        BL_set_opstate( BL_ALIGN ); // state-transition
+        BL_set_opstate( BL_ALIGN );
         BL_optimer = BL_TIME_ALIGN;
 
         // Set initial commutation timing period upon state transition.
         BL_set_timing( (uint16_t)BL_CT_RAMP_START );
       }
     }
-    else if( BL_ALIGN == BL_get_opstate() )
+    else if( BL_ALIGN == bl_opstate )
     {
       if (BL_optimer > 0)
       {
@@ -338,7 +362,7 @@ void BL_State_Ctrl(void)
         BL_set_opstate(BL_RAMPUP);
       }
     }
-    else if( BL_RAMPUP == BL_get_opstate() )
+    else if( BL_RAMPUP == bl_opstate )
     {
       // grab the current commutation period setpoint to handoff to ramp control
       uint16_t bl_timing_setpt = BL_get_timing();
@@ -355,13 +379,13 @@ void BL_State_Ctrl(void)
         BL_set_opstate( BL_OPN_LOOP );
       }
     }
-    else if( BL_OPN_LOOP == BL_get_opstate() )
+    else if( BL_OPN_LOOP == bl_opstate )
     {
       // get the present BL commutation timing setpoint
       uint16_t bl_timing_setpt = BL_get_timing();
       // control setpoint is Startup Speed, update the commutation timing
       timing_ramp_control(bl_timing_setpt, (uint16_t)BL_CT_STARTUP);
-      inp_dutycycle = PWM_PD_STARTUP; // BL_motor_speed;
+      inp_dutycycle = PWM_PD_STARTUP;
 
       // controller returns true upon successful control step
       if (TRUE == BL_cl_control(bl_timing_setpt) /* (BL_motor_speed > PWM_PD_CLOOP) */ )
@@ -369,18 +393,20 @@ void BL_State_Ctrl(void)
         BL_set_opstate( BL_CLS_LOOP );
       }
     }
-    else if( BL_CLS_LOOP == BL_get_opstate() )
+    else if( BL_CLS_LOOP == bl_opstate )
     {
-      static const uint8_t CL_FAULT_CNTR = 100;
-      static uint8_t fault_counter = 100;
-      static uint8_t fault_increment = 2;
-      static uint8_t fault_decrement = 2;
+#define CL_FAULT_CNTR 2000
+      const static uint8_t FAULT_INCR = 20;
+      const static uint8_t FAULT_DECR = 1;
+      static uint16_t fault_counter = CL_FAULT_CNTR;
+
       // controller returns false upon failed control step
       if (TRUE == BL_cl_control(BL_get_timing()))
       {
         if (fault_counter < CL_FAULT_CNTR)
         {
-          fault_counter += 2;
+          // fault_counter += FAULT_INCR;
+          fault_counter = CL_FAULT_CNTR;
         }
       }
       else
@@ -389,17 +415,15 @@ void BL_State_Ctrl(void)
         // throw a fault if max number of faults exceeded during motor run
         if (fault_counter > 0)
         {
-          fault_counter -= 1;
+          fault_counter -= FAULT_DECR;
         }
         else
         {
           Faultm_set(FAULT_1);
         }
       }
-      inp_dutycycle = BL_motor_speed; // set pwm period from UI
     }
   }
-
   // pwm duty-cycle is propogated to timer peripheral at next commutation step
   PWM_set_dutycycle( inp_dutycycle );
 }
@@ -411,13 +435,15 @@ void BL_State_Ctrl(void)
  */
 void BL_Commutation_Step(void)
 {
+  static uint16_t frame_timer = 0;
+
   switch( BL_get_opstate() )
   {
+  case BL_ARMING:
   case BL_ALIGN:
-    //keep sector 0 on until timeout. Sequencer initializes to sector 0
+    // keep sector 0 on until timeout
     Sequence_Step_0();
     break;
-
   case BL_RAMPUP:
   case BL_OPN_LOOP:
   case BL_CLS_LOOP:
@@ -425,7 +451,7 @@ void BL_Commutation_Step(void)
     break;
 
   case BL_STOPPED:
-  case BL_MANUAL:
+  case BL_NONE:
   default:
     break;
   }
