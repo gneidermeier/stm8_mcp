@@ -59,6 +59,7 @@ static void spd_plus(void);
 static void spd_minus(void);
 static void m_stop(void);
 static void m_start(void);
+static void help_me(void);
 
 /* Public variables  ---------------------------------------------------------*/
 
@@ -79,6 +80,7 @@ typedef enum
   M_START     = '/', // /
   SPD_PLUS    = '.', // >
   SPD_MINUS   = ',', // <
+  HELP_ME     = '?',
   K_UNDEFINED = -1
 }
 ui_keycode_t;
@@ -111,7 +113,8 @@ static const ui_key_handler_t ui_keyhandlers_tb[] =
   {SPD_PLUS,   spd_plus},
   {SPD_MINUS,  spd_minus},
   {M_STOP,     m_stop},
-  {M_START,    m_start}
+  {M_START,    m_start},
+  {HELP_ME,    help_me}
 };
 
 // macros to help make the LUT slightly more encapsulated
@@ -154,7 +157,7 @@ static void Log_println(int zrof)
     printf(
       "{%04X) UIspd%=%X CtmCt=%04X BLdc=%04X Vs=%04X Sflt=%X RCsigCt=%04X MspdCt=%u Mspd%=%u PWMdc=%04X ERR=%04X ST=%u BR=%04X BF=%04X \r\n",
       Line_Count++,  // increment line count
-      UI_Speed, BL_get_timing(), BL_get_speed(),
+      ui_speed, BL_get_timing(), BL_get_speed(),
       Vsystem,
       (int)Faultm_get_status(),
       Driver_get_pulse_dur(),
@@ -171,16 +174,12 @@ static void Log_println(int zrof)
 }
 
 /*
- * Service the slider and trim inputs for speed setting.
  * The UI Speed value represents percent of motor speed (0% : 100%), which is
  * proportional to RC radio control servo signal.
  *
- * Servo input will have range of (0:1600) which can directly be used as the
+ * Servo input will have range of (0:1024?) which can directly be used as the
  * pwm input if the timer prescaler is set such that 16Mhz works out to a
- * PWM period of    0.0000000625 * 1600 = 100 uS so 10 kHz .
- *
- * The UI motor speed is for now scaled to the range of the PWM period in
- * clock counts i.e. (0:250) .. this is due to being used as the timing table index.
+ * PWM period of    0.0000000625 * 2 * 1024 = 128 uS so 7812.5 Hz .
  *
  * The standard RC framerate is 50 Hz or 20 mS. With pertask updating at 60Hz,
  * then the timely response of the system should be assured.
@@ -216,6 +215,7 @@ static void timing_minus(void)
  */
 static void m_start(void)
 {
+//  BL_set_speed( PWM_BL_START );
 }
 
 /*
@@ -285,6 +285,23 @@ static ui_handlrp_t handle_term_inp(void)
     Log_Level = 255;// default anykey enable continous/verbous log
   }
   return fp;
+}
+
+void help_me(void)
+{
+  printf("\r\n");
+  printf("----------------------------------------------\r\n");
+  printf("BL Motor Control on STM8 %s\r\n", "Version 0.1");
+  printf("Keys:\r\n");
+  printf(" <    >   :  Slower/Faster\r\n");
+  printf(" Space Bar:  stop\r\n");
+  printf("----------------------------------------------\r\n");
+  printf("\r\n");	
+}
+
+void Print_banner(void)
+{
+  help_me();
 }
 
 /**
@@ -375,10 +392,17 @@ static void Periodic_task(void)
 uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
+  static bool is_first = TRUE; 
 
 #ifdef UART_IT_RXNE_ENABLE
   Pdu_Manager_Handle_Rx();
 #endif
+
+  if (is_first)
+  {
+    is_first = FALSE;
+    Print_banner();
+  }
 
   if (0 != TaskRdy)
   {
