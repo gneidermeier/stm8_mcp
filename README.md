@@ -143,31 +143,32 @@ covered here, sorry!)
    directory and capture the output to a text file: 
  `doxygen docs\config\doxyfile.cfg 2>&1 > doxygen.log`
 
-The documentation is generated under the `<project_root>/build` folder. Open
+The documentation is generated under the `<project_root>/build` directory. Open
 `<project_root>/build/html/index.html` to view the HTML documentation.
 
 ## Update documentation on GitHub pages
 
-In a separate project folder, create a clone of the project repo in which to 
+In a separate project directory, create a clone of the project repo in which to 
 checkout the `gh-pages` 
 [https://github.com/gneidermeier/stm8_mcp/tree/gh-pages](branch). 
 
-In the gh-pages clone-repo, create an orphan branch 'gh-pages'. I needed [help with this]
-(https://stackoverflow.com/questions/48235671/deploy-project-to-gh-pages-from-a-git-clone).
+In the gh-pages clone-repo, create an orphan branch 'gh-pages' - (I needed [help with this]
+https://stackoverflow.com/questions/48235671/deploy-project-to-gh-pages-from-a-git-clone).
 
-Replace all of the contents in the `/docs` folder of the `gh-pages` branch with the contents
-of `<project_root>/build/html` in the build branch. This is shown below in 
-Unix shell syntax for clarity (we have Git Bash and/or Cygwin on our Windows 
-workstations). 
+Replace all of the contents in the `docs/` directory of the `gh-pages` branch 
+with the contents of `<project_root>/build/html` in the build branch. 
+Execute the commands shown below in an appropriate shell environment (e.g. Linux,
+Git Bash or Cygwin) to deploy the docs in gh-pages: 
 
     cd /path/to/my/clone_clone_of_gh-pages
     git checkout --orphan gh-pages
     git rm -rf .
     rm '.gitignore'
     echo "#Project gh-pages site" > README.md
-    cp -r `<project_root>/build/html/* /docs
+    cp -r `<project_root>/build/html/* docs/
     git add docs/
     git commit -a -m "Initial Commit"
     git push -u origin gh-pages
 
-
+If there is any conflicts with the gh-pages branch, it is easy to delete a branch (e.g.
+on github web) and the commands above will then work to regenerate the branch.
