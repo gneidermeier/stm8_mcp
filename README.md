@@ -1,16 +1,14 @@
 # Introduction
 
-This is a minimalistic implementation of a brushless motor driver on STM8
+This is a minimalistic implementation of a brushless DC motor driver on STM8
 microcontrollers. It is presently limited to the small (1100kv) brushless
 outrunners such as seen on cheap drones and RC planes.
 
-It's function is to perform the commutation of a typical trapezoidally wound
-brushless PMSM (permanent magnet synchronous motor). 
-The software drives the motor by applying the 6-step drive sequence.
-Timing of the motor is obtained by measurement of the motor back-EMF using ADC
-input to the STM8. This eliminates the dependency on a Hall sensor for determining motor commutation timing.
+The software drives the motor by applying the 6-step (trapezoidal) drive sequence.
+Motor synchronization is to be accomplished by using the motor back-EMF waveform 
+sampled by the ADC (analog digital converter) input to the STM8. 
 
-# Obtaining and installing toolchain
+# Obtaining and installing development environment
 
 Presently the de-facto toolchain is ST Visual Develop with COSMIC C compiler -
 these tools have free licenses, but are available for Windows OS only.
@@ -76,17 +74,18 @@ toolchain in STVD:
 
 # Running the controller with a motor
 The critical component of the hardware is the [3-phase driver](https://simple-circuit.com/wp-content/uploads/2017/12/brushless-dc-motor-3-phase-bridge-circuit.png) 
-circuit. The 3-phase driver circuit is implemented in large part by the [IR2104 
-half-bridge IC](https://www.infineon.com/dgdl/Infineon-IR2104-DS-v01_00-EN.pdf?fileId=5546d462533600a4015355c7c1c31671). Most variations of the this kind of circuit use an [N channel MOSFET](https://www.infineon.com/dgdl/irfz44npbf.pdf?fileId=5546d462533600a40153563b3a9f220d)
+circuit. The 3-phase driver circuit is implemented in large part by the [IR2104 half-bridge IC]
+(https://www.infineon.com/dgdl/Infineon-IR2104-DS-v01_00-EN.pdf?fileId=5546d462533600a4015355c7c1c31671). 
+Most variations of the this kind of circuit use an [N channel MOSFET]
+(https://www.infineon.com/dgdl/irfz44npbf.pdf?fileId=5546d462533600a40153563b3a9f220d)
 for both the high-side as well as low-side of the half-bridge. The IR2104 incorporates a 
-built-in charge pump for driving the high-side (Vgs of HS going to be significantly 
-higher than Vbat).
+built-in charge pump for driving the high-side (Vgs of HS going to be significantly higher than Vbat).
  
 [Reference project](https://simple-circuit.com/arduino-sensorless-bldc-motor-controller-esc/) 
-implements the controller with an Arduino Uno, which has the 
-additional capability of the input comparator. This provides a means for detecting zero-crossing point and thus direct measurement of motor timing.
+implements the controller with an Arduino Uno, which has the additional capability 
+of the input comparator. This provides a means for detecting zero-crossing point and thus 
+direct measurement of motor timing.
 
-It is possible to run the software without a motor connected.
 Connecting a motor can cause the potential for more dramatic failure scenario so 
 do it at your own risk to your dev board and equipment!
 
@@ -140,10 +139,11 @@ covered here, sorry!)
 1. Open the Command Prompt (or alternatively, Power Shell) in Windows and 
  execute the command `cd <project_root>` to navigate into the project root 
  directory.
-2. In the project root directory type the command 
- `doxygen docs/config/doxyfile.cfg`
+2. In a Windows Command Prompt run doxygen from the root of the project root 
+   directory and capture the output to a text file: 
+ `doxygen docs\config\doxyfile.cfg 2>&1 > doxygen.log`
 
-This will generate the documentation under the `<project_root>/build` folder. Open
+The documentation is generated under the `<project_root>/build` folder. Open
 `<project_root>/build/html/index.html` to view the HTML documentation.
 
 ## Update documentation on GitHub pages

@@ -296,9 +296,13 @@ void help_me(void)
   printf(" <    >   :  Slower/Faster\r\n");
   printf(" Space Bar:  stop\r\n");
   printf("----------------------------------------------\r\n");
-  printf("\r\n");	
+  printf("\r\n");
 }
 
+/**
+ * @brief Print the software information to the terminal
+ * @note needs to report s/w version
+ */
 void Print_banner(void)
 {
   help_me();
@@ -392,7 +396,7 @@ static void Periodic_task(void)
 uint8_t Task_Ready(void)
 {
   static uint8_t framecount = 0;
-  static bool is_first = TRUE; 
+  static bool is_first = TRUE;
 
 #ifdef UART_IT_RXNE_ENABLE
   Pdu_Manager_Handle_Rx();

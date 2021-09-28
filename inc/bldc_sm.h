@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
-  * @file BLDC_sm.h
-  * @brief state-manager for BLDC
+  * @file bldc_sm.h
+  * @brief state-manager for motor control
   * @author Neidermeier
   * @version
   * @date Nov-2020
@@ -18,7 +18,7 @@
 #endif
 
 /* macros --------------------------------------------------------------------*/
-#define PWM_BL_STOP  U8_MAX
+#define PWM_BL_STOP  U16_MAX
 
 
 /* types ---------------------------------------------------------------------*/
@@ -33,9 +33,9 @@
  */
 typedef enum
 {
-    BL_NOT_RUNNING,
-    BL_IS_RUNNING
-} 
+  BL_NOT_RUNNING,
+  BL_IS_RUNNING
+}
 BL_RUNSTATE_t;
 
 /**

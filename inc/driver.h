@@ -43,13 +43,15 @@ void Driver_Step(void);
 void Driver_Update(void);
 
 uint16_t Driver_Get_ADC(void);
-uint16_t Driver_Get_Back_EMF_Avg(void);
 
 void Driver_on_PWM_edge(void);
 void Driver_on_ADC_conv(void);
 
 void Driver_on_capture_rise(void);
 void Driver_on_capture_fall(void);
+
+void Driver_set_pulse_dur(uint16_t);
+uint16_t Driver_get_pulse_dur(void);
 
 uint16_t Driver_get_motor_spd_pcnt(void);
 uint16_t Driver_get_pulse_dur(void);

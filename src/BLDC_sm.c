@@ -23,7 +23,7 @@
 /*
  * precision is 1/TIM2_PWM_PD = 0.4% per count
  */
-#define PWM_PCNT_ARMING    10.0 // TBD
+#define PWM_PCNT_ARMING     8.5 // TBD
 #define PWM_PCNT_ALIGN     25.0
 #define PWM_PCNT_RAMPUP    14.0
 #define PWM_PCNT_STARTUP   12.0
@@ -263,15 +263,14 @@ uint8_t BL_get_opstate(void)
 /**
  * @brief closed loop control function
  * @param current_setpoint commutation period
- * @param enable_fault fault be enabled only on closed loop operation
- * @return controllable: TRUE, not controllable:FALSE)
+ * @return TRUE: within control limits, FALSE: not within control limits
  */
 bool BL_cl_control(uint16_t current_setpoint)
 {
   // returns true if plausible conditions for transition to closed-loop
   if ( TRUE == Seq_get_timing_error_p() )
   {
-#define ERROR_LIMIT 50
+    const uint8_t ERROR_LIMIT = 50;
     // needs to be small enough to be stable upon transition from to closed-loop
     const int16_t ERROR_MAX = ERROR_LIMIT;
     const int16_t ERROR_MIN = -(ERROR_LIMIT);
@@ -279,7 +278,7 @@ bool BL_cl_control(uint16_t current_setpoint)
 
     if ((timing_error > ERROR_MIN) && (timing_error < ERROR_MAX))
     {
-      static const uint8_t PROP_GAIN = 10; // inverse of kP
+      const uint8_t PROP_GAIN = 10; // inverse of kP
       int16_t correction = timing_error / PROP_GAIN ;
 
       BL_set_timing(current_setpoint + correction);
@@ -310,11 +309,11 @@ void BL_State_Ctrl(void)
 
     if( BL_ARMING == bl_opstate )
     {
+      const uint16_t ARMING_TIME_100 = 0x08FF;
       static uint16_t atimer = 0;
-
+// todo: tbd
       BL_set_timing( 0x0010 ); // set to some small value (sampling vBatt measurement)
 
-#define ARMING_TIME_100  0x08FF
 
       if (atimer < ARMING_TIME_100)
       {
@@ -396,8 +395,8 @@ void BL_State_Ctrl(void)
     else if( BL_CLS_LOOP == bl_opstate )
     {
 #define CL_FAULT_CNTR 2000
-      const static uint8_t FAULT_INCR = 20;
-      const static uint8_t FAULT_DECR = 1;
+      const uint8_t FAULT_INCR = 20;
+      const uint8_t FAULT_DECR = 1;
       static uint16_t fault_counter = CL_FAULT_CNTR;
 
       // controller returns false upon failed control step

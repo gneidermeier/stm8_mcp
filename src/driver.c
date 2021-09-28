@@ -146,6 +146,11 @@ uint16_t Driver_get_pulse_dur(void)
   return Pulse_dur;
 }
 
+void Driver_set_pulse_dur(uint16_t duration)
+{
+  Pulse_dur = duration;
+}
+
 /**
  * @brief Converts servo pulse width to servo position
  * @details 100% of servo throttle range resides in the portion of the servo
@@ -183,22 +188,6 @@ uint16_t Driver_get_motor_spd_pcnt(void)
   return motor_pcnt_speed;
 }
 
-#if 0 // BUFFER_ADC_BEMF
-/** @cond */
-/**
- * @brief Get Back-EMF buffer averaged.
- *
- * @details 4 samples are captured within a single commutation sector.
- *
- * @return  Calculated average of 4 samples stored in back-EMF frame buffer
- */
-uint16_t Driver_Get_Back_EMF_Avg(void)
-{
-  return phase_average;
-}
-/** @endcond */
-#endif
-
 /**
  * @brief Accessor for system voltage measurement.
  * @details Phase voltage measurement from ADC Channel 0 is to be used as
@@ -218,16 +207,16 @@ uint16_t Driver_Get_ADC(void)
 void Driver_Get_Rx_It(void)
 {
   static uint8_t rxPos = 0;
-    
-  #if defined( S105_DEV ) || defined( S105_DISCOVERY )
 
-    rxReceive[rxPos] = UART2_ReceiveData8();
+#if defined( S105_DEV ) || defined( S105_DISCOVERY )
 
-  #elif defined( S003_DEV )
+  rxReceive[rxPos] = UART2_ReceiveData8();
 
-    rxReceive[rxPos] = UART1_ReceiveData8();
+#elif defined( S003_DEV )
 
-  #endif
+  rxReceive[rxPos] = UART1_ReceiveData8();
+
+#endif
 
   rxPos++;
 
@@ -240,20 +229,20 @@ void Driver_Get_Rx_It(void)
 /**
  * @brief  Return Rx Buffer
  */
- 
+
 uint8_t Driver_Return_Rx_Buffer(void)
 {
   static uint8_t rxReadLoc = 0;
-  
+
   uint8_t tmp = rxReceive[rxReadLoc];
-    
+
   rxReadLoc += 1;
-    
+
   if (rxReadLoc > (RX_BUFFER_SIZE - 1))
   {
     rxReadLoc = 0;
   }
-    
+
   return tmp;
 }
 
@@ -263,17 +252,20 @@ uint8_t Driver_Return_Rx_Buffer(void)
 
 void Driver_Clear_Rx_Buffer_Element(uint8_t Location)
 {
-    rxReceive[Location] = 0;
+  rxReceive[Location] = 0;
 }
 
 /*
  * event handlers ********************************
  */
- 
+
 /**
  * @brief Call from timer/capture ISR on capture of rising edge of servo pulse
  *
 */
+/*
+ * need to save global/static of "raw" value so that can check for lost signal
+ */
 void Driver_on_capture_rise(void)
 {
 // 16-bit counter setup to wrap at 0xffff so no concern for sign of result
@@ -290,9 +282,6 @@ void Driver_on_capture_rise(void)
  */
 void Driver_on_capture_fall(void)
 {
-
-// noise on this signal when motor running?
-
   uint16_t t16 = get_pulse_end() - curr_pulse_start_tm /* get_pulse_start() */;
 
 // apply exponential filter (simple moving average) to smoothe the signal
@@ -355,7 +344,6 @@ void Driver_on_ADC_conv(void)
  *   System Timer period = fMaster * PS * 100%DC
  *                                   = (1/16 Mhz) * 8 * 250 counts -> 0.000125 S
  *
- *
  *    BL Control Timer frequency                            =
  *      timer period * ISR frame count * CT_FRAME       =
  *      0.000125 sec * 4 ISRs          * 2 timer events = 0.001 seconds (1000 Hz)
@@ -382,19 +370,15 @@ void Driver_Update(void)
     // refresh the timer with the updated commutation time period
     MCU_set_comm_timer( BL_get_timing() );
 
-#if 0
     /* Toggles LED to verify task timing */
-    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-#endif
+    //GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
   }
   else if (0 == (trate % UI_FRAME))
   {
     Periodic_Task_Wake();
 
-#if 0
     /* Toggles LED to verify task timing */
-    GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-#endif
+    // GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
   }
 }
 
@@ -434,10 +418,8 @@ void Driver_Step(void)
     break;
   }
 
-#if 0
   /* Toggles LED */
-  GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
-#endif
+  //GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 }
 
 /**@}*/ // defgroup

@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file temp.c
+  * @file pdu_manager.c
   * @brief
   * @author Shearer
   * @version
@@ -8,7 +8,7 @@
   ******************************************************************************
   */
 /**
- * \defgroup 
+ * \defgroup pdu_manager PDU Manager
  * @brief
  * @{
  */
@@ -45,13 +45,13 @@ static uint8_t data[MAX_RX_DATA_SIZE];
 static uint8_t Find_Frame(void)
 {
   uint8_t count;
-    
+
   for(count = 0; count < RX_BUFFER_SIZE; count++)
   {
     if(SOF == Driver_Return_Rx_Buffer())
     {
       return count;
-    }       
+    }
   }
   return NO_FRAME;
 }
@@ -68,20 +68,20 @@ static uint8_t Read_Data(void)
   uint8_t activeCheck;
   uint8_t size;
   uint8_t command;
-    
+
   size = Driver_Return_Rx_Buffer();
   command = Driver_Return_Rx_Buffer();
-    
+
   activeCheck = size + command;
-    
+
   for(i = 0; i < size; i++)
   {
     data[i] = Driver_Return_Rx_Buffer();
     activeCheck += data[i];
   }
-    
+
   receivedCheckSum = Driver_Return_Rx_Buffer();
-    
+
   return activeCheck;
 }
 
@@ -111,9 +111,9 @@ void Pdu_Manager_Handle_Rx(void)
 {
   uint8_t frameLocation;
   uint8_t checkSum;
-  
+
   frameLocation = Find_Frame();
-  
+
   if(NO_FRAME != frameLocation)
   {
     checkSum = Read_Data();
@@ -123,3 +123,4 @@ void Pdu_Manager_Handle_Rx(void)
     }
   }
 }
+/**@}*/ // defgroup

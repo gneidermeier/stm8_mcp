@@ -1,6 +1,6 @@
 # Commutation Timing Control {#ramp_ctrl}
 
-## Ramp Timing
+## Ramp Timing Control
 
 At each time-step of the state-machine, BLDC_OL_comm_tm decrements by
 BLDC_ONE_RAMP_UNIT. The slope would be expressed by the ratio RAMP_UNIT / EXEC_RATE
@@ -45,11 +45,13 @@ on a temp copy of the present timing value so that it can be tested for overshoo
 
 \enduml
 
-## Open Loop Timing
+## Open Loop Timing Control
 
-In open loop operation the commutation timing lookup table is a statically
-generated mapping of commutation period across the operating range of the duty-cycle
-at speed/dc greater than ramp.
+In OPEN_LOOP_CONTROL state, the motor speed is held at the speed it reached at the
+end of the ramp as it begins to sample the back-EMF signal and compute the 
+control error term. If the back-EMF value is plausible and the control error 
+remains within the pre-determined controllability range, the software state 
+transitions to CLOSED LOOP CONTROL.
 
 \startuml
 
@@ -72,6 +74,29 @@ at speed/dc greater than ramp.
     endif
     :timing_ramp_control( tgt_timing );
   endif
+  stop
+
+\enduml
+
+## Closed Loop Timing Control
+
+In CLOSED LOOP CONTROL, the proportional control algorithm is engaged: This is 
+implemented by multiplying the control error term by a constant of proportionality
+(kP) and summing the resultant control output to the present motor speed setpoint.
+
+\startuml
+  start
+
+  :error_term = (1 * scale_64) - (back_EMF_falling * scale_64 / back_EMF_rising);
+
+  if ((error_term > ERROR_MIN) && (timing_error < ERROR_MAX)) then
+      :correction = timing_error * PROP_GAIN;
+      :BL_set_timing(current_setpoint + correction);
+      :Controllable = TRUE;
+  else
+        :Controllable = FALSE;
+  endif
+  
   stop
 
 \enduml

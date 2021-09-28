@@ -12,7 +12,7 @@ Background Task.
 
 \startuml
 
-System Timer ISR -> Driver: Update()
+System_Timer_ISR -> Driver: Update()
 Driver ->  BL: Update()
 Driver -> Periodic Task: Task_set_ready()
 
@@ -28,7 +28,7 @@ to interrupt at at 15 degree intervals within a given 60-degree commutation sect
 
 \startuml
 
-Commutation Timer ISR -> Driver: Step()
+Commutation_Timer_ISR -> Driver: Step()
 Driver -> BL: Step()
 BL ->  Sequencer: Step()
 Sequencer-> PWM: Phase_control()
