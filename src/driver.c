@@ -21,9 +21,6 @@
 #include "driver.h"
 
 /* Private defines -----------------------------------------------------------*/
-
-//#define PH0_ADC_TBUF_SZ  8
-
 /*
  TODO: system voltage should be measured at startup
 */
@@ -39,52 +36,19 @@
     ( ADC_Global - DC_HALF_REF )
 
 /* Private types -----------------------------------------------------------*/
-
 /* Public variables  ---------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
 static uint16_t ADC_Global;
-
-// Accummulates a string of 10-bit ADC samples for averaging - could reduce
-// to 8 bits as possibly the 2 lsb's are not that significant anyway.
-//static uint16_t ph0_adc_fbuf[PH0_ADC_TBUF_SZ];
-//static uint8_t  ph0_adc_tbct;
-//static uint16_t phase_average;
-
 static uint16_t prev_pulse_start_tm;
 static uint16_t curr_pulse_start_tm;
-
 static uint16_t Pulse_perd;
 static uint16_t Pulse_dur;
 
 static uint8_t rxReceive[RX_BUFFER_SIZE];
 
 /* Private function prototypes -----------------------------------------------*/
-
 /* Private functions ---------------------------------------------------------*/
-
-#if 0 // BUFFER_ADC_BEMF
-/*
- * averag 8 samples .. could be inline or macro
- */
-static void udpate_phase_average(void)
-{
-  int n;
-// use midpoint  as initial condition which yields neutral control action
-  phase_average = MID_ADC;
-
-  for(n  = 0 ; n < PH0_ADC_TBUF_SZ; n++)
-  {
-    phase_average = (phase_average  + ph0_adc_fbuf[n]) >> 1;
-
-    ph0_adc_fbuf[n] = MID_ADC; // initialize each element to midpoint
-  }
-
-  ph0_adc_tbct = 0; // reset the sample index
-}
-#endif
-
 /* External functions ---------------------------------------------------------*/
 
 /** @cond */
@@ -303,13 +267,10 @@ void Driver_on_PWM_edge(void)
   /* Toggles LED to verify task timing */
 //  GPIO_WriteReverse(LED_GPIO_PORT, (GPIO_Pin_TypeDef)LED_GPIO_PIN);
 
-#if 0 // BUFFER_ADC_BEMF
-  ph0_adc_tbct += 1 ; // advance the buffer index
-#endif
-// Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
+  // Enable the ADC: 1 -> ADON for the first time it just wakes the ADC up
   ADC1_Cmd(ENABLE);
 
-// ADON = 1 for the 2nd time => starts the ADC conversion
+  // ADON = 1 for the 2nd time => starts the ADC conversion
   ADC1_StartConversion();
 }
 
@@ -322,14 +283,7 @@ void Driver_on_PWM_edge(void)
  */
 void Driver_on_ADC_conv(void)
 {
-  ADC_Global = ADC1_GetBufferValue( ADC1_CHANNEL_0 );
-
-#if 0 // BUFFER_ADC_BEMF
-  if (ph0_adc_tbct < PH0_ADC_TBUF_SZ)
-  {
-    ph0_adc_fbuf[ph0_adc_tbct] = ADC_Global ;
-  }
-#endif
+  ADC_Global = ADC1_GetBufferValue( PH0_BEMF_IN_CH );
 }
 
 /**
@@ -397,17 +351,14 @@ void Driver_Step(void)
   static const uint8_t Modulus = 4;
   static int index = 0;
 
-// Since the modulus being used (4) is a power of 2, then a bitwise & can be used
-// instead of a MOD (%) to save a few instructions, which is actually significant
-// as this is a very high frequency ISR!
+  // The modulus being used (4) is a power of 2, so a bitwise & can be used
+  // instead of a MOD (%) to save a few instructions, which is actually significant
+  // as this is a very high frequency ISR!
   index = (index + 1) & (Modulus - 1);
 
   switch(index)
   {
   case 0:
-#if 0 // BUFFER_ADC_BEMF
-    udpate_phase_average(); // average 8 samples from frame buffer
-#endif
     BL_Commutation_Step();
     break;
 

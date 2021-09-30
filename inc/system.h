@@ -34,6 +34,8 @@
 #endif
 
 
+//#define ENABLE_MAN_TIMING
+
 /**
  * the STM8 variant is defined in the project file, along with the appropriate 
  * compiler settings for the particular MCU (memory model etc.)
@@ -42,14 +44,10 @@
  */
 #if defined ( S105_DEV )
 
-//#define ENABLE_MAN_TIMING
-
-  #define ESTOP_BTN_IN_PORT  GPIOF
-  #define ESTOP_BTN_IN_PIN   GPIO_PIN_4
-
 // AIN0, B0
   #define PH0_BEMF_IN_PORT   GPIOB
   #define PH0_BEMF_IN_PIN    GPIO_PIN_0
+  #define PH0_BEMF_IN_CH     ADC1_CHANNEL_0
 
   #define LED_GPIO_PORT      GPIOE
   #define LED_GPIO_PIN       GPIO_PIN_5
@@ -69,12 +67,10 @@
  * drive the commutation step, leaving TIM1 unnused (TIM1 input capture/compare 
  * might be used capture servo signal from R/C radio or flight controller).
  */
-  #define ESTOP_BTN_IN_PORT  GPIOA
-  #define ESTOP_BTN_IN_PIN   GPIO_PIN_4
-
 // AIN0, B0
   #define PH0_BEMF_IN_PORT   GPIOB
   #define PH0_BEMF_IN_PIN    GPIO_PIN_0
+  #define PH0_BEMF_IN_CH     ADC1_CHANNEL_0
 
   #define LED_GPIO_PORT      GPIOD
   #define LED_GPIO_PIN       GPIO_PIN_0
@@ -92,23 +88,22 @@
  * s003 does not have TIM3. TIM2 drives PWM/control, TIM1 drives commutation step.
  * Not likely to use the 8k flash part, code barely or does not fit.
  */
-// C4 is ok so long as AIN3 is not needed
-  #define ESTOP_BTN_IN_PORT  GPIOD
-  #define ESTOP_BTN_IN_PIN   GPIO_PIN_2
-
-// AIN2, C4
-  #define PH0_BEMF_IN_PORT   GPIOC
-  #define PH0_BEMF_IN_PIN    GPIO_PIN_4 // B4 is not HS (TTL)
+// AIN3, D2
+  #define PH0_BEMF_IN_PORT   GPIOD
+  #define PH0_BEMF_IN_PIN    GPIO_PIN_2
+  #define PH0_BEMF_IN_CH     ADC1_CHANNEL_3
 
   #define LED_GPIO_PORT      GPIOB
   #define LED_GPIO_PIN       GPIO_PIN_5
 
-// invalid .. no timer avilable ?
+// TODO TIM1 CH3/4
   #define SERVO_GPIO_PORT    (GPIO_TypeDef *)(-1)
   #define SERVO_GPIO_PIN     (uint8_t)(-1)
 
-//  #define HAS_SERVO_INPUT // no timer available?
+//  #define HAS_SERVO_INPUT // TODO TIM1 CH3/4
+
 //  #define SPI_ENABLED     // can't fit SPI in 8k
+
 //  #define UNDERVOLTAGE_FAULT_ENABLED
 #endif
 
